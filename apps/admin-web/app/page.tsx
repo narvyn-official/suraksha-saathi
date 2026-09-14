@@ -1,0 +1,755 @@
+"use client";
+import { useEffect, useState, useCallback } from "react";
+import {
+  ShieldCheck,
+  Upload,
+  Flame,
+  Wind,
+  GraduationCap,
+  Users,
+  BadgeCheck,
+  LockKeyhole,
+  Download,
+  Search,
+  CheckCircle2,
+  FileCheck2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyMedia,
+} from "@/components/ui/empty";
+import { Skeleton } from "@/components/ui/skeleton";
+import QRCode from "qrcode";
+import { curriculum } from "@/lib/grading";
+type Row = { id: string; worker_name: string; worker_id: string; payload: any };
+type Credential = {
+  id: string;
+  attempt_id: string;
+  token: string;
+  issued_at: number;
+  revoked_at: number | null;
+  reason: string | null;
+};
+async function api(path: string, method = "GET", body?: unknown) {
+  const r = await fetch(`/api/${path}`, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const d: any = await r.json();
+  if (!r.ok) throw new Error(d.error || "Request failed");
+  return d;
+}
+const title = (id: string) =>
+  curriculum.modules.find((m) => m.id === id)?.title[0] ?? id;
+function download(name: string, content: string, type = "application/json") {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+export default function Home() {
+  const [tab, setTab] = useState("records");
+  const [records, setRecords] = useState<Row[]>([]),
+    [credentials, setCredentials] = useState<Credential[]>([]),
+    [loading, setLoading] = useState(true),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState(""),
+    [error, setError] = useState(""),
+    [filter, setFilter] = useState(""),
+    [selected, setSelected] = useState<Row | null>(null),
+    [active, setActive] = useState<Credential | null>(null),
+    [qr, setQr] = useState(""),
+    [token, setToken] = useState(""),
+    [verification, setVerification] = useState<any>(null),
+    [revoke, setRevoke] = useState<Credential | null>(null),
+    [reason, setReason] = useState("");
+  const load = useCallback(async () => {
+    const d = await api("records");
+    setRecords(d.attempts);
+    setCredentials(d.credentials);
+  }, []);
+  useEffect(() => {
+    load()
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [load]);
+  useEffect(() => {
+    let alive = true;
+    setQr("");
+    if (active)
+      QRCode.toDataURL(`SURAKSHA:CREDENTIAL:${active.token}`, {
+        width: 360,
+        margin: 4,
+        errorCorrectionLevel: "M",
+      })
+        .then((url) => {
+          if (alive) setQr(url);
+        })
+        .catch(() =>
+          setError(
+            "Could not draw credential QR. Download the credential text instead.",
+          ),
+        );
+    return () => {
+      alive = false;
+    };
+  }, [active]);
+  const verifyToken = useCallback(async (value: string) => {
+    setTab("verify");
+    setToken(value);
+    setVerification(null);
+    const result = await api("verify", "POST", { token: value });
+    setVerification(result);
+    return result;
+  }, []);
+  useEffect(() => {
+    const context = (document as any).modelContext;
+    if (!context?.registerTool) return;
+    const lifecycle = new AbortController();
+    Promise.resolve(
+      context.registerTool(
+        {
+          name: "verify_training_credential",
+          title: "Verify pilot training credential",
+          description:
+            "Verify a credential signature and current workspace status, updating the visible verification result. Does not issue a certificate.",
+          inputSchema: {
+            type: "object",
+            properties: { token: { type: "string", maxLength: 6000 } },
+            required: ["token"],
+            additionalProperties: false,
+          },
+          annotations: { readOnlyHint: true, untrustedContentHint: true },
+          execute: async (input: any) => {
+            if (typeof input?.token !== "string" || input.token.length > 6000)
+              throw new Error("Invalid credential text");
+            return verifyToken(input.token);
+          },
+        },
+        { signal: lifecycle.signal },
+      ),
+    ).catch(() => {});
+    return () => lifecycle.abort();
+  }, [verifyToken]);
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await fn();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function importFile(file: File | undefined) {
+    if (!file) return;
+    await run(async () => {
+      if (file.size > 1000000)
+        throw new Error("Choose a JSON export smaller than 1 MB.");
+      const result = await api("import", "POST", JSON.parse(await file.text()));
+      await load();
+      setMessage(
+        `${result.imported} attempt(s) imported. ${result.unchanged} already saved.`,
+      );
+    });
+  }
+  async function issue(row: Row) {
+    await run(async () => {
+      const result = await api("credentials", "POST", { attemptId: row.id });
+      await load();
+      setActive({ ...result, attempt_id: row.id, issued_at: Date.now() });
+      setSelected(null);
+      setMessage("Pilot simulation credential issued.");
+    });
+  }
+  const matches = records.filter((r) =>
+    `${r.worker_name} ${r.worker_id} ${title(r.payload.moduleId)}`
+      .toLowerCase()
+      .includes(filter.toLowerCase()),
+  );
+  const passed = records.filter(
+    (r) => r.payload.kind === "assessment" && r.payload.result.passed,
+  ).length;
+  return (
+    <>
+      <header className="topbar">
+        <div className="brand">
+          <span className="brand-icon">
+            <ShieldCheck />
+          </span>
+          <strong>Suraksha Saathi</strong>
+          <span className="brand-divider">Training centre</span>
+        </div>
+        <span className="privacy">
+          <LockKeyhole size={16} /> Trainer workspace
+        </span>
+      </header>
+      <main className="workspace">
+        <div className="page-heading">
+          <div>
+            <p className="eyebrow">WORKER SAFETY · JHARKHAND</p>
+            <h1>Training overview</h1>
+            <p className="muted">
+              Review learning records and verify pilot credentials.
+            </p>
+          </div>
+          <span className="pill">Pilot programme</span>
+        </div>
+        <div className="stats">
+          {[
+            {
+              icon: Users,
+              title: "Workers",
+              value: new Set(records.map((r) => r.worker_id)).size,
+              desc: "With imported training records",
+            },
+            {
+              icon: GraduationCap,
+              title: "Completed attempts",
+              value: records.length,
+              desc: `${passed} passed assessments`,
+            },
+            {
+              icon: BadgeCheck,
+              title: "Active pilot credentials",
+              value: credentials.filter((c) => !c.revoked_at).length,
+              desc: "Simulation learning only",
+            },
+          ].map((s) => (
+            <div className="stat" key={s.title}>
+              <div className="stat-label">
+                <span>{s.title}</span>
+                <s.icon size={21} />
+              </div>
+              {loading ? (
+                <Skeleton className="my-4 h-9 w-12" />
+              ) : (
+                <strong>{s.value}</strong>
+              )}
+              <p>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+        {error && (
+          <div role="alert" className="notice error">
+            {error}{" "}
+            {error.includes("Sign in") ? (
+              <a href="/signin-with-chatgpt?return_to=/">Sign in</a>
+            ) : (
+              <Button variant="outline" onClick={() => run(load)}>
+                Retry loading
+              </Button>
+            )}
+          </div>
+        )}
+        {message && (
+          <div role="status" className="notice success">
+            <CheckCircle2 size={19} />
+            {message}
+          </div>
+        )}
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList className="mb-6 h-12 bg-[#e9edf5]">
+            <TabsTrigger value="records" className="px-5">
+              Training records
+            </TabsTrigger>
+            <TabsTrigger value="credentials" className="px-5">
+              Credentials
+            </TabsTrigger>
+            <TabsTrigger value="curriculum" className="px-5">
+              Curriculum
+            </TabsTrigger>
+            <TabsTrigger value="verify" className="px-5">
+              Verify
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="records">
+            <div className="dashboard-grid">
+              <section className="panel records-panel">
+                <div className="section-heading">
+                  <h2>Learning records</h2>
+                  <span className="count">{records.length}</span>
+                </div>
+                {records.length > 0 && (
+                  <div className="search">
+                    <Search size={18} />
+                    <Input
+                      aria-label="Find worker or module"
+                      value={filter}
+                      onChange={(e) => setFilter(e.target.value)}
+                      placeholder="Find worker or module"
+                    />
+                  </div>
+                )}
+                {loading ? (
+                  <Skeleton className="h-48 w-full" />
+                ) : matches.length ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Worker / lesson</TableHead>
+                        <TableHead>Outcome</TableHead>
+                        <TableHead className="text-right">Review</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {matches.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell>
+                            <strong>
+                              {r.worker_name || "Unnamed learner"}
+                            </strong>
+                            <span className="table-sub">
+                              {title(r.payload.moduleId)}
+                            </span>
+                            <span className="table-meta">
+                              {r.payload.mode === "arcore"
+                                ? "Camera AR"
+                                : r.payload.mode === "hybrid"
+                                  ? "AR + screen"
+                                  : "On-screen"}{" "}
+                              ·{" "}
+                              {new Date(r.payload.endedAt).toLocaleDateString()}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={`badge ${r.payload.result.passed ? "good" : "review"}`}
+                            >
+                              {r.payload.kind === "practice"
+                                ? "Practice"
+                                : r.payload.result.passed
+                                  ? "Passed"
+                                  : "Needs practice"}
+                            </span>
+                            <span className="table-sub">
+                              {r.payload.result.score}% ·{" "}
+                              {r.payload.events.length}/8 decisions
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              onClick={() => setSelected(r)}
+                            >
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Empty className="min-h-72">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <GraduationCap />
+                      </EmptyMedia>
+                      <EmptyTitle>
+                        {filter
+                          ? "No matching records"
+                          : "Bring learning into view"}
+                      </EmptyTitle>
+                      <EmptyDescription>
+                        {filter
+                          ? "Try another worker name or lesson."
+                          : "Import a worker’s training file to review their decisions and assessment results."}
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                )}
+              </section>
+              <section className="panel import-panel">
+                <span className="feature-icon">
+                  <Upload />
+                </span>
+                <h2>Import offline training</h2>
+                <p>
+                  On the worker’s phone, open{" "}
+                  <strong>My record → Export records for trainer.</strong> Then
+                  choose that file here.
+                </p>
+                <label htmlFor="training-file" className="field-label">
+                  Training file (.json)
+                </label>
+                <Input
+                  id="training-file"
+                  type="file"
+                  accept="application/json,.json"
+                  disabled={busy}
+                  onChange={(e) => {
+                    void importFile(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                  className="h-12 bg-white"
+                />
+                <p className="fine">
+                  Results are recalculated from recorded answers. A critical
+                  unsafe decision cannot be averaged away.
+                </p>
+                <div className="import-note">
+                  <FileCheck2 size={20} />
+                  <span>
+                    Repeat imports are safe. Existing records are checked before
+                    saving.
+                  </span>
+                </div>
+              </section>
+            </div>
+          </TabsContent>
+          <TabsContent value="credentials">
+            <section className="panel">
+              <h2>Pilot credentials</h2>
+              {credentials.length ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Credential</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {credentials.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell>
+                          <strong>
+                            {records.find((r) => r.id === c.attempt_id)
+                              ?.worker_name || "Learner"}
+                          </strong>
+                          <span className="table-sub">
+                            {c.id.slice(0, 8)} ·{" "}
+                            {new Date(c.issued_at).toLocaleDateString()}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`badge ${c.revoked_at ? "review" : "good"}`}
+                          >
+                            {c.revoked_at ? "Revoked" : "Active pilot"}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Button variant="ghost" onClick={() => setActive(c)}>
+                            View QR
+                          </Button>
+                          {!c.revoked_at && (
+                            <Button
+                              variant="ghost"
+                              onClick={() => {
+                                setReason("");
+                                setRevoke(c);
+                              }}
+                            >
+                              Revoke
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <BadgeCheck />
+                    </EmptyMedia>
+                    <EmptyTitle>No credentials yet</EmptyTitle>
+                    <EmptyDescription>
+                      Review a passed assessment to issue a signed pilot
+                      simulation credential.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              )}
+            </section>
+          </TabsContent>
+          <TabsContent value="curriculum">
+            <div className="dashboard-grid">
+              {curriculum.modules.map((m, i) => (
+                <section className="panel" key={m.id}>
+                  <span className="feature-icon">
+                    {i === 0 ? <Flame /> : <Wind />}
+                  </span>
+                  <h2>{m.title[0]}</h2>
+                  <p>{m.subtitle[0]}</p>
+                  <ul className="objectives">
+                    {m.objectives.map((o) => (
+                      <li key={o[0]}>{o[0]}</li>
+                    ))}
+                  </ul>
+                  <span className="pill">
+                    8 decisions · English & Hindi draft
+                  </span>
+                </section>
+              ))}
+            </div>
+            <p className="scope">
+              Content v{curriculum.version} awaits a competent safety reviewer.
+              Santali awaits native review.
+            </p>
+          </TabsContent>
+          <TabsContent value="verify">
+            <section className="panel verify-panel">
+              <h2>Verify a pilot credential</h2>
+              <p>Paste the signed text from a Suraksha Saathi credential QR.</p>
+              <label htmlFor="credential" className="field-label">
+                Credential text
+              </label>
+              <Input
+                id="credential"
+                value={token}
+                onChange={(e) => {
+                  setToken(e.target.value);
+                  setVerification(null);
+                }}
+                placeholder="SURAKSHA:CREDENTIAL:…"
+              />
+              <Button
+                disabled={busy || !token.trim()}
+                className="mt-4"
+                onClick={() =>
+                  run(async () => {
+                    setVerification(null);
+                    await verifyToken(token);
+                  })
+                }
+              >
+                Verify credential
+              </Button>
+              {verification && (
+                <div
+                  className={`verification ${verification.status === "active" ? "success" : "error"}`}
+                  role="status"
+                >
+                  <h3>
+                    {verification.status === "active"
+                      ? "Signature verified · active pilot"
+                      : verification.status === "revoked"
+                        ? "Credential revoked"
+                        : "Signature verified · status unknown"}
+                  </h3>
+                  <p>
+                    {title(verification.moduleId)} · {verification.score}%
+                  </p>
+                  <p>
+                    {verification.reason ||
+                      verification.message ||
+                      "Current status checked in this workspace."}
+                  </p>
+                  <p>Practical observation: not assessed.</p>
+                </div>
+              )}
+            </section>
+          </TabsContent>
+        </Tabs>
+        <footer className="scope">
+          <ShieldCheck size={18} />
+          <span>
+            Pilot records describe simulation learning. Practical competence and
+            permission to work require separate assessment.
+          </span>
+        </footer>
+      </main>
+      <Dialog
+        open={!!selected}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Review assessment decisions</DialogTitle>
+            <DialogDescription>
+              {selected?.worker_name || "Learner"} ·{" "}
+              {title(selected?.payload.moduleId || "")}
+            </DialogDescription>
+          </DialogHeader>
+          {selected && (
+            <>
+              <div className="review-summary">
+                <strong>{selected.payload.result.score}%</strong>
+                <span>
+                  {selected.payload.kind === "practice"
+                    ? "Guided practice"
+                    : selected.payload.result.passed
+                      ? "Simulation passed"
+                      : "More practice needed"}
+                  <br />
+                  Practical observation: not assessed
+                </span>
+              </div>
+              {selected.payload.events.map((e: any, i: number) => {
+                const q = curriculum.modules
+                  .find((m) => m.id === selected.payload.moduleId)!
+                  .questions.find((q) => q.id === e.questionId)!;
+                const o = q.options.find((o) => o.id === e.optionId)!;
+                return (
+                  <div className="decision" key={e.questionId}>
+                    <h3>
+                      {i + 1}. {q.prompt[0]}
+                    </h3>
+                    <p className={o.correct ? "correct" : "incorrect"}>
+                      {o.correct ? "✓" : "!"} {o.text[0]}
+                    </p>
+                    <p>{q.explanation[0]}</p>
+                  </div>
+                );
+              })}
+              {selected.payload.kind === "assessment" &&
+                selected.payload.result.passed && (
+                  <>
+                    <p className="fine">
+                      Issue a pilot simulation credential. This does not certify
+                      identity, practical competence or statutory compliance.
+                    </p>
+                    <Button disabled={busy} onClick={() => issue(selected)}>
+                      Issue / view pilot credential
+                    </Button>
+                  </>
+                )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={!!active}
+        onOpenChange={(open) => {
+          if (!open) setActive(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {active?.revoked_at
+                ? "Revoked pilot credential"
+                : "Pilot simulation credential"}
+            </DialogTitle>
+            <DialogDescription>
+              Signed learning evidence · practical observation not assessed
+            </DialogDescription>
+          </DialogHeader>
+          {qr ? (
+            <img
+              className="credential-qr"
+              src={qr}
+              width={300}
+              height={300}
+              alt="Signed pilot credential QR"
+            />
+          ) : (
+            <Skeleton className="mx-auto h-64 w-64" />
+          )}
+          <p className="fine">
+            Scan with the Android app to verify the signature offline. Offline
+            verification cannot confirm revocation.
+          </p>
+          <Button
+            onClick={() =>
+              active &&
+              download(
+                `suraksha-credential-${active.id.slice(0, 8)}.txt`,
+                `SURAKSHA:CREDENTIAL:${active.token}`,
+                "text/plain",
+              )
+            }
+          >
+            <Download size={18} />
+            Download credential text
+          </Button>
+          {qr && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                const a = document.createElement("a");
+                a.href = qr;
+                a.download = "suraksha-pilot-qr.png";
+                a.click();
+              }}
+            >
+              Save QR image
+            </Button>
+          )}
+        </DialogContent>
+      </Dialog>
+      <AlertDialog
+        open={!!revoke}
+        onOpenChange={(open) => {
+          if (!open) setRevoke(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke this pilot credential?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The signed QR remains readable offline, but this dashboard will
+              show it as revoked. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <label htmlFor="reason" className="field-label">
+            Reason
+          </label>
+          <Input
+            id="reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            maxLength={500}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy || reason.trim().length < 5}
+              onClick={() =>
+                run(async () => {
+                  await api("credentials", "PATCH", { id: revoke!.id, reason });
+                  await load();
+                  setRevoke(null);
+                  setMessage("Credential revoked.");
+                })
+              }
+            >
+              Revoke credential
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}

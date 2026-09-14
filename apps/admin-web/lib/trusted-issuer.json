@@ -1,0 +1,12 @@
+{
+  "issuer": "suraksha-pilot",
+  "kid": "fed854b05028c2ed",
+  "spki": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfsFsMXB18HQXJu5whw2gPTT397L+BQtaIEmRVp7juAsX7Yp8g6NxvpEJxP2g/fzEfPT6jGZOjygixb8UtIU6vw==",
+  "jwk": {
+    "kty": "EC",
+    "x": "fsFsMXB18HQXJu5whw2gPTT397L-BQtaIEmRVp7juAs",
+    "y": "F-2KfIOjcb6RCcT9oP38xHz0-oxmTo8oIsW_FLSFOr8",
+    "crv": "P-256"
+  },
+  "scope": "pilot-simulation"
+}

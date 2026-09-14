@@ -1,0 +1,572 @@
+{
+  "schemaVersion": 1,
+  "version": "0.1.0",
+  "reviewStatus": "pilot-draft",
+  "languages": {
+    "en": "available",
+    "hi": "available",
+    "sat-Olck": "native-review-required"
+  },
+  "modules": [
+    {
+      "id": "fire",
+      "title": ["Fire safety", "आग से सुरक्षा"],
+      "subtitle": [
+        "Recognise danger. Choose a safe response.",
+        "खतरा पहचानें। सुरक्षित कदम चुनें।"
+      ],
+      "duration": "8–12",
+      "icon": "fire",
+      "colour": "#3157D5",
+      "objectives": [
+        [
+          "Raise the alarm and decide when to withdraw.",
+          "अलार्म बजाएँ और समझें कि कब पीछे हटना है।"
+        ],
+        [
+          "Recognise extinguisher actions and a safe escape route.",
+          "अग्निशामक के उपयोग के चरण और सुरक्षित निकास पहचानें।"
+        ],
+        [
+          "Reach the assembly point and report missing people.",
+          "एकत्र होने की जगह पहुँचें और लापता लोगों की जानकारी दें।"
+        ]
+      ],
+      "lessons": [
+        {
+          "title": ["Your first action", "आपका पहला कदम"],
+          "body": [
+            "Raise the alarm when you recognise a fire. Follow the site's emergency plan. If smoke is growing, an escape route is threatened, or you are not trained and authorised, withdraw and notify the responsible person.",
+            "आग पहचानते ही अलार्म बजाएँ। कार्यस्थल की आपात योजना का पालन करें। धुआँ बढ़ रहा हो, निकास पर खतरा हो, या आप प्रशिक्षित और अधिकृत न हों, तो पीछे हटें और ज़िम्मेदार व्यक्ति को बताएँ।"
+          ]
+        },
+        {
+          "title": [
+            "Know when equipment is appropriate",
+            "उपकरण का सही उपयोग समझें"
+          ],
+          "body": [
+            "Only trained, authorised people should attempt an incipient-fire response under the site procedure. Read the extinguisher label. Do not use a water extinguisher on energised electrical equipment. A growing fire or explosion risk calls for withdrawal.",
+            "केवल प्रशिक्षित और अधिकृत व्यक्ति ही कार्यस्थल की प्रक्रिया के अनुसार छोटी शुरुआती आग पर कार्रवाई करें। अग्निशामक का लेबल पढ़ें। बिजली चालू होने पर विद्युत उपकरण पर पानी वाला अग्निशामक न चलाएँ। आग बढ़ने या विस्फोट का खतरा होने पर पीछे हटें।"
+          ]
+        },
+        {
+          "title": ["Rehearse the sequence", "चरणों का अभ्यास करें"],
+          "body": [
+            "For a suitable extinguisher and authorised scenario: pull the pin, aim at the base, squeeze the handle, and sweep across the base. Keep an escape route available and withdraw if conditions worsen. Screen practice does not replace supervised hands-on training.",
+            "उपयुक्त अग्निशामक और अधिकृत परिस्थिति में: पिन निकालें, आग के आधार पर निशाना लगाएँ, हैंडल दबाएँ और आधार पर दाएँ-बाएँ चलाएँ। निकास खुला रखें और हालात बिगड़ने पर पीछे हटें। स्क्रीन पर अभ्यास, प्रशिक्षक के साथ वास्तविक अभ्यास का विकल्प नहीं है।"
+          ]
+        },
+        {
+          "title": [
+            "Leave and account for people",
+            "बाहर जाएँ और लोगों की जानकारी दें"
+          ],
+          "body": [
+            "Use the designated unblocked exit. Go to the assembly point, report your arrival and tell the responsible person if someone is missing. Do not return for belongings or enter again to search.",
+            "निर्धारित खुले निकास का उपयोग करें। एकत्र होने की जगह जाएँ, पहुँचने की जानकारी दें और किसी के लापता होने पर ज़िम्मेदार व्यक्ति को बताएँ। सामान लेने या खोजने के लिए वापस न जाएँ।"
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "id": "fire-alarm",
+          "critical": true,
+          "scene": "alarm",
+          "prompt": [
+            "Smoke is growing near a conveyor. What do you do first?",
+            "कन्वेयर के पास धुआँ बढ़ रहा है। पहले क्या करेंगे?"
+          ],
+          "explanation": [
+            "Raise the alarm and withdraw from escalating conditions.",
+            "अलार्म बजाएँ और बढ़ते खतरे से दूर जाएँ।"
+          ],
+          "options": [
+            {
+              "id": "notify",
+              "text": [
+                "Raise the alarm and withdraw",
+                "अलार्म बजाएँ और पीछे हटें"
+              ],
+              "correct": true
+            },
+            {
+              "id": "inspect",
+              "text": ["Move closer to inspect", "पास जाकर जाँच करें"]
+            },
+            {
+              "id": "belongings",
+              "text": ["Collect your belongings first", "पहले अपना सामान लें"]
+            }
+          ]
+        },
+        {
+          "id": "fire-role",
+          "critical": true,
+          "scene": "alarm",
+          "prompt": [
+            "You have not been authorised to fight fires. What is your role?",
+            "आपको आग बुझाने की अनुमति नहीं है। आपकी भूमिका क्या है?"
+          ],
+          "explanation": [
+            "Alert others and evacuate according to the site plan.",
+            "दूसरों को सचेत करें और कार्यस्थल की योजना के अनुसार बाहर जाएँ।"
+          ],
+          "options": [
+            {
+              "id": "evacuate",
+              "text": [
+                "Alert others and evacuate",
+                "दूसरों को सचेत करें और बाहर जाएँ"
+              ],
+              "correct": true
+            },
+            {
+              "id": "fight",
+              "text": ["Try the extinguisher anyway", "फिर भी अग्निशामक चलाएँ"]
+            }
+          ]
+        },
+        {
+          "id": "fire-equipment",
+          "critical": true,
+          "scene": "equipment",
+          "prompt": [
+            "The equipment is still electrically energised. Which choice is unsafe?",
+            "उपकरण में अभी बिजली चालू है। कौन-सा विकल्प असुरक्षित है?"
+          ],
+          "explanation": [
+            "Water can conduct electricity. Equipment choice must follow the approved procedure.",
+            "पानी बिजली का प्रवाह कर सकता है। उपकरण का चुनाव अनुमोदित प्रक्रिया के अनुसार करें।"
+          ],
+          "options": [
+            {
+              "id": "water",
+              "text": [
+                "Using a water extinguisher",
+                "पानी वाला अग्निशामक चलाना"
+              ],
+              "correct": true
+            },
+            {
+              "id": "withdraw",
+              "text": [
+                "Withdrawing and notifying the responsible person",
+                "पीछे हटना और ज़िम्मेदार व्यक्ति को बताना"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fire-pin",
+          "critical": false,
+          "scene": "equipment",
+          "prompt": [
+            "In an authorised extinguisher exercise, what comes before aiming?",
+            "अधिकृत अग्निशामक अभ्यास में निशाना लगाने से पहले क्या करेंगे?"
+          ],
+          "explanation": [
+            "Pull the pin first in the reviewed pull–aim–squeeze–sweep sequence.",
+            "पिन निकालें, निशाना लगाएँ, दबाएँ, दाएँ-बाएँ चलाएँ — इस क्रम में पहले पिन निकालें।"
+          ],
+          "options": [
+            {
+              "id": "pin",
+              "text": ["Pull the pin", "पिन निकालें"],
+              "correct": true
+            },
+            {
+              "id": "squeeze",
+              "text": ["Squeeze immediately", "तुरंत हैंडल दबाएँ"]
+            },
+            {
+              "id": "turn",
+              "text": ["Turn away from the fire", "आग से मुँह मोड़ लें"]
+            }
+          ]
+        },
+        {
+          "id": "fire-aim",
+          "critical": false,
+          "scene": "equipment",
+          "prompt": [
+            "Where do you aim in the approved training exercise?",
+            "अनुमोदित अभ्यास में कहाँ निशाना लगाएँगे?"
+          ],
+          "explanation": [
+            "Aim at the base, then squeeze and sweep, while keeping your escape route clear.",
+            "आधार पर निशाना लगाएँ, फिर दबाएँ और दाएँ-बाएँ चलाएँ। निकास खुला रखें।"
+          ],
+          "options": [
+            {
+              "id": "base",
+              "text": ["At the base of the fire", "आग के आधार पर"],
+              "correct": true
+            },
+            {
+              "id": "smoke",
+              "text": ["At the smoke above it", "ऊपर के धुएँ पर"]
+            }
+          ]
+        },
+        {
+          "id": "fire-escalation",
+          "critical": true,
+          "scene": "exits",
+          "prompt": [
+            "The fire is spreading during the exercise. What should happen?",
+            "अभ्यास में आग फैल रही है। अब क्या करना चाहिए?"
+          ],
+          "explanation": [
+            "Stop the response and withdraw when conditions worsen.",
+            "स्थिति बिगड़ने पर कार्रवाई रोकें और पीछे हटें।"
+          ],
+          "options": [
+            {
+              "id": "retreat",
+              "text": ["Stop and withdraw", "रोकें और पीछे हटें"],
+              "correct": true
+            },
+            {
+              "id": "continue",
+              "text": [
+                "Keep trying until the extinguisher is empty",
+                "अग्निशामक खाली होने तक प्रयास करते रहें"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fire-exit",
+          "critical": true,
+          "scene": "exits",
+          "prompt": [
+            "Exit A is blocked by smoke. Exit B is the designated clear route. Choose your exit.",
+            "निकास A पर धुआँ है। निकास B निर्धारित खुला रास्ता है। निकास चुनें।"
+          ],
+          "explanation": [
+            "Use the designated unblocked route, even when another route is shorter.",
+            "निर्धारित खुले मार्ग का उपयोग करें, चाहे दूसरा रास्ता छोटा हो।"
+          ],
+          "options": [
+            {
+              "id": "exit-b",
+              "text": ["Exit B — clear route", "निकास B — खुला रास्ता"],
+              "correct": true
+            },
+            {
+              "id": "exit-a",
+              "text": ["Exit A — shorter route", "निकास A — छोटा रास्ता"]
+            }
+          ]
+        },
+        {
+          "id": "fire-account",
+          "critical": true,
+          "scene": "assembly",
+          "prompt": [
+            "At the assembly point you notice a missing colleague. What do you do?",
+            "एकत्र होने की जगह पर एक साथी नहीं मिला। आप क्या करेंगे?"
+          ],
+          "explanation": [
+            "Tell the responsible person. Do not re-enter the danger area.",
+            "ज़िम्मेदार व्यक्ति को बताएँ। खतरे वाले क्षेत्र में वापस न जाएँ।"
+          ],
+          "options": [
+            {
+              "id": "report",
+              "text": [
+                "Report the missing person and remain outside",
+                "लापता व्यक्ति की जानकारी दें और बाहर रहें"
+              ],
+              "correct": true
+            },
+            {
+              "id": "rescue",
+              "text": ["Go back to search", "ढूँढने के लिए वापस जाएँ"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gas",
+      "title": ["Gas & confined spaces", "गैस और सीमित स्थान"],
+      "subtitle": [
+        "Know when entry must be refused.",
+        "जानें कि प्रवेश कब मना करना चाहिए।"
+      ],
+      "duration": "10–12",
+      "icon": "gas",
+      "colour": "#07646C",
+      "objectives": [
+        [
+          "Recognise a confined-space boundary and uncertain gas readings.",
+          "सीमित स्थान की सीमा और अनिश्चित गैस रीडिंग पहचानें।"
+        ],
+        [
+          "Check permits, isolation, PPE, attendant and rescue arrangements.",
+          "अनुमति, अलगाव, सुरक्षा उपकरण, निगरानी और बचाव की व्यवस्था जाँचें।"
+        ],
+        [
+          "Refuse unsafe entry and avoid unplanned rescue.",
+          "असुरक्षित प्रवेश से मना करें और बिना योजना बचाव के लिए न जाएँ।"
+        ]
+      ],
+      "lessons": [
+        {
+          "title": [
+            "Unknown does not mean safe",
+            "अज्ञात का अर्थ सुरक्षित नहीं"
+          ],
+          "body": [
+            "A confined space may contain a dangerous atmosphere or other serious hazards. A phone camera cannot measure gas. Readings in this lesson are simulated. Unknown or unverified instrument status must never be treated as clearance to enter.",
+            "सीमित स्थान में खतरनाक वातावरण या अन्य गंभीर खतरे हो सकते हैं। फ़ोन का कैमरा गैस नहीं मापता। इस पाठ की रीडिंग काल्पनिक है। अज्ञात या बिना जाँच वाले उपकरण की स्थिति को प्रवेश की अनुमति न मानें।"
+          ]
+        },
+        {
+          "title": ["Check every prerequisite", "हर शर्त जाँचें"],
+          "body": [
+            "Entry requires the applicable site permit, isolation, authorised atmospheric assessment, ventilation where required, communication and viable rescue arrangements. The exact controls must come from the reviewed site procedure. A permit alone is not sufficient.",
+            "प्रवेश के लिए कार्यस्थल का लागू अनुमति पत्र, अलगाव, अधिकृत वातावरण जाँच, आवश्यक वेंटिलेशन, संचार और बचाव की व्यवस्था चाहिए। सही नियंत्रण कार्यस्थल की जाँची गई प्रक्रिया से तय हों। केवल अनुमति पत्र काफ़ी नहीं है।"
+          ]
+        },
+        {
+          "title": ["People and protective equipment", "लोग और सुरक्षा उपकरण"],
+          "body": [
+            "The attendant stays outside with reliable communication. Sending both buddies inside removes that protection. PPE must suit the identified hazard and authorised role. A dust mask does not protect against oxygen deficiency or an unknown toxic atmosphere.",
+            "निगरानी करने वाला व्यक्ति भरोसेमंद संचार के साथ बाहर रहता है। दोनों साथियों को अंदर भेजने से यह सुरक्षा हट जाती है। सुरक्षा उपकरण पहचाने गए खतरे और अधिकृत भूमिका के अनुरूप हों। धूल वाला मास्क ऑक्सीजन की कमी या अज्ञात जहरीले वातावरण से नहीं बचाता।"
+          ]
+        },
+        {
+          "title": ["Alarms and rescue", "अलार्म और बचाव"],
+          "body": [
+            "Withdraw on the simulated alarm according to the site procedure. If a colleague becomes unresponsive, raise the alarm and summon trained rescue. Do not rush in: unplanned entry can create another casualty.",
+            "काल्पनिक अलार्म बजने पर कार्यस्थल की प्रक्रिया के अनुसार बाहर आएँ। साथी बेहोश हो तो अलार्म बजाएँ और प्रशिक्षित बचाव दल बुलाएँ। जल्दबाज़ी में अंदर न जाएँ: बिना योजना प्रवेश से एक और व्यक्ति घायल हो सकता है।"
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "id": "gas-boundary",
+          "critical": true,
+          "scene": "boundary",
+          "prompt": [
+            "You reach a marked confined-space boundary. What comes before crossing it?",
+            "आप सीमित स्थान की चिह्नित सीमा पर हैं। पार करने से पहले क्या ज़रूरी है?"
+          ],
+          "explanation": [
+            "Stay outside until every required entry condition is satisfied.",
+            "प्रवेश की सभी शर्तें पूरी होने तक बाहर रहें।"
+          ],
+          "options": [
+            {
+              "id": "check",
+              "text": [
+                "Check all authorised entry conditions",
+                "प्रवेश की सभी अधिकृत शर्तें जाँचें"
+              ],
+              "correct": true
+            },
+            {
+              "id": "quick",
+              "text": ["Take a quick look inside", "जल्दी से अंदर देख लें"]
+            }
+          ]
+        },
+        {
+          "id": "gas-meter",
+          "critical": true,
+          "scene": "meter",
+          "prompt": [
+            "The gas instrument is unverified. May you enter?",
+            "गैस उपकरण की जाँच नहीं हुई है। क्या प्रवेश करेंगे?"
+          ],
+          "explanation": [
+            "An unverified reading cannot establish a safe atmosphere.",
+            "बिना जाँच की रीडिंग वातावरण को सुरक्षित नहीं साबित करती।"
+          ],
+          "options": [
+            {
+              "id": "wait",
+              "text": [
+                "Stay outside and request authorised testing",
+                "बाहर रहें और अधिकृत जाँच करवाएँ"
+              ],
+              "correct": true
+            },
+            {
+              "id": "smell",
+              "text": [
+                "Enter if there is no unusual smell",
+                "अजीब गंध न हो तो प्रवेश करें"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gas-permit",
+          "critical": true,
+          "scene": "permit",
+          "prompt": [
+            "A reading looks normal, but the required permit is missing.",
+            "रीडिंग सामान्य लगती है, लेकिन ज़रूरी अनुमति पत्र नहीं है।"
+          ],
+          "explanation": [
+            "A reading does not replace the required permit and controls.",
+            "रीडिंग ज़रूरी अनुमति और नियंत्रण का विकल्प नहीं है।"
+          ],
+          "options": [
+            {
+              "id": "refuse",
+              "text": ["Do not enter", "प्रवेश न करें"],
+              "correct": true
+            },
+            {
+              "id": "enter",
+              "text": [
+                "Enter because the reading looks normal",
+                "रीडिंग सामान्य है, इसलिए प्रवेश करें"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gas-ppe",
+          "critical": true,
+          "scene": "ppe",
+          "prompt": [
+            "Can a dust mask make an oxygen-deficient atmosphere safe to enter?",
+            "क्या धूल वाला मास्क ऑक्सीजन की कमी वाले वातावरण में प्रवेश सुरक्षित करता है?"
+          ],
+          "explanation": [
+            "A dust mask does not supply oxygen. Do not enter.",
+            "धूल वाला मास्क ऑक्सीजन नहीं देता। प्रवेश न करें।"
+          ],
+          "options": [
+            {
+              "id": "no",
+              "text": ["No — refuse entry", "नहीं — प्रवेश से मना करें"],
+              "correct": true
+            },
+            {
+              "id": "yes",
+              "text": ["Yes, for a short time", "हाँ, थोड़ी देर के लिए"]
+            }
+          ]
+        },
+        {
+          "id": "gas-attendant",
+          "critical": true,
+          "scene": "buddy",
+          "prompt": [
+            "Where must the attendant remain?",
+            "निगरानी करने वाला कहाँ रहे?"
+          ],
+          "explanation": [
+            "The attendant stays outside with reliable communication.",
+            "निगरानी करने वाला भरोसेमंद संचार के साथ बाहर रहता है।"
+          ],
+          "options": [
+            {
+              "id": "outside",
+              "text": [
+                "Outside, maintaining communication",
+                "बाहर, संचार बनाए रखते हुए"
+              ],
+              "correct": true
+            },
+            {
+              "id": "inside",
+              "text": [
+                "Inside with the entrant",
+                "प्रवेश करने वाले के साथ अंदर"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "gas-controls",
+          "critical": false,
+          "scene": "permit",
+          "prompt": [
+            "Which arrangement is still needed when a permit has been issued?",
+            "अनुमति जारी होने पर भी कौन-सी व्यवस्था ज़रूरी है?"
+          ],
+          "explanation": [
+            "A permit is one part of the system; isolation, communication and rescue controls still apply.",
+            "अनुमति व्यवस्था का एक हिस्सा है; अलगाव, संचार और बचाव के नियंत्रण फिर भी लागू हैं।"
+          ],
+          "options": [
+            {
+              "id": "controls",
+              "text": [
+                "All required isolation, communication and rescue controls",
+                "ज़रूरी अलगाव, संचार और बचाव के सभी नियंत्रण"
+              ],
+              "correct": true
+            },
+            {
+              "id": "none",
+              "text": ["Nothing else is needed", "और कुछ नहीं चाहिए"]
+            }
+          ]
+        },
+        {
+          "id": "gas-alarm",
+          "critical": true,
+          "scene": "meter",
+          "prompt": [
+            "The simulated gas alarm activates. What should you do?",
+            "काल्पनिक गैस अलार्म बजता है। क्या करेंगे?"
+          ],
+          "explanation": [
+            "Withdraw and notify according to the site procedure.",
+            "कार्यस्थल की प्रक्रिया के अनुसार बाहर जाएँ और जानकारी दें।"
+          ],
+          "options": [
+            {
+              "id": "leave",
+              "text": ["Withdraw and notify", "बाहर जाएँ और जानकारी दें"],
+              "correct": true
+            },
+            {
+              "id": "finish",
+              "text": ["Finish the job first", "पहले काम पूरा करें"]
+            }
+          ]
+        },
+        {
+          "id": "gas-rescue",
+          "critical": true,
+          "scene": "rescue",
+          "prompt": [
+            "A colleague inside becomes unresponsive. Choose your response.",
+            "अंदर एक साथी बेहोश हो जाता है। अपना कदम चुनें।"
+          ],
+          "explanation": [
+            "Raise the alarm and summon trained rescue; do not make an unplanned entry.",
+            "अलार्म बजाएँ और प्रशिक्षित बचाव दल बुलाएँ; बिना योजना अंदर न जाएँ।"
+          ],
+          "options": [
+            {
+              "id": "call",
+              "text": [
+                "Raise the alarm and call trained rescue",
+                "अलार्म बजाएँ और प्रशिक्षित बचाव दल बुलाएँ"
+              ],
+              "correct": true
+            },
+            {
+              "id": "rush",
+              "text": [
+                "Rush inside to pull them out",
+                "निकालने के लिए तुरंत अंदर जाएँ"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
