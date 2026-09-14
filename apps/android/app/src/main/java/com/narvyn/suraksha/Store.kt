@@ -8,7 +8,7 @@ import org.json.JSONObject
 import org.json.JSONArray
 import java.util.UUID
 
-class Store(context: Context): SQLiteOpenHelper(context,"suraksha.db",null,2) {
+class Store(context: Context, databaseName: String = "suraksha.db"): SQLiteOpenHelper(context,databaseName,null,3) {
     val prefs = context.getSharedPreferences("preferences", Context.MODE_PRIVATE)
     val workerId: String get() = prefs.getString("workerId", null) ?: UUID.randomUUID().toString().also { prefs.edit().putString("workerId",it).commit() }
     var name: String get() = prefs.getString("name", "") ?: ""; set(value) { prefs.edit().putString("name", value).commit() }
@@ -18,9 +18,13 @@ class Store(context: Context): SQLiteOpenHelper(context,"suraksha.db",null,2) {
         db.execSQL("CREATE TABLE attempts(id TEXT PRIMARY KEY, payload TEXT NOT NULL, updated_at INTEGER NOT NULL)")
         db.execSQL("CREATE TABLE credentials(id TEXT PRIMARY KEY, payload TEXT NOT NULL)")
         createRecallTable(db)
+        createComponentTable(db)
     }
     private fun createRecallTable(db:SQLiteDatabase){db.execSQL("CREATE TABLE recalls(id TEXT PRIMARY KEY, payload TEXT NOT NULL)")}
-    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { if(oldVersion<2)createRecallTable(db) }
+    private fun createComponentTable(db: SQLiteDatabase) { db.execSQL("CREATE TABLE component_learning(id TEXT PRIMARY KEY, payload TEXT NOT NULL)") }
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) { if(oldVersion<2)createRecallTable(db); if(oldVersion<3)createComponentTable(db) }
+    fun componentRecords(): Map<String, JSONObject> = readableDatabase.rawQuery("SELECT id,payload FROM component_learning",null).use { c -> buildMap { while(c.moveToNext())put(c.getString(0),JSONObject(c.getString(1))) } }
+    fun saveComponent(record: JSONObject) { check(writableDatabase.insertWithOnConflict("component_learning",null,ContentValues().apply { put("id",record.getString("module")); put("payload",record.toString()) },SQLiteDatabase.CONFLICT_REPLACE)!=-1L) }
     fun recalls():Map<String,JSONObject> = readableDatabase.rawQuery("SELECT id,payload FROM recalls",null).use{c->buildMap{while(c.moveToNext())put(c.getString(0),JSONObject(c.getString(1)))}}
     fun saveRecall(record:JSONObject){check(writableDatabase.insertWithOnConflict("recalls",null,ContentValues().apply{put("id",record.getString("key"));put("payload",record.toString())},SQLiteDatabase.CONFLICT_REPLACE)!=-1L)}
     fun save(session: TrainingSession) {

@@ -1,20 +1,20 @@
 # Suraksha Saathi — continuous development roadmap
 
-Updated 14 September 2026. The user has authorized ongoing autonomous development and useful feature additions. Preserve the refined light theme and focus on workers using mid-range Android 10+ phones in Jharkhand. This document is the durable handoff between recurring development runs. Update it after each meaningful increment.
+Updated 15 September 2026. The user has authorized ongoing autonomous development and useful feature additions. Preserve the refined light theme and focus on workers using mid-range Android 10+ phones in Jharkhand. This document is the durable handoff between recurring development runs. Update it after each meaningful increment.
 
 ## Baseline
 
 Public repository: https://github.com/narvyn-official/suraksha-saathi
 
-Current tested milestone: v0.3.0-pilot (source identified by the release tag). Four modules (fire, gas/confined spaces, machinery/isolation, PPE/exposure), 32 decisions, English/Hindi pilot text, native offline SQLite progress, ARCore anchors, detailed original 3D equipment with material lighting, local spaced retrieval review, signed pilot credentials, and persistent trainer analytics are implemented. See build-status.md, validation.md and reference-benchmark.md for evidence and limitations. The local dashboard is http://localhost:5173/ when its development server is running.
+Current tested milestone: v0.3.1-pilot (source identified by the release tag). Four modules (fire, gas/confined spaces, machinery/isolation, PPE/exposure), 32 decisions, English/Hindi pilot text, native offline SQLite progress, ARCore anchors, detailed original 3D equipment with material lighting, local spaced retrieval review, staged component recognition, signed pilot credentials, and persistent trainer analytics are implemented. See build-status.md, validation.md and reference-benchmark.md for evidence and limitations. The local dashboard is http://localhost:5173/ when its development server is running.
 
 ## First work to pick up
 
-Current user steering prioritizes realistic equipment and evidence-informed learning. The v0.3 milestone adds the fourth PPE/exposure domain, detailed equipment renderer and local spaced-review loop. Next implement staged component inspection: guided labels, independent component selection, explanation and an orientation change. Link this to the existing review schedule without changing certification evidence. See ar-learning-evidence.md and spaced-review.md for research and boundaries.
+Current user steering prioritizes realistic equipment and evidence-informed learning. The v0.3.1 milestone adds camera-free staged component recognition: 12 visible parts, examples, hidden labels, two orientations, hints, text alternatives and an integrated local review queue. Due reviews start without examples; early clean repetition cannot postpone the due date. Assistance and mixed-mode exposure remain attributable. See component-practice.md, ar-learning-evidence.md and spaced-review.md for implemented scope and boundaries.
 
 Continue realism through approved reference geometry, clearer component silhouettes and grounded contact/shadow cues. Investigate a maintainable authored asset pipeline before promising photorealism. Current models remain original procedural illustrations; real phone frame-time, lighting and tracking measurements are external validation gates.
 
-Then implement the fifth proposed domain: emergency reporting, evacuation and safe response around an injured coworker. Keep guidance appropriate to untrained workers; do not teach hazardous rescue or substitute for practical first-aid instruction. The original brief ended at “(3) Machinery”; the fourth/fifth domains are product proposals under the user’s design freedom, not claims about an unseen official brief.
+**Next implement the fifth proposed domain:** emergency reporting, evacuation and safe response around an injured coworker. Keep guidance appropriate to untrained workers; do not teach hazardous rescue or substitute for practical first-aid instruction. The original brief ended at “(3) Machinery”; the fourth/fifth domains are product proposals under the user’s design freedom, not claims about an unseen official brief.
 
 ## Prioritized backlog
 
@@ -71,3 +71,5 @@ Choose a smaller higher-value fix ahead of this order when a reproducible defect
 - 2026-09-14: Enabled recurring continuation in this task and established this roadmap. Baseline v0.2 remains the latest released application. Next implementation: integrated PPE/exposure domain.
 
 - 2026-09-14: Completed v0.3 implementation and validation: PPE brings coverage to four domains/32 decisions; detailed geometry and material lighting work in the shared viewer/AR renderer; offline spaced review persists separately from assessment evidence. Twelve JVM, six web and seven emulator tests passed, with web build/API checks and visual equipment review. Added primary-source learning research and a practical-transfer study plan. Next: staged component identification with fading guidance and changed orientation.
+
+- 2026-09-15: Completed the initial staged component-recognition flow, database version 3 migration and English/Hindi alternatives. Review fixed answer-position predictability, hint attribution, mixed-mode attribution and early-repeat spacing inflation. Later review rounds begin without examples. All 21 JVM tests and the combined 10-test emulator suite passed; actual rendered-buffer checks cover recreation. Fresh views were inspected and an emulator demo captured. This feature is camera-free and keeps assessment/credential evidence unchanged. Next: fifth emergency/reporting domain with primary-source content and explicit competent-review gates; then extend reviewed component interactions to the AR camera path with recovery checks.

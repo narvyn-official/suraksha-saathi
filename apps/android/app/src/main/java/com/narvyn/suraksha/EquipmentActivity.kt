@@ -52,6 +52,7 @@ class EquipmentActivity:Activity(){
    }
    AlertDialog.Builder(this).setTitle(t("Inspect the illustration","चित्र के पुर्ज़े जानें")).setItems(parts.map{it.first}.toTypedArray()){_,which->AlertDialog.Builder(this).setTitle(parts[which].first).setMessage(parts[which].second).setPositiveButton(t("Close","बंद करें"),null).show()}.setNegativeButton(t("Close","बंद करें"),null).show()
   },LinearLayout.LayoutParams(0,-2,1f));root.add(detailControls,bottom=8)
+  root.add(action(t("Practice finding parts","पुर्ज़े पहचानने का अभ्यास"),false){startActivity(android.content.Intent(this,ComponentPracticeActivity::class.java).putExtra("moduleId",module))},bottom=8)
   root.add(action(t("Back to lesson","पाठ पर वापस जाएँ")){finish()})
   setContentView(root)
  }

@@ -26,6 +26,17 @@ class RecallActivity:Activity(){
   body.add(label(t("Remember. Decide. Reflect.","याद करें। निर्णय लें। सोचें।"),26f,Palette.ink,true),bottom=10)
   body.add(label(t("Personal review · your assessment results stay unchanged.","व्यक्तिगत दोहराव · आपके मूल्यांकन परिणाम नहीं बदलते।"),14f,Palette.muted),bottom=20)
   if(item==null){
+   val componentRecords=store.componentRecords().filter { (module,record) -> ComponentCatalog.modules.containsKey(module) && record.optInt("catalogVersion")==ComponentCatalog.VERSION }
+   if(componentRecords.isNotEmpty()) {
+    body.add(label(t("Equipment recognition","उपकरण की पहचान"),20f,Palette.ink,true),bottom=12)
+    componentRecords.forEach { (module,record) ->
+     val done=record.optInt("stage")==3; val dueAt=record.optLong("dueAt"); val ready=!done||dueAt<=now
+     val card=card();card.add(label(curriculum.module(module).local("title",hi),17f,Palette.ink,true),bottom=8)
+     card.add(label(if(!done)t("Saved part practice","सहेजा हुआ पुर्ज़ा अभ्यास")else if(ready)t("Ready to recognize again","फिर पहचानने के लिए तैयार")else t("Next: ","अगला: ")+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(Date(dueAt)),14f,Palette.muted),bottom=10)
+     card.add(action(if(!done)t("Resume part practice","पुर्ज़ा अभ्यास जारी रखें")else if(ready)t("Review equipment","उपकरण दोहराएँ")else t("Practise equipment early","उपकरण का अभ्यास अभी करें"),false){startActivity(android.content.Intent(this,ComponentPracticeActivity::class.java).putExtra("moduleId",module).putExtra("startReview",true))})
+     body.add(card,bottom=14)
+    }
+   }
    val due=items.filter{it.dueAt<=now}
    body.add(label(t("${due.size} decisions ready to revisit","${due.size} निर्णय दोहराने के लिए तैयार"),20f,Palette.ink,true),bottom=16)
    if(items.isEmpty())body.add(label(t("Complete a current assessment to start reviews. If a question changed, its older answer is not reused.","दोहराव शुरू करने के लिए वर्तमान मूल्यांकन पूरा करें। सवाल बदलने पर पुराना उत्तर दोबारा उपयोग नहीं होता।")),bottom=20)

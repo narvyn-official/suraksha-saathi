@@ -1,6 +1,6 @@
 # Evidence-informed AR learning design
 
-Research and design notes, 14 September 2026. See [current offline review implementation](spaced-review.md) for the implemented subset; the six interaction designs below include work still to build. These are proposed learning interactions and acceptance criteria, not a report of implemented features or demonstrated learning gains. The studies below do not establish effectiveness for Suraksha Saathi or for Jharkhand workers; that requires local evaluation.
+Research and design notes, 14 September 2026. See [current offline review implementation](spaced-review.md) and [staged component practice](component-practice.md) for the implemented subsets; the six interaction designs below include work still to build. These are proposed learning interactions and acceptance criteria, not a report of implemented features or demonstrated learning gains. The studies below do not establish effectiveness for Suraksha Saathi or for Jharkhand workers; that requires local evaluation.
 
 The recommended foundation is **realistic equipment, meaningful decisions, progressively reduced help, corrective practice, and delayed recall**. Visual presence can help recognition and engagement. A convincing model alone does not establish learning, practical competence, or safe transfer.
 

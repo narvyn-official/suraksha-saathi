@@ -1,4 +1,16 @@
-# Pilot validation — 14 September 2026
+# Pilot validation — 15 September 2026
+
+## v0.3.1 verification
+
+- **21 JVM tests** passed: prior grading/recall tests plus nine component-learning tests. The new cases cover both-view completion, hint/error attribution, sticky description exposure, varied answer positions, restoration, content-version resets, due/early spacing and projection rejection.
+- **Ten Android instrumented tests** passed in the final combined emulator run (99.779 seconds). Existing seven app tests passed alongside three component tests covering all four models, changed-angle identification, saved feedback/recreation, Hindi description/hint use, assessment/credential isolation and an isolated database-version-2-to-3 migration with prior records preserved.
+- Render checks use PixelCopy to confirm actual model pixels after recreation, then wait for composition before screenshots. Final fire/gas/machinery/PPE views, the Hindi description screen and completion screen were visually inspected. Earlier captures ran ahead of surface composition; the screenshot wait was corrected. The first device run also exposed a competing smooth scroll during transitions; transitions now reposition without that animation, and the rerun passed.
+- Read-only code review identified and verified fixes for predictable letter positions, ineffective text hints, early-repeat spacing inflation, mixed-mode attribution and examples preceding due review questions.
+- Debug APK and test APK builds passed. APK SHA-256: `5625ec253cbc9106b35a1bdc10959d9413fc4f837639988bea4e2b102df9f4b2`.
+- The release MP4 is a 95-second emulator capture from the combined test run. It is a software walkthrough, not real-camera AR or field evidence. It does not include the final few seconds of the test runner.
+- No dashboard, scored curriculum or issuer changes were made. Their prior v0.3.0 checks below remain the latest web evidence and were not unnecessarily repeated.
+
+The new component exercise is camera-free and works with generic illustrations at two fixed viewing angles. Its local records distinguish visual, description and mixed practice; none are practical certification evidence. Physical-device AR, reviewed language/content and measured learning gains remain outstanding.
 
 ## v0.3.0 verification
 

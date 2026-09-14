@@ -11,3 +11,5 @@ The AR path configures ambient-intensity light estimation and reuses its color-c
 The offline viewer supports drag rotation and tilt, pinch zoom, accessible rotation/zoom buttons, and bilingual component-inspection dialogs. Camera controls persist across activity recreation. Inspection explains recognition and limitations; it does not authorise operating or servicing equipment.
 
 Visual realism still needs validation against approved site equipment, competent safety review and representative Android hardware. Manufacturer-specific photogrammetry or authored PBR assets would be a later, separately reviewed step. Better shading alone does not establish dimensional accuracy, practical competence or operational suitability.
+
+App 0.3.1 adds [staged recognition practice](component-practice.md) with the same meshes, fixed viewing angles and projected callouts. This is currently camera-free; the callouts are not a real-equipment detector or mesh manipulation system.
