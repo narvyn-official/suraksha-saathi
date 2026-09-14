@@ -30,3 +30,6 @@ fun Context.action(text: String,primary: Boolean=true,onClick: ()->Unit)=Button(
     minHeight=dp(56);minimumHeight=dp(56);setPadding(dp(16),dp(12),dp(16),dp(12));setOnClickListener{onClick()}
 }
 fun Activity.notice(title: String,message: String) { android.app.AlertDialog.Builder(this).setTitle(title).setMessage(message).setPositiveButton("OK",null).show() }
+
+/** Explicit structure for screen-reader heading navigation; bold text alone has no heading semantics. */
+fun TextView.asHeading()=apply { isAccessibilityHeading=true }

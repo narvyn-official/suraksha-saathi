@@ -1,4 +1,4 @@
-# Fire component practice in camera AR — app 0.4.1
+# Fire component practice in camera AR — updated for app 0.4.3
 
 This pilot extends the existing component-recognition session into an optional ARCore camera view for the **fire model only**. The same three generic parts, two model orientations, examples, hints, feedback and local review schedule are used. The catalogue remains version 1 and scored curriculum remains 0.4.0. Other models retain screen practice. This implementation has software tests, but no physical-camera validation yet.
 
@@ -12,7 +12,8 @@ Three native 48dp letter buttons connect by leader lines to model-space parts. L
 
 ## Interaction and recovery rules
 
-- Answers, hints and advancement require current camera and anchor tracking, a front view, acceptable elevation and all three projected targets in the visible viewport. A rejected tap creates no answer or learner error.
+- New answers and hints require current camera and anchor tracking, a front view, acceptable elevation and all three projected targets in the visible viewport. A rejected tap creates no answer or learner error.
+- From app 0.4.3, example and saved-feedback advancement require foreground state, not camera tracking. Scrolling to read feedback must not disable its Continue action. These transitions add no answer or visual-exposure evidence; the next camera answer remains gated.
 - Tracking eligibility expires after 500 ms without a new camera image. Repeated renders of the same `Frame.timestamp` do not renew it. Resume requires an advancing timestamp; a cached pre-pause image cannot become fresh again.
 - Marker and uncertain-response requests are checked on the next GL frame and again on the UI thread. Scene revisions change on stage changes, placement reset and lifecycle changes; old queued choices cannot apply to a new stage.
 - Camera/anchor loss and exceptions hide markers and clear pending choices. A stopped anchor is detached. **Place model again** resets placement without resetting learning. **Retry camera** permits a new user-requested AR installation attempt after a refusal.

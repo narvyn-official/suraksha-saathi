@@ -17,3 +17,5 @@ App 0.3.1 adds [staged recognition practice](component-practice.md) with the sam
 App 0.4.0 adds an original emergency station: a detailed generic reporting radio with simulated display, a closed first-aid case and an assembly marker. It is used in the offline viewer, AR decision station and component-recognition practice. It cannot transmit a report, locate people, assess a route or teach treatment.
 
 App 0.4.1 reuses the fire geometry for optional [camera component recognition](camera-component-practice.md). No asset, shader or physical-fidelity claims change in this increment.
+
+App 0.4.3 makes the offline inspection page scrollable, preserving the model viewport at large text sizes and in landscape. Native tilt controls and a readable view-state summary supplement rotation/zoom and gestures. Meshes and shaders remain unchanged; see [accessibility scope](accessibility.md).

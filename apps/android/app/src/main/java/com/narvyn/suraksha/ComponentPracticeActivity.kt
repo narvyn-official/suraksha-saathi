@@ -99,16 +99,17 @@ class ComponentPracticeActivity: Activity() {
     private fun updateCameraActions() { cameraActions.forEach { it.isEnabled= !cameraSelected || camera?.ready()==true } }
     private fun gated(button: Button): Button { if(cameraSelected) { cameraActions.add(button); button.isEnabled=camera?.ready()==true }; return button }
     private fun mayInteract() = !cameraSelected || (activeForeground && camera?.ready()==true)
-    private fun advance() { if(mayInteract()) { session.advance(System.currentTimeMillis()); saveAndRender() } }
+    private fun advance() { if(activeForeground) { session.advance(System.currentTimeMillis()); saveAndRender() } }
 
 
     private fun render() {
         header.removeAllViews(); lower.removeAllViews(); cameraActions.clear(); cameraStatus=null
-        header.add(label(t("Find the part","पुर्ज़ा पहचानें"),26f,Palette.ink,true),bottom=8)
+        header.add(label(t("Find the part","पुर्ज़ा पहचानें"),26f,Palette.ink,true).asHeading(),bottom=8)
         header.add(label(t("Personal practice · generic equipment · no certificate score","व्यक्तिगत अभ्यास · सामान्य उपकरण · प्रमाणपत्र का अंक नहीं"),13f,Palette.muted),bottom=12)
         if (session.done) {
+            header.accessibilityPaneTitle=t("Practice complete","अभ्यास पूरा हुआ")
             sceneContainer.visibility = View.GONE; camera?.pauseCamera()
-            header.add(label(t("Practice complete","अभ्यास पूरा हुआ"),23f,Palette.success,true),bottom=16)
+            header.add(label(t("Practice complete","अभ्यास पूरा हुआ"),23f,Palette.success,true).asHeading(),bottom=16)
             val summary = card(Palette.successBg)
             summary.add(label(t("${session.data.optInt("visualCorrect")} identifications without hints in the model; ${session.data.optInt("descriptionCorrect")} using descriptions.","मॉडल में ${session.data.optInt("visualCorrect")} पहचान बिना संकेत के; विवरण से ${session.data.optInt("descriptionCorrect")} पहचान।")),bottom=12)
             summary.add(label(t("Camera: ${session.data.optInt("cameraCorrect")} · screen: ${session.data.optInt("screenCorrect")} · both views: ${session.data.optInt("mixedPresentationCorrect")} (new unassisted visual records).", "कैमरा: ${session.data.optInt("cameraCorrect")} · स्क्रीन: ${session.data.optInt("screenCorrect")} · दोनों दृश्य: ${session.data.optInt("mixedPresentationCorrect")} (नए बिना मदद के दृश्य रिकॉर्ड)।"),14f,Palette.muted),bottom=12)
@@ -129,9 +130,11 @@ class ComponentPracticeActivity: Activity() {
             header.add(cameraStatus!!,bottom=8)
             header.add(action(t("Continue on screen","स्क्रीन पर जारी रखें"),false) { switchCamera(false) },bottom=10)
         }
+        if (session.answer == null) header.add(action(if(session.descriptions)t("Use the model","मॉडल उपयोग करें")else t("Use text descriptions","लिखित विवरण उपयोग करें"),false) { if(cameraSelected) { cameraSelected=false; camera?.pauseCamera(); scene.resume() }; session.useDescriptions(!session.descriptions); saveAndRender() },top=8)
         val stage = when(session.stage) { 0 -> t("1 · See an example","1 · उदाहरण देखें"); 1 -> t("2 · Find without labels","2 · बिना नाम के पहचानें"); else -> if (session.descriptions) t("3 · Recall with reordered choices","3 · बदले क्रम में याद करें") else t("3 · Find from another angle","3 · दूसरे कोण से पहचानें") }
+        header.accessibilityPaneTitle=if(session.answer!=null)t("Part feedback: ","पुर्ज़े की प्रतिक्रिया: ")+session.target.title(hi) else t("Part ${session.index+1}: ","पुर्ज़ा ${session.index+1}: ")+stage
         header.add(label(t("Part ${session.index+1} of ${session.parts.size} · ","पुर्ज़ा ${session.index+1} / ${session.parts.size} · ")+stage,14f,Palette.blue,true),bottom=12)
-        header.add(label((if (session.stage == 0) t("Meet: ","जानें: ") else t("Find: ","पहचानें: "))+session.target.title(hi),22f,Palette.ink,true),bottom=8)
+        header.add(label((if (session.stage == 0) t("Meet: ","जानें: ") else t("Find: ","पहचानें: "))+session.target.title(hi),22f,Palette.ink,true).asHeading(),bottom=8)
         header.add(label(if (session.stage == 0) t("Notice the identifying cue, then try without labels.","पहचान का संकेत देखें, फिर बिना नाम के कोशिश करें।") else if (session.descriptions) t("Choose the description that matches this part.","इस पुर्ज़े से मिलता विवरण चुनें।") else t("Follow a line to the part, then choose its letter.","रेखा के सिरे पर पुर्ज़ा देखें, फिर उसका अक्षर चुनें।"),15f,Palette.muted),bottom=8)
         if(!cameraSelected) scene.configure(session,hi) { choose(it) }
         if (session.showLabels && !session.descriptions) {
@@ -140,7 +143,7 @@ class ComponentPracticeActivity: Activity() {
         if (session.stage == 0) {
             lower.add(label(session.target.description(hi)),top=10,bottom=10)
             lower.add(label(session.target.explain(hi),15f,Palette.muted),bottom=16)
-            lower.add(gated(action(t("Try without labels","बिना नाम के कोशिश करें")) { advance() }),bottom=12)
+            lower.add(action(t("Try without labels","बिना नाम के कोशिश करें")) { advance() },bottom=12)
         } else if (session.answer == null) {
             if (session.descriptions) session.order.forEach { part -> lower.add(action(part.description(hi),false) { choose(part.id) }.apply { tag = "component-description-${part.id}" },bottom=10) }
             if (session.helped) lower.add(label(if(session.descriptions) session.target.description(hi) else t("Labels are visible for this retry. Take your time.","इस कोशिश में नाम दिख रहे हैं। आराम से पहचानें।"),15f,Palette.blue),bottom=12)
@@ -148,14 +151,14 @@ class ComponentPracticeActivity: Activity() {
             lower.add(gated(action(t("I’m not sure","मुझे निश्चित नहीं है"),false) { choose("_unsure") }),bottom=10)
         } else {
             val feedback = card(if(session.correct)Palette.successBg else Palette.amberBg)
-            feedback.add(label(if(session.correct)t("You found it","आपने पहचान लिया")else t("Let’s look at the cue","पहचान का संकेत देखें"),20f,Palette.ink,true),bottom=10)
+            feedback.add(label(if(session.correct)t("You found it","आपने पहचान लिया")else t("Let’s look at the cue","पहचान का संकेत देखें"),20f,Palette.ink,true).asHeading(),bottom=10)
             feedback.add(label(session.target.description(hi)),bottom=10)
             feedback.add(label(session.target.explain(hi),15f,Palette.muted),bottom=12)
             feedback.add(label(t("In your own words: what helped you recognize this part?","अपने शब्दों में: इस पुर्ज़े को पहचानने में किस बात ने मदद की?"),16f,Palette.ink,true))
             lower.add(feedback,bottom=14)
-            lower.add(gated(action(if(!session.correct)t("Try with guidance","मदद के साथ कोशिश करें")else if(session.stage==1)if(session.descriptions)t("Try reordered choices","बदले क्रम में कोशिश करें")else t("Try the changed view","बदले दृश्य में कोशिश करें")else t("Continue","आगे बढ़ें")) { advance() }),bottom=12)
+            lower.add(action(if(!session.correct)t("Try with guidance","मदद के साथ कोशिश करें")else if(session.stage==1)if(session.descriptions)t("Try reordered choices","बदले क्रम में कोशिश करें")else t("Try the changed view","बदले दृश्य में कोशिश करें")else t("Continue","आगे बढ़ें")) { advance() },bottom=12)
         }
-        if (session.answer == null) lower.add(action(if(session.descriptions)t("Use the model","मॉडल उपयोग करें")else t("Use text descriptions","लिखित विवरण उपयोग करें"),false) { if(cameraSelected) { cameraSelected=false; camera?.pauseCamera(); scene.resume() }; session.useDescriptions(!session.descriptions); saveAndRender() },top=8)
+
         if(session.module=="fire") {
             if(!cameraSelected) lower.add(action(t("Use camera AR · fire","कैमरा AR उपयोग करें · आग"),false) { switchCamera(true) },top=12)
             else {
