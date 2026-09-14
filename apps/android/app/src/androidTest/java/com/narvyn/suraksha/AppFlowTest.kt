@@ -35,7 +35,7 @@ class AppFlowTest {
     tap(s,q.getJSONArray("options").objects().first{it.optBoolean("correct")}.local("text",false))
     if(i<questions.lastIndex)tap(s,"Continue") else tap(s,"Continue")
    }
-   shot("result.png");Store(context).use{val result=it.attempts().first();assertTrue(result.getBoolean("finished"));assertTrue(result.getJSONObject("result").getBoolean("passed"));assertEquals(8,result.getJSONArray("events").length())}
+   shot("result.png");Store(context).use{val result=it.attempts().first();assertEquals("assessment",result.getString("kind"));assertTrue(result.getBoolean("finished"));assertTrue(result.getJSONObject("result").getBoolean("passed"));assertEquals(8,result.getJSONArray("events").length())}
   }
  }
  @Test fun offlineCredentialSignatureRejectsTampering(){
