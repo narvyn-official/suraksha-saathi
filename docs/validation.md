@@ -1,5 +1,16 @@
 # Pilot validation — 15 September 2026
 
+## v0.4.2 verification
+
+- **42 JVM tests** passed: grading (5), decision recall (9), component learning (14), shared camera readiness/freshness (4), AR decision recovery (7), and measured callout layout (3). New cases cover duplicate and stale answers/Continue callbacks, wrong questions, pause/resume revisions, saved feedback, final acknowledgement, critical stops, persistence exceptions, measured card heights and invalid/offscreen layouts.
+- **Six Android instrumented tests** passed together on the API 36 ARM64 emulator (25.025 seconds). Four new tests cover saved guided feedback in English/Hindi across repeated recreation, stale Continue callbacks, neutral assessment acknowledgement, final guided feedback and return to the parent screen with its saved answer preserved. Two existing tests cover assessment recreation and critical-error termination.
+- Visual inspection found a black SurfaceView behind the permission-off placeholder. The overlay now uses the light canvas while the camera is stopped and becomes transparent when the camera starts. After this change, all six native tests passed again (36.869 seconds, including recording pauses); the final APK and test APK built successfully. Fresh English/Hindi camera-off screens, Hindi guided feedback and the English assessment acknowledgement were visually inspected.
+- Final APK SHA-256: `5a4351bf4d893dd0c854a0a252e909b5ae07a2ab4391cbb559750f093471a192`. The release MP4 is a **39.287-second emulator recovery walkthrough** (container duration), recorded during the final six-test run. It shows stored-record recovery and screen fallback, not positive camera placement or physical AR performance.
+- Code review checked UI-owned state mutation, immutable renderer snapshots, question/lifecycle revision guards, real-image freshness, stopped-anchor handling, camera retry and native callout bounds. A translated-button bounds calculation was corrected to use actual displayed coordinates. Tests inject save exceptions; actual low-storage failure and process-death atomicity were not tested.
+- Curriculum 0.4.0, all content archives, equipment geometry/shaders, database schema, grading rules, credential trust and dashboard source are unchanged. Prior web evidence remains applicable; web checks were not repeated for this Android-only increment.
+
+See [AR decision recovery](ar-assessment-recovery.md) for implementation and primary references. Actual camera placement, lighting, readable tracked callouts, system installation/retry and physical interruption recovery remain external device gates. Full large-font/TalkBack verification is the next bounded software priority. The older scored path described as pending in the historical v0.4.1 section below has now been hardened.
+
 ## v0.4.1 verification
 
 - **32 JVM tests** passed: grading (5), decision recall (9), component learning (14), and camera readiness/freshness/viewing geometry (4). New cases cover camera/screen/mixed attribution, description exposure, legacy restoration, stale revisions, repeated images, an advancing image after pause, and rejection of unreadable viewing angles.

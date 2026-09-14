@@ -2,161 +2,295 @@ package com.narvyn.suraksha
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.*
 import android.opengl.*
+import android.opengl.Matrix
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.*
 import android.widget.*
 import com.google.ar.core.*
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
-/** Camera-backed, world-anchored action stations. All hazard content is simulated. */
+/** Camera-backed decision stations. Rendering never reads or mutates an assessment JSONObject. */
 class ArActivity: Activity(), GLSurfaceView.Renderer {
-    private lateinit var surface: GLSurfaceView
-    private lateinit var overlay: TargetOverlay
+    private data class Option(val id: String, val text: String)
+    private data class Scene(val revision: Int, val questionId: String, val module: String, val options: List<Option>, val heights: List<Float>, val columns: Int, val width: Int, val height: Int, val canAnswer: Boolean)
+    private data class Choice(val revision: Int, val questionId: String, val optionId: String)
+    private data class Placement(val revision: Int, val x: Float, val y: Float, val at: Long)
+    private data class Preview(val revision: Int, val points: List<ComponentProjection.Point?>, val boxes: List<ArChoiceLayout.Box>?, val message: String)
     private lateinit var store: Store
-    private lateinit var training: TrainingSession
+    private lateinit var flow: ArDecisionFlow
+    private lateinit var surface: GLSurfaceView
+    private lateinit var overlay: AnswerOverlay
+    private lateinit var viewport: FrameLayout
+    private lateinit var feedback: ScrollView
+    private lateinit var feedbackBody: LinearLayout
+    private lateinit var controls: LinearLayout
     private lateinit var question: TextView
     private lateinit var status: TextView
-    private var ar: Session?=null
-    private var anchor: Anchor?=null
+    private lateinit var mode: TextView
+    private var hi=false
+    private var active=false
+    @Volatile private var running=false
+    @Volatile private var ar: Session?=null
+    @Volatile private var scene=Scene(0,"","fire",emptyList(),emptyList(),1,0,0,false)
+    private var anchor: Anchor?=null // Only accessed on GL thread while running; stopped before UI cleanup.
     private var installRequested=false
     private var widthPx=1;private var heightPx=1
     private var texture=0;private var program=0
     private val equipment=WorldEquipment()
-    private val lightCorrection=floatArrayOf(1f,1f,1f,1f)
-    private val estimatedLight=FloatArray(4)
-    private var message=""
-    @Volatile private var tapped: Pair<Float,Float>?=null
-    @Volatile private var canAnswer=false
-    @Volatile private var options=emptyList<Pair<String,String>>()
+    private val freshness=ComponentCameraFreshness()
+    private val lightCorrection=floatArrayOf(1f,1f,1f,1f);private val estimatedLight=FloatArray(4)
+    private val projection=FloatArray(16);private val view=FloatArray(16);private val model=FloatArray(16);private val vp=FloatArray(16);private val mvp=FloatArray(16)
+    private val pendingChoice=AtomicReference<Choice?>(null)
+    private val pendingPlacement=AtomicReference<Placement?>(null)
+    private val resetPlacement=AtomicBoolean(false)
+    private val pendingPreview=AtomicReference<Preview?>(null)
+    private val previewPosted=AtomicBoolean(false)
     private val vertices=floats(floatArrayOf(-1f,-1f,1f,-1f,-1f,1f,1f,1f))
-    private val uv=ByteBuffer.allocateDirect(8*4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-    private val hi get()=store.hi
-    private fun t(en:String,h:String)=if(hi)h else en
-    override fun onCreate(savedInstanceState:Bundle?){
-        super.onCreate(savedInstanceState);store=Store(this);val data=store.attempt(intent.getStringExtra("attemptId")?:"")
-        if(data==null){finish();return};training=TrainingSession(data,Curriculum(this).module(data.getString("moduleId")))
-        val root=FrameLayout(this)
-        surface=GLSurfaceView(this).apply{setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);preserveEGLContextOnPause=true;setRenderer(this@ArActivity);renderMode=GLSurfaceView.RENDERMODE_CONTINUOUSLY}
-        root.addView(surface)
-        overlay=TargetOverlay();root.addView(overlay)
-        val top=column(16).apply{background=shape(Color.WHITE,16)}
-        top.add(label(t("AR TRAINING · SIMULATED","AR प्रशिक्षण · काल्पनिक"),13f,Palette.blue,true),bottom=8)
-        question=label("",20f,Palette.ink,true);top.add(question,bottom=8)
-        status=label("",14f,Palette.muted);top.add(status)
-        root.addView(top,FrameLayout.LayoutParams(-1,-2,Gravity.TOP).apply{setMargins(dp(12),dp(38),dp(12),0)})
-        val bottom=column(12).apply{background=shape(Color.WHITE,16)}
-        bottom.add(label(t("Tap the floor to place the action stations. Then tap a floating answer.","विकल्प रखने के लिए फ़र्श पर टैप करें। फिर हवा में दिख रहे उत्तर पर टैप करें।"),14f,Palette.muted),bottom=8)
-        bottom.add(action(t("Pause and return","रोकें और वापस जाएँ"),false){finish()})
-        root.addView(bottom,FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM).apply{setMargins(dp(12),0,dp(12),dp(28))})
-        setContentView(root);refreshQuestion()
-    }
-    private fun refreshQuestion(){
-        if(training.finished){setResult(RESULT_OK);finish();return}
-        // An answer persisted before process interruption is advanced exactly once.
-        if(training.data.optBoolean("awaitingContinue")){training.advance();store.save(training);if(training.finished){finish();return}}
-        question.text="${training.index+1}/${training.questions.size} · "+training.current.local("prompt",hi)
-        options=training.options().map{it.getString("id") to it.local("text",hi)}
-    }
-    override fun onResume(){super.onResume();if(!::surface.isInitialized)return
-        if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED){requestPermissions(arrayOf(Manifest.permission.CAMERA),1);return}
-        try{
-            if(ar==null){
-                if(ArCoreApk.getInstance().requestInstall(this,!installRequested)==ArCoreApk.InstallStatus.INSTALL_REQUESTED){installRequested=true;return}
-                ar=Session(this).apply{configure(Config(this).apply{planeFindingMode=Config.PlaneFindingMode.HORIZONTAL;updateMode=Config.UpdateMode.LATEST_CAMERA_IMAGE;lightEstimationMode=Config.LightEstimationMode.AMBIENT_INTENSITY})}
-            }
-            ar?.resume();surface.onResume()
-        }catch(e:Exception){android.app.AlertDialog.Builder(this).setTitle(t("AR is not ready","AR तैयार नहीं है")).setMessage(t("Use on-screen practice on this device. AR needs a supported phone and installed Google Play Services for AR.","इस उपकरण पर स्क्रीन अभ्यास करें। AR के लिए समर्थित फ़ोन और Google Play Services for AR चाहिए।")).setPositiveButton("OK"){_,_->finish()}.setOnCancelListener{finish()}.show()}
-    }
-    override fun onPause(){canAnswer=false;if(::surface.isInitialized)surface.onPause();ar?.pause();super.onPause()}
-    override fun onDestroy(){anchor?.detach();ar?.close();if(::store.isInitialized)store.close();super.onDestroy()}
-    override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray){super.onRequestPermissionsResult(requestCode,permissions,grantResults);if(grantResults.firstOrNull()==PackageManager.PERMISSION_GRANTED)onResume()else finish()}
-    override fun onSurfaceCreated(gl:GL10?,config:EGLConfig?){
-        equipment.create()
-        val textures=IntArray(1);GLES20.glGenTextures(1,textures,0);texture=textures[0]
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR)
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR)
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE)
-        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE)
-        val v=shader(GLES20.GL_VERTEX_SHADER,"attribute vec2 p;attribute vec2 uv;varying vec2 tex;void main(){gl_Position=vec4(p,0.0,1.0);tex=uv;}")
-        val f=shader(GLES20.GL_FRAGMENT_SHADER,"#extension GL_OES_EGL_image_external : require\nprecision mediump float;uniform samplerExternalOES camera;varying vec2 tex;void main(){gl_FragColor=texture2D(camera,tex);}")
-        program=GLES20.glCreateProgram();GLES20.glAttachShader(program,v);GLES20.glAttachShader(program,f);GLES20.glLinkProgram(program)
-    }
-    override fun onSurfaceChanged(gl:GL10?,width:Int,height:Int){widthPx=width;heightPx=height;GLES20.glViewport(0,0,width,height)}
-    override fun onDrawFrame(gl:GL10?){
-        GLES20.glClearColor(.06f,.09f,.14f,1f);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        val session=ar?:return
-        try{
-            session.setCameraTextureName(texture);session.setDisplayGeometry(windowManager.defaultDisplay.rotation,widthPx,heightPx)
-            val frame=session.update();frame.transformCoordinates2d(Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,vertices,Coordinates2d.TEXTURE_NORMALIZED,uv)
-            GLES20.glUseProgram(program);GLES20.glActiveTexture(GLES20.GL_TEXTURE0);GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
-            val p=GLES20.glGetAttribLocation(program,"p");val u=GLES20.glGetAttribLocation(program,"uv")
-            vertices.position(0);uv.position(0);GLES20.glEnableVertexAttribArray(p);GLES20.glEnableVertexAttribArray(u)
-            GLES20.glVertexAttribPointer(p,2,GLES20.GL_FLOAT,false,0,vertices);GLES20.glVertexAttribPointer(u,2,GLES20.GL_FLOAT,false,0,uv)
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);GLES20.glDisableVertexAttribArray(p);GLES20.glDisableVertexAttribArray(u)
-            if(frame.camera.trackingState!=TrackingState.TRACKING){canAnswer=false;overlay.targets=emptyList();showStatus(t("Move the phone slowly. Tracking is paused.","फ़ोन धीरे घुमाएँ। ट्रैकिंग रुकी है।"));overlay.postInvalidate();return}
-            val tap=tapped;tapped=null
-            if(anchor==null&&tap!=null){frame.hitTest(tap.first,tap.second).firstOrNull{it.trackable is Plane&&(it.trackable as Plane).isPoseInPolygon(it.hitPose)}?.let{anchor=it.createAnchor()}}
-            val a=anchor
-            if(a==null){canAnswer=false;showStatus(t("Find a clear floor or tabletop and tap to place.","खुला फ़र्श या मेज़ खोजें और रखने के लिए टैप करें।"));return}
-            if(a.trackingState!=TrackingState.TRACKING){canAnswer=false;overlay.targets=emptyList();overlay.postInvalidate();return}
-            val projection=FloatArray(16);val view=FloatArray(16);val model=FloatArray(16);val vp=FloatArray(16);val mvp=FloatArray(16)
-            frame.camera.getProjectionMatrix(projection,0,.1f,30f);frame.camera.getViewMatrix(view,0);a.pose.toMatrix(model,0)
-            android.opengl.Matrix.multiplyMM(vp,0,projection,0,view,0);android.opengl.Matrix.multiplyMM(mvp,0,vp,0,model,0)
-            // Bounded ambient adaptation preserves readability; this is not environmental HDR rendering.
-            if(frame.lightEstimate.state==LightEstimate.State.VALID){
-                frame.lightEstimate.getColorCorrection(estimatedLight,0)
-                for(i in 0..3){val value=estimatedLight[i];if(value.isFinite())lightCorrection[i]=lightCorrection[i]*.9f+value.coerceIn(.65f,1.35f)*.1f}
-            }
-            equipment.draw(vp,model,training.data.getString("moduleId"),frame.camera.pose.translation,lightCorrection)
-            val currentOptions=options
-            overlay.targets=currentOptions.mapIndexedNotNull{i,option->
-                val point=FloatArray(4);val x=(i-(currentOptions.size-1)/2f)*.5f
-                android.opengl.Matrix.multiplyMV(point,0,mvp,0,floatArrayOf(x,.75f,0f,1f),0)
-                if(point[3]<=.1f)null else {
-                    val px=(point[0]/point[3]+1f)*widthPx/2;val py=(1f-point[1]/point[3])*heightPx/2
-                    val scale=(1.1f/point[3]).coerceIn(.7f,1.25f);val w=dp(132)*scale;val h=dp(110)*scale
-                    Target(option.first,option.second,RectF(px-w/2,py-h/2,px+w/2,py+h/2))
-                }
-            }
-            canAnswer=!training.data.optBoolean("awaitingContinue")&&!training.finished
-            showStatus(t("Stations placed · tap your answer","विकल्प रखे गए · अपना उत्तर चुनें"));overlay.postInvalidate()
-        }catch(_:Exception){canAnswer=false;overlay.targets=emptyList();overlay.postInvalidate();showStatus(t("Tracking interrupted. Pause and retry.","ट्रैकिंग बाधित है। रोकें और फिर कोशिश करें।"))}
-    }
-    private fun showStatus(text:String){if(message!=text){message=text;runOnUiThread{status.text=text}}}
-    private fun choose(id:String){
-        if(!canAnswer)return;canAnswer=false
-        val correct=training.answer(id);store.save(training)
-        if(training.finished){finish();return}
-        if(training.guided){android.app.AlertDialog.Builder(this).setTitle(if(correct)t("Safe understanding","सही समझ")else t("Let’s practise","अभ्यास करें")).setMessage(training.current.local("explanation",hi)).setCancelable(false).setPositiveButton(t("Continue","आगे बढ़ें")){_,_->training.advance();store.save(training);refreshQuestion()}.show()}
-        else {training.advance();store.save(training);refreshQuestion()}
-    }
-    data class Target(val id:String,val label:String,val rect:RectF)
-    inner class TargetOverlay:View(this@ArActivity){
-        @Volatile var targets=emptyList<Target>()
-        private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
-        init{contentDescription=t("World-anchored training choices. Tap a choice to answer.","दुनिया में रखे प्रशिक्षण विकल्प। उत्तर देने के लिए टैप करें।")}
-        override fun onDraw(canvas:Canvas){
-            targets.forEach{target->
-                paint.color=Color.WHITE;canvas.drawRoundRect(target.rect,dp(14).toFloat(),dp(14).toFloat(),paint)
-                paint.color=Palette.blue;paint.style=Paint.Style.STROKE;paint.strokeWidth=dp(2).toFloat();canvas.drawRoundRect(target.rect,dp(14).toFloat(),dp(14).toFloat(),paint);paint.style=Paint.Style.FILL
-                val textPaint=android.text.TextPaint(paint).apply{color=Palette.ink;textSize=dp(15).toFloat()}
-                val layout=android.text.StaticLayout.Builder.obtain(target.label,0,target.label.length,textPaint,(target.rect.width()-dp(16)).toInt().coerceAtLeast(1)).setAlignment(android.text.Layout.Alignment.ALIGN_CENTER).build()
-                canvas.save();canvas.translate(target.rect.left+dp(8),target.rect.centerY()-layout.height/2);layout.draw(canvas);canvas.restore()
+    private val uv=floats(FloatArray(8))
+    private fun t(en: String,hindi: String)=if(hi)hindi else en
+
+    override fun onCreate(state: Bundle?) {
+        super.onCreate(state);store=Store(this);hi=store.hi
+        val data=store.attempt(intent.getStringExtra("attemptId") ?: "")
+        if(data==null) { finish();return }
+        val curriculum=Curriculum(this)
+        val module=curriculum.versions[data.optString("contentVersion")]?.getJSONArray("modules")?.objects()?.firstOrNull { it.getString("id")==data.optString("moduleId") }
+        if(module==null) { Toast.makeText(this,t("This training version cannot be resumed.","प्रशिक्षण का यह संस्करण जारी नहीं किया जा सकता।"),Toast.LENGTH_LONG).show();finish();return }
+        flow=ArDecisionFlow(TrainingSession(data,module)) { store.save(it) }
+        installRequested=state?.getBoolean("installRequested") ?: false
+        val root=column(16).apply { setBackgroundColor(Palette.canvas) }
+        root.setOnApplyWindowInsetsListener { v,i ->
+            if(android.os.Build.VERSION.SDK_INT>=30) { val b=i.getInsets(WindowInsets.Type.systemBars());v.setPadding(dp(16)+b.left,dp(12)+b.top,dp(16)+b.right,dp(12)+b.bottom) }
+            else v.setPadding(dp(16)+i.systemWindowInsetLeft,dp(12)+i.systemWindowInsetTop,dp(16)+i.systemWindowInsetRight,dp(12)+i.systemWindowInsetBottom)
+            i
+        }
+        mode=label("",13f,Palette.blue,true);root.add(mode,bottom=8)
+        question=label("",20f,Palette.ink,true);root.add(question,bottom=8)
+        status=label("",14f,Palette.muted);root.add(status,bottom=12)
+        val middle=FrameLayout(this)
+        viewport=FrameLayout(this)
+        surface=GLSurfaceView(this).apply {
+            setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);preserveEGLContextOnPause=true
+            importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            setRenderer(this@ArActivity);renderMode=GLSurfaceView.RENDERMODE_CONTINUOUSLY;onPause()
+        }
+        viewport.addView(surface,FrameLayout.LayoutParams(-1,-1))
+        overlay=AnswerOverlay();viewport.addView(overlay,FrameLayout.LayoutParams(-1,-1))
+        middle.addView(viewport,FrameLayout.LayoutParams(-1,-1))
+        feedbackBody=column(12)
+        feedback=ScrollView(this).apply { isFillViewport=true;addView(feedbackBody) }
+        middle.addView(feedback,FrameLayout.LayoutParams(-1,-1))
+        root.addView(middle,LinearLayout.LayoutParams(-1,0,1f))
+        controls=column();root.add(controls,top=12)
+        root.add(action(t("Continue on screen","स्क्रीन पर जारी रखें"),false) { setResult(RESULT_OK);finish() },top=10)
+        viewport.addOnLayoutChangeListener { _,l,top,r,b,ol,ot,or,ob ->
+            if((r-l!=or-ol || b-top!=ob-ot) && ::flow.isInitialized && !flow.finished && !flow.training.data.optBoolean("awaitingContinue")) {
+                flow.invalidate();refreshScene()
             }
         }
-        override fun onTouchEvent(event:MotionEvent):Boolean{if(event.action==MotionEvent.ACTION_UP){val target=targets.firstOrNull{it.rect.contains(event.x,event.y)};if(target!=null)choose(target.id)else tapped=event.x to event.y;performClick()};return true}
-        override fun performClick():Boolean{super.performClick();return true}
+        setContentView(root);renderState()
     }
-    companion object{
-        private fun floats(values:FloatArray):FloatBuffer=ByteBuffer.allocateDirect(values.size*4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply{put(values);position(0)}
-        private fun shader(type:Int,source:String):Int=GLES20.glCreateShader(type).also{GLES20.glShaderSource(it,source);GLES20.glCompileShader(it)}
+    private fun renderState() {
+        if(flow.finished) { stopCamera();setResult(RESULT_OK);finish();return }
+        val training=flow.training
+        mode.text=if(training.guided)t("AR PRACTICE · SIMULATED","AR अभ्यास · काल्पनिक")else t("AR ASSESSMENT · NO HINTS","AR मूल्यांकन · कोई संकेत नहीं")
+        question.text="${training.index+1}/${training.questions.size} · "+training.current.local("prompt",hi)
+        val saved=training.data.optBoolean("awaitingContinue")
+        feedback.visibility=if(saved)View.VISIBLE else View.GONE
+        viewport.visibility=if(saved)View.GONE else View.VISIBLE
+        controls.removeAllViews();feedbackBody.removeAllViews()
+        if(saved) {
+            stopCamera()
+            status.text=t("Your answer is saved. Continue when you are ready.","आपका उत्तर सहेजा गया है। तैयार होने पर आगे बढ़ें।")
+            val card=card(if(training.guided && !training.data.optBoolean("lastCorrect"))Palette.amberBg else Palette.soft)
+            card.add(label(if(training.guided)if(training.data.optBoolean("lastCorrect"))t("Safe understanding","सही समझ")else t("Let’s learn from this","इससे सीखें") else t("Answer saved","उत्तर सहेजा गया"),22f,Palette.ink,true),bottom=12)
+            if(training.guided) card.add(label(training.current.local("explanation",hi),18f))
+            else card.add(label(t("Assessment feedback is available after the attempt ends.","मूल्यांकन समाप्त होने के बाद प्रतिक्रिया उपलब्ध होगी।"),16f,Palette.muted))
+            feedbackBody.add(card,bottom=16)
+            val revision=flow.revision
+            feedbackBody.add(action(t("Continue","आगे बढ़ें")) {
+                try { if(flow.continueSaved(revision)) { renderState();if(!flow.finished)startCamera(false) } } catch(_: Exception) { saveFailed() }
+            })
+        } else {
+            status.text=t("Place the simulated stations on a clear training surface.","काल्पनिक विकल्प खाली प्रशिक्षण सतह पर रखें।")
+            val row=LinearLayout(this)
+            row.addView(action(t("Place again","फिर रखें"),false) { flow.invalidate();pendingPlacement.set(null);pendingChoice.set(null);resetPlacement.set(true);refreshScene() },LinearLayout.LayoutParams(0,dp(48),1f).apply { marginEnd=dp(8) })
+            row.addView(action(if(checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)t("Retry camera","कैमरा फिर आज़माएँ")else t("Enable camera","कैमरा चालू करें"),false) { retryCamera() },LinearLayout.LayoutParams(0,dp(48),1f))
+            controls.add(row)
+            if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) controls.add(action(t("Camera permission settings","कैमरा अनुमति सेटिंग"),false) { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName"))) },top=8)
+        }
+        refreshScene()
+    }
+    private fun refreshScene() {
+        if(!::overlay.isInitialized || flow.finished) return
+        pendingChoice.set(null);pendingPlacement.set(null)
+        val training=flow.training
+        val options=training.options().map { Option(it.getString("id"),it.local("text",hi)) }
+        val columns=if(options.size==2 && viewport.width>=dp(280))2 else 1
+        val widths=((viewport.width-dp(10)*(columns+1))/columns).coerceAtLeast(1)
+        val revision=flow.revision
+        val heights=overlay.bind(options,widths,revision,training.current.getString("id"))
+        scene=Scene(revision,training.current.getString("id"),training.data.getString("moduleId"),options,heights,columns,viewport.width,viewport.height,!training.data.optBoolean("awaitingContinue"))
+    }
+    override fun onResume() {
+        super.onResume();active=true
+        if(!::flow.isInitialized)return
+        flow.resume();renderState();if(!flow.finished && !flow.training.data.optBoolean("awaitingContinue"))startCamera(false)
+    }
+    override fun onPause() { active=false;if(::flow.isInitialized)flow.pause();stopCamera();super.onPause() }
+    override fun onDestroy() { anchor?.detach();ar?.close();ar=null;if(::store.isInitialized)store.close();super.onDestroy() }
+    override fun onSaveInstanceState(out: Bundle) { out.putBoolean("installRequested",installRequested);super.onSaveInstanceState(out) }
+    override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
+        super.onRequestPermissionsResult(code,permissions,results)
+        if(code==51 && active && ::flow.isInitialized) { renderState();startCamera(false) }
+    }
+    private fun startCamera(requestPermission: Boolean) {
+        if(!active || flow.finished || flow.training.data.optBoolean("awaitingContinue") || running)return
+        if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) {
+            status.text=t("Camera permission is off. Enable it, or continue on screen.","कैमरा अनुमति बंद है। अनुमति दें, या स्क्रीन पर जारी रखें।")
+            if(requestPermission)requestPermissions(arrayOf(Manifest.permission.CAMERA),51)
+            return
+        }
+        try {
+            if(ar==null) {
+                if(ArCoreApk.getInstance().requestInstall(this,!installRequested)==ArCoreApk.InstallStatus.INSTALL_REQUESTED) {
+                    installRequested=true;status.text=t("Complete AR installation, or continue on screen.","AR स्थापना पूरी करें, या स्क्रीन पर जारी रखें।");return
+                }
+                ar=Session(this).apply { configure(Config(this).apply { planeFindingMode=Config.PlaneFindingMode.HORIZONTAL;updateMode=Config.UpdateMode.LATEST_CAMERA_IMAGE;lightEstimationMode=Config.LightEstimationMode.AMBIENT_INTENSITY }) }
+            }
+            freshness.requireNewImage();ar!!.resume();running=true;overlay.cameraVisible(true);surface.onResume()
+        } catch(_: Exception) { status.text=t("Camera AR is unavailable. Retry, or continue on screen.","कैमरा AR उपलब्ध नहीं है। फिर कोशिश करें, या स्क्रीन पर जारी रखें।");overlay.clear() }
+    }
+    private fun stopCamera() {
+        pendingChoice.set(null);pendingPlacement.set(null);pendingPreview.set(null)
+        if(::overlay.isInitialized) { overlay.clear();overlay.cameraVisible(false) }
+        if(::surface.isInitialized)surface.onPause()
+        if(running) { try { ar?.pause() } catch(_: Exception) {} };running=false
+    }
+    private fun retryCamera() {
+        stopCamera();anchor?.detach();anchor=null;ar?.close();ar=null;freshness.clear();installRequested=false
+        flow.invalidate();refreshScene();startCamera(true)
+    }
+    private fun saveFailed() {
+        flow.invalidate();stopCamera();renderState()
+        status.text=t("Could not save. Your previously saved progress is preserved.","सहेजा नहीं जा सका। पहले सहेजी गई प्रगति सुरक्षित है।")
+        notice(t("Could not save","सहेजा नहीं जा सका"),t("Check available storage, then retry from your saved progress.","उपलब्ध स्टोरेज जाँचें, फिर सहेजी गई प्रगति से कोशिश करें।"))
+    }
+    private fun queueChoice(optionId: String, revision: Int, questionId: String) {
+        if(active && flow.revision==revision && flow.ready(SystemClock.elapsedRealtime()) && overlay.targetsVisible()) pendingChoice.compareAndSet(null,Choice(revision,questionId,optionId))
+    }
+    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        equipment.create()
+        val textures=IntArray(1);GLES20.glGenTextures(1,textures,0);texture=textures[0];GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR)
+        GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE)
+        val v=shader(GLES20.GL_VERTEX_SHADER,"attribute vec2 p;attribute vec2 uv;varying vec2 tex;void main(){gl_Position=vec4(p,0.0,1.0);tex=uv;}")
+        val f=shader(GLES20.GL_FRAGMENT_SHADER,"#extension GL_OES_EGL_image_external : require\nprecision mediump float;uniform samplerExternalOES camera;varying vec2 tex;void main(){gl_FragColor=texture2D(camera,tex);}")
+        program=GLES20.glCreateProgram();GLES20.glAttachShader(program,v);GLES20.glAttachShader(program,f);GLES20.glLinkProgram(program);GLES20.glDeleteShader(v);GLES20.glDeleteShader(f)
+    }
+    override fun onSurfaceChanged(gl: GL10?, w: Int, h: Int) { widthPx=w;heightPx=h;GLES20.glViewport(0,0,w,h) }
+    override fun onDrawFrame(gl: GL10?) {
+        GLES20.glClearColor(.965f,.973f,.99f,1f);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+        if(!running)return
+        val current=scene;val session=ar ?: return
+        try {
+            if(resetPlacement.getAndSet(false)) { anchor?.detach();anchor=null }
+            session.setCameraTextureName(texture);session.setDisplayGeometry(windowManager.defaultDisplay.rotation,widthPx,heightPx)
+            val frame=session.update();drawCamera(frame)
+            val observedAt=freshness.observedAt(frame.timestamp,SystemClock.elapsedRealtime())
+            if(observedAt==null || frame.camera.trackingState!=TrackingState.TRACKING) { unavailable(current,t("Tracking paused. Wait for a fresh, tracked camera image.","ट्रैकिंग रुकी है। नए, ट्रैक किए गए कैमरा दृश्य की प्रतीक्षा करें।"));return }
+            val tap=pendingPlacement.getAndSet(null)
+            if(anchor==null && tap!=null && tap.revision==current.revision && SystemClock.elapsedRealtime()-tap.at in 0L..500L) {
+                frame.hitTest(tap.x,tap.y).firstOrNull { val plane=it.trackable as? Plane;plane!=null && plane.type==Plane.Type.HORIZONTAL_UPWARD_FACING && plane.trackingState==TrackingState.TRACKING && plane.isPoseInPolygon(it.hitPose) }?.let { anchor=it.createAnchor() }
+            }
+            val a=anchor
+            if(a==null) { unavailable(current,t("Tap the camera view to place stations on a clear surface.","खाली सतह पर विकल्प रखने के लिए कैमरा दृश्य पर टैप करें।"));return }
+            if(a.trackingState!=TrackingState.TRACKING) {
+                if(a.trackingState==TrackingState.STOPPED) { a.detach();anchor=null }
+                unavailable(current,t("Placement tracking stopped. Wait or place again.","रखी जगह की ट्रैकिंग रुकी है। प्रतीक्षा करें या फिर रखें।"));return
+            }
+            frame.camera.getProjectionMatrix(projection,0,.1f,30f);frame.camera.getViewMatrix(view,0);a.pose.toMatrix(model,0)
+            Matrix.multiplyMM(vp,0,projection,0,view,0);Matrix.multiplyMM(mvp,0,vp,0,model,0)
+            if(frame.lightEstimate.state==LightEstimate.State.VALID) { frame.lightEstimate.getColorCorrection(estimatedLight,0);for(i in 0..3)if(estimatedLight[i].isFinite())lightCorrection[i]=lightCorrection[i]*.9f+estimatedLight[i].coerceIn(.65f,1.35f)*.1f }
+            equipment.draw(vp,model,current.module,frame.camera.pose.translation,lightCorrection)
+            val points=current.options.indices.map { i -> ComponentProjection.project(floatArrayOf((i-(current.options.size-1)/2f)*.5f,.75f,0f),mvp,widthPx,heightPx) }
+            val boxes=if(current.canAnswer && current.width==widthPx && current.height==heightPx)ArChoiceLayout.arrange(points,current.heights,current.columns,widthPx,heightPx,dp(10).toFloat())else null
+            flow.frame(current.revision,boxes!=null,observedAt)
+            val choice=pendingChoice.getAndSet(null)
+            if(boxes!=null && choice!=null && choice.revision==current.revision && choice.questionId==current.questionId && flow.ready(SystemClock.elapsedRealtime())) {
+                runOnUiThread {
+                    if(active && flow.revision==choice.revision && overlay.targetsVisible()) {
+                        try { if(flow.choose(choice.optionId,choice.questionId,choice.revision,SystemClock.elapsedRealtime()))renderState() } catch(_: Exception) { saveFailed() }
+                    }
+                }
+            }
+            publish(Preview(current.revision,points,boxes,if(boxes==null)t("Keep every station in view. If choices do not fit, continue on screen.","सभी विकल्प दृश्य में रखें। विकल्प न समाएँ तो स्क्रीन पर जारी रखें।")else t("Stations placed · choose one response.","विकल्प रखे गए · एक उत्तर चुनें।")))
+        } catch(_: Exception) { unavailable(current,t("Camera interrupted. Retry, or continue on screen.","कैमरा बाधित है। फिर कोशिश करें, या स्क्रीन पर जारी रखें।")) }
+    }
+    private fun drawCamera(frame: Frame) {
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST);vertices.position(0);uv.position(0)
+        frame.transformCoordinates2d(Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,vertices,Coordinates2d.TEXTURE_NORMALIZED,uv)
+        GLES20.glUseProgram(program);GLES20.glActiveTexture(GLES20.GL_TEXTURE0);GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
+        val p=GLES20.glGetAttribLocation(program,"p");val u=GLES20.glGetAttribLocation(program,"uv");vertices.position(0);uv.position(0)
+        GLES20.glEnableVertexAttribArray(p);GLES20.glEnableVertexAttribArray(u);GLES20.glVertexAttribPointer(p,2,GLES20.GL_FLOAT,false,0,vertices);GLES20.glVertexAttribPointer(u,2,GLES20.GL_FLOAT,false,0,uv)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);GLES20.glDisableVertexAttribArray(p);GLES20.glDisableVertexAttribArray(u)
+    }
+    private fun unavailable(current: Scene, message: String) {
+        flow.frame(current.revision,false,SystemClock.elapsedRealtime());pendingChoice.set(null);pendingPlacement.set(null)
+        publish(Preview(current.revision,emptyList(),null,message))
+    }
+    private fun publish(value: Preview) {
+        pendingPreview.set(value)
+        if(previewPosted.compareAndSet(false,true))runOnUiThread {
+            previewPosted.set(false);val latest=pendingPreview.getAndSet(null)
+            if(active && latest!=null && flow.revision==latest.revision && scene.canAnswer) {
+                if(latest.boxes!=null && flow.ready(SystemClock.elapsedRealtime()))overlay.position(latest.points,latest.boxes)else overlay.clear()
+                if(status.text.toString()!=latest.message)status.text=latest.message
+            }
+        }
+    }
+    private inner class AnswerOverlay: FrameLayout(this@ArActivity) {
+        private val buttons=mutableListOf<Button>();private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+        private var lines=emptyList<FloatArray>()
+        private val placeholder=label(t("Camera view paused\nYou can continue on screen.","कैमरा दृश्य रुका है\nआप स्क्रीन पर जारी रख सकते हैं।"),17f,Palette.muted,true).apply { gravity=Gravity.CENTER;setPadding(dp(16),dp(16),dp(16),dp(16));background=shape(Palette.surface,16,Palette.line) }
+        init { setWillNotDraw(false);cameraVisible(false);addView(placeholder,LayoutParams(-1,-2,Gravity.CENTER).apply { setMargins(dp(8),0,dp(8),0) }) }
+        fun cameraVisible(visible: Boolean) { setBackgroundColor(if(visible)Color.TRANSPARENT else Palette.canvas) }
+        fun bind(options: List<Option>, width: Int, revision: Int, questionId: String): List<Float> {
+            buttons.forEach { removeView(it) };buttons.clear();clear()
+            return options.map { option ->
+                val button=action(option.text,false) { queueChoice(option.id,revision,questionId) }.apply { tag="ar-answer-${option.id}";textSize=16f;setPadding(dp(12),dp(10),dp(12),dp(10));visibility=INVISIBLE;isEnabled=false }
+                button.measure(MeasureSpec.makeMeasureSpec(width,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(0,MeasureSpec.UNSPECIFIED))
+                val h=button.measuredHeight.coerceAtLeast(dp(48));buttons.add(button);addView(button,LayoutParams(width,h));h.toFloat()
+            }
+        }
+        fun clear() { buttons.forEach { it.visibility=INVISIBLE;it.isEnabled=false };lines=emptyList();placeholder.visibility=VISIBLE;invalidate() }
+        fun targetsVisible(): Boolean {
+            val visible=Rect()
+            return isShown && buttons.isNotEmpty() && getLocalVisibleRect(visible) && buttons.all { b -> b.visibility==VISIBLE && b.isEnabled && visible.contains(kotlin.math.floor(b.x).toInt(),kotlin.math.floor(b.y).toInt(),kotlin.math.ceil(b.x+b.width).toInt(),kotlin.math.ceil(b.y+b.height).toInt()) }
+        }
+        fun position(points: List<ComponentProjection.Point?>, boxes: List<ArChoiceLayout.Box>) {
+            if(boxes.size!=buttons.size) { clear();return }
+            placeholder.visibility=GONE
+            buttons.forEachIndexed { i,b -> val box=boxes[i];b.x=box.left;b.y=box.top;b.visibility=VISIBLE;b.isEnabled=true }
+            lines=points.mapIndexedNotNull { i,p -> p?.let { floatArrayOf(it.x,it.y,boxes[i].left+boxes[i].width/2,boxes[i].top+boxes[i].height/2) } };invalidate()
+        }
+        override fun onDraw(canvas: Canvas) { super.onDraw(canvas);lines.forEach { p -> paint.color=Color.WHITE;paint.strokeWidth=dp(5).toFloat();canvas.drawLine(p[0],p[1],p[2],p[3],paint);paint.color=Palette.blue;paint.strokeWidth=dp(2).toFloat();canvas.drawLine(p[0],p[1],p[2],p[3],paint) } }
+        override fun onTouchEvent(event: MotionEvent): Boolean { if(event.action==MotionEvent.ACTION_UP) { if(active && scene.canAnswer)pendingPlacement.set(Placement(scene.revision,event.x,event.y,SystemClock.elapsedRealtime()));performClick() };return true }
+        override fun performClick(): Boolean { super.performClick();return true }
+    }
+    companion object {
+        private fun floats(values: FloatArray): FloatBuffer=ByteBuffer.allocateDirect(values.size*4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply { put(values);position(0) }
+        private fun shader(type: Int,source: String): Int=GLES20.glCreateShader(type).also { GLES20.glShaderSource(it,source);GLES20.glCompileShader(it) }
     }
 }
