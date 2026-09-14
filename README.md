@@ -2,6 +2,8 @@
 
 A working **v0.1 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
 
+[Download the APK and emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.1.0-pilot.1).
+
 ## What you can use now
 
 - Android app with English and Hindi lessons, guided practice and assessments for fire response and gas/confined spaces.

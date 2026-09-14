@@ -18,6 +18,7 @@ android {
     sourceSets["main"].assets.srcDir("../../../content")
 }
 dependencies {
+    implementation("androidx.core:core:1.17.0")
     implementation("com.google.ar:core:1.50.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")

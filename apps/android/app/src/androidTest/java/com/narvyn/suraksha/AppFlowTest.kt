@@ -3,6 +3,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
@@ -27,7 +28,7 @@ class AppFlowTest {
    s.onActivity{it.setShowWhenLocked(true);it.setTurnScreenOn(true);it.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);it.getSystemService(android.app.KeyguardManager::class.java).requestDismissKeyguard(it,null)}
    InstrumentationRegistry.getInstrumentation().waitForIdleSync()
    onView(withText("Learn to stay safe.")).check(matches(isDisplayed()));shot("home.png")
-   tap(s,"Start learning");tap(s,"Take an assessment");onView(withText("On-screen decisions")).perform(click());onView(withText("I’m in a safe area")).perform(click())
+   tap(s,"Start learning");tap(s,"Take an assessment");onView(withText("On-screen decisions")).inRoot(isDialog()).perform(click());onView(withText("I’m in a safe area")).inRoot(isDialog()).perform(click())
    val curriculum=Curriculum(context);val questions=curriculum.module("fire").getJSONArray("questions").objects()
    questions.forEachIndexed{i,q->
     if(i==2)s.recreate()
