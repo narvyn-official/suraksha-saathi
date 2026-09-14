@@ -34,3 +34,14 @@ export const credentials = sqliteTable(
     uniqueIndex("idx_credentials_owner_attempt").on(t.owner, t.attemptId),
   ],
 );
+export const workers = sqliteTable(
+  "workers",
+  {
+    owner: text("owner").notNull(),
+    id: text("id").notNull(),
+    name: text("name").notNull(),
+    sector: text("sector").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.owner, t.id] })],
+);

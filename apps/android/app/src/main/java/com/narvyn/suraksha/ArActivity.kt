@@ -28,6 +28,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private var installRequested=false
     private var widthPx=1;private var heightPx=1
     private var texture=0;private var program=0
+    private val equipment=WorldEquipment()
     private var message=""
     @Volatile private var tapped: Pair<Float,Float>?=null
     @Volatile private var canAnswer=false
@@ -40,7 +41,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         super.onCreate(savedInstanceState);store=Store(this);val data=store.attempt(intent.getStringExtra("attemptId")?:"")
         if(data==null){finish();return};training=TrainingSession(data,Curriculum(this).module(data.getString("moduleId")))
         val root=FrameLayout(this)
-        surface=GLSurfaceView(this).apply{setEGLContextClientVersion(2);preserveEGLContextOnPause=true;setRenderer(this@ArActivity);renderMode=GLSurfaceView.RENDERMODE_CONTINUOUSLY}
+        surface=GLSurfaceView(this).apply{setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);preserveEGLContextOnPause=true;setRenderer(this@ArActivity);renderMode=GLSurfaceView.RENDERMODE_CONTINUOUSLY}
         root.addView(surface)
         overlay=TargetOverlay();root.addView(overlay)
         val top=column(16).apply{background=shape(Color.WHITE,16)}
@@ -75,6 +76,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     override fun onDestroy(){anchor?.detach();ar?.close();if(::store.isInitialized)store.close();super.onDestroy()}
     override fun onRequestPermissionsResult(requestCode:Int,permissions:Array<out String>,grantResults:IntArray){super.onRequestPermissionsResult(requestCode,permissions,grantResults);if(grantResults.firstOrNull()==PackageManager.PERMISSION_GRANTED)onResume()else finish()}
     override fun onSurfaceCreated(gl:GL10?,config:EGLConfig?){
+        equipment.create()
         val textures=IntArray(1);GLES20.glGenTextures(1,textures,0);texture=textures[0]
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR)
@@ -106,10 +108,11 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
             val projection=FloatArray(16);val view=FloatArray(16);val model=FloatArray(16);val vp=FloatArray(16);val mvp=FloatArray(16)
             frame.camera.getProjectionMatrix(projection,0,.1f,30f);frame.camera.getViewMatrix(view,0);a.pose.toMatrix(model,0)
             android.opengl.Matrix.multiplyMM(vp,0,projection,0,view,0);android.opengl.Matrix.multiplyMM(mvp,0,vp,0,model,0)
+            equipment.draw(vp,model,training.data.getString("moduleId"))
             val currentOptions=options
             overlay.targets=currentOptions.mapIndexedNotNull{i,option->
                 val point=FloatArray(4);val x=(i-(currentOptions.size-1)/2f)*.5f
-                android.opengl.Matrix.multiplyMV(point,0,mvp,0,floatArrayOf(x,.2f,0f,1f),0)
+                android.opengl.Matrix.multiplyMV(point,0,mvp,0,floatArrayOf(x,.75f,0f,1f),0)
                 if(point[3]<=.1f)null else {
                     val px=(point[0]/point[3]+1f)*widthPx/2;val py=(1f-point[1]/point[3])*heightPx/2
                     val scale=(1.1f/point[3]).coerceIn(.7f,1.25f);val w=dp(132)*scale;val h=dp(110)*scale

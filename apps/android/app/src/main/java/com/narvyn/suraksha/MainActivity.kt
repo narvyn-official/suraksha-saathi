@@ -74,16 +74,24 @@ class MainActivity: Activity() {
     }
     private fun profile(){
         val field=EditText(this).apply{setSingleLine();hint=t("Your name","आपका नाम");setText(store.name);setPadding(dp(20),dp(16),dp(20),dp(16))}
-        AlertDialog.Builder(this).setTitle(t("Your learning profile","आपकी सीखने की प्रोफ़ाइल")).setMessage(t("Stored on this phone. No email or account required.","इस फ़ोन पर सुरक्षित। ईमेल या खाते की ज़रूरत नहीं।")).setView(field).setPositiveButton(t("Save","सहेजें")){_,_->store.name=field.text.toString().trim().take(80);render()}.setNegativeButton(t("Cancel","रद्द करें"),null).show()
+        val sectors=listOf("Unspecified","Mining","Steel","Mica","Other")
+        val sector=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,if(hi)listOf("नहीं चुना","खनन","इस्पात","अभ्रक","अन्य")else sectors);setSelection(sectors.indexOf(store.sector).coerceAtLeast(0));minimumHeight=dp(56)}
+        val form=column(16);form.add(field);form.add(label(t("Work sector","काम का क्षेत्र"),14f),top=12);form.add(sector)
+        AlertDialog.Builder(this).setTitle(t("Your learning profile","आपकी सीखने की प्रोफ़ाइल")).setMessage(t("Stored on this phone. No email or account required.","इस फ़ोन पर सुरक्षित। ईमेल या खाते की ज़रूरत नहीं।")).setView(form).setPositiveButton(t("Save","सहेजें")){_,_->store.name=field.text.toString().trim().take(80);store.sector=sectors[sector.selectedItemPosition];render()}.setNegativeButton(t("Cancel","रद्द करें"),null).show()
     }
     private fun home(){
         body.add(chip(t("OFFLINE READY  ·  PILOT TRAINING","ऑफ़लाइन तैयार  ·  पायलट प्रशिक्षण")),bottom=20)
         title(t("Learn to stay safe.","सुरक्षित रहना सीखें।"),t("Choose a lesson. Go at your own pace.","पाठ चुनें। अपनी गति से सीखें।"))
-        val active=store.attempts().firstOrNull{!it.optBoolean("finished")}
+        val history=store.attempts();val latest=curriculum.modules.associate{m->m.getString("id") to history.firstOrNull{it.optString("moduleId")==m.getString("id")&&it.optString("kind")=="assessment"&&it.optBoolean("finished")}}
+        val passed=latest.values.count{it?.optJSONObject("result")?.optBoolean("passed")==true}
+        body.add(label(t("$passed / ${curriculum.modules.size} module assessments passed","$passed / ${curriculum.modules.size} पाठ मूल्यांकन पास"),14f,Palette.muted),bottom=16)
+        val active=history.firstOrNull{!it.optBoolean("finished")}
         if(active!=null)body.add(action(t("Continue saved training","सहेजा गया प्रशिक्षण जारी रखें"),false){session=TrainingSession(active,curriculum.module(active.getString("moduleId")));selected=active.getString("moduleId");go("training")},bottom=20)
         curriculum.modules.forEachIndexed{i,m->
             val c=card(if(i==0)0xffecf1fc.toInt() else Color.WHITE)
             c.add(label(t("LESSON ${i+1}  ·  ${m.getString("duration")} MIN","पाठ ${i+1}  ·  ${m.getString("duration")} मिनट"),13f,Palette.blue),bottom=14)
+            c.add(SceneView(this,m.getString("id"),hi,false,true),bottom=16)
+            latest[m.getString("id")]?.let{a->val ok=a.getJSONObject("result").optBoolean("passed");c.add(chip(if(ok)t("Assessment passed","मूल्यांकन पास")else t("Practice recommended","अभ्यास सुझाया गया"),if(ok)Palette.successBg else Palette.amberBg,if(ok)Palette.success else Palette.amber),bottom=12)}
             c.add(label(m.local("title",hi),23f,Palette.ink,true),bottom=8);c.add(label(m.local("subtitle",hi),16f,Palette.muted),bottom=20)
             c.add(action(t("Start learning","सीखना शुरू करें"),i==0){selected=m.getString("id");go("module")})
             body.add(c,bottom=16)
@@ -94,6 +102,8 @@ class MainActivity: Activity() {
     private fun module(){
         val m=curriculum.module(selected)
         title(m.local("title",hi),m.local("subtitle",hi))
+        body.add(SceneView(this,selected,hi),bottom=12)
+        body.add(action(t("Explore in 3D","3D में देखें"),false){startActivity(Intent(this,EquipmentActivity::class.java).putExtra("moduleId",selected))},bottom=20)
         val objectives=card();objectives.add(label(t("What you’ll learn","आप क्या सीखेंगे"),19f,Palette.ink,true),bottom=12)
         val obj=m.getJSONArray("objectives");for(i in 0 until obj.length())objectives.add(label("✓  "+obj.getJSONArray(i).getString(if(hi)1 else 0),16f),bottom=10)
         body.add(objectives,bottom=16)
@@ -129,6 +139,7 @@ class MainActivity: Activity() {
         title(m.local("title",hi),t("Question ${s.index+1} of ${s.questions.size}","सवाल ${s.index+1} / ${s.questions.size}"))
         body.add(ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal).apply{max=s.questions.size;progress=s.index+1;progressTintList=android.content.res.ColorStateList.valueOf(Palette.blue)},bottom=20)
         val q=s.current
+        body.add(SceneView(this,s.data.getString("moduleId"),hi,s.guided),bottom=16)
         val scene=card(0xffecf1fc.toInt());scene.add(label(t("TRAINING SCENARIO","प्रशिक्षण परिस्थिति"),13f,Palette.blue),bottom=12)
         scene.add(label(q.local("prompt",hi),22f,Palette.ink,true));body.add(scene,bottom=20)
         if(s.data.optBoolean("awaitingContinue")){
@@ -177,7 +188,7 @@ class MainActivity: Activity() {
         listOf(t("1. Choose a lesson and learn the steps.","1. पाठ चुनें और चरण सीखें।"),t("2. Practise with guidance, then try an assessment.","2. निर्देशों के साथ अभ्यास करें, फिर मूल्यांकन करें।"),t("3. Your progress is saved after every answer.","3. हर उत्तर के बाद प्रगति सहेजी जाती है।"),t("4. Export records for your trainer. Completed practice does not authorise hazardous work.","4. प्रशिक्षक के लिए रिकॉर्ड भेजें। अभ्यास पूरा करना खतरनाक काम की अनुमति नहीं है।")).forEach{body.add(card().apply{add(label(it))},bottom=12)}
         body.add(action(t("Choose language","भाषा चुनें"),false){language()},top=8,bottom=12)
         body.add(action(t("Check AR support","AR समर्थन जाँचें"),false){ArCoreApk.getInstance().checkAvailabilityAsync(this){a->notice(t("AR support","AR समर्थन"),a.name)}},bottom=12)
-        body.add(label(t("Version 0.1.0 • Pilot content requires safety review. Santali lessons await native-speaker review. Audio uses installed offline Android voices.","संस्करण 0.1.0 • पायलट सामग्री की सुरक्षा समीक्षा ज़रूरी है। संताली पाठों की स्थानीय वक्ता समीक्षा बाकी है। आवाज़ Android की इंस्टॉल ऑफ़लाइन आवाज़ से आती है।"),14f,Palette.muted))
+        body.add(label(t("Version 0.2.0 • Pilot content requires safety review. Santali lessons await native-speaker review. Audio uses installed offline Android voices.","संस्करण 0.2.0 • पायलट सामग्री की सुरक्षा समीक्षा ज़रूरी है। संताली पाठों की स्थानीय वक्ता समीक्षा बाकी है। आवाज़ Android की इंस्टॉल ऑफ़लाइन आवाज़ से आती है।"),14f,Palette.muted))
     }
     private fun verifyPage(){
         title(t("Verify a record","रिकॉर्ड जाँचें"),t("Scan a receipt or signed training credential.","रसीद या हस्ताक्षरित प्रशिक्षण प्रमाणपत्र स्कैन करें।"))

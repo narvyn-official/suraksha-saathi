@@ -5,6 +5,7 @@ import {
   Upload,
   Flame,
   Wind,
+  Wrench,
   GraduationCap,
   Users,
   BadgeCheck,
@@ -51,8 +52,18 @@ import {
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
 import QRCode from "qrcode";
-import { curriculum } from "@/lib/grading";
-type Row = { id: string; worker_name: string; worker_id: string; payload: any };
+import {
+  TrainingInsights,
+  WorkerDirectory,
+} from "@/components/training/Insights";
+import { curriculum, curriculumFor } from "@/lib/grading";
+type Row = {
+  id: string;
+  worker_name: string;
+  worker_id: string;
+  worker_sector?: string;
+  payload: any;
+};
 type Credential = {
   id: string;
   attempt_id: string;
@@ -82,7 +93,7 @@ function download(name: string, content: string, type = "application/json") {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export default function Home() {
-  const [tab, setTab] = useState("records");
+  const [tab, setTab] = useState("insights");
   const [records, setRecords] = useState<Row[]>([]),
     [credentials, setCredentials] = useState<Credential[]>([]),
     [loading, setLoading] = useState(true),
@@ -97,9 +108,15 @@ export default function Home() {
     [verification, setVerification] = useState<any>(null),
     [revoke, setRevoke] = useState<Credential | null>(null),
     [reason, setReason] = useState("");
+  const [coverage, setCoverage] = useState({
+    returned: 0,
+    total: 0,
+    truncated: false,
+  });
   const load = useCallback(async () => {
     const d = await api("records");
     setRecords(d.attempts);
+    if (d.coverage) setCoverage(d.coverage);
     setCredentials(d.credentials);
   }, []);
   useEffect(() => {
@@ -229,7 +246,9 @@ export default function Home() {
               Review learning records and verify pilot credentials.
             </p>
           </div>
-          <span className="pill">Pilot programme</span>
+          <Button variant="outline" disabled={busy} onClick={() => run(load)}>
+            Refresh records
+          </Button>
         </div>
         <div className="stats">
           {[
@@ -284,8 +303,20 @@ export default function Home() {
             {message}
           </div>
         )}
+        {coverage.truncated && (
+          <div className="notice">
+            Showing the latest {coverage.returned} of {coverage.total} imported
+            attempts. Analytics and worker histories cover this subset.
+          </div>
+        )}
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="mb-6 h-12 bg-[#e9edf5]">
+            <TabsTrigger value="insights" className="px-5">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="workers" className="px-5">
+              Workers
+            </TabsTrigger>
             <TabsTrigger value="records" className="px-5">
               Training records
             </TabsTrigger>
@@ -299,6 +330,24 @@ export default function Home() {
               Verify
             </TabsTrigger>
           </TabsList>
+          <TabsContent value="insights">
+            {loading ? (
+              <Skeleton className="h-72 w-full" />
+            ) : (
+              <TrainingInsights
+                records={records}
+                certificates={credentials}
+                onReview={setSelected}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="workers">
+            <WorkerDirectory
+              records={records}
+              certificates={credentials}
+              onReview={setSelected}
+            />
+          </TabsContent>
           <TabsContent value="records">
             <div className="dashboard-grid">
               <section className="panel records-panel">
@@ -360,7 +409,8 @@ export default function Home() {
                             </span>
                             <span className="table-sub">
                               {r.payload.result.score}% ·{" "}
-                              {r.payload.events.length}/8 decisions
+                              {r.payload.events.length}/{r.payload.result.total}{" "}
+                              decisions
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
@@ -506,7 +556,7 @@ export default function Home() {
               {curriculum.modules.map((m, i) => (
                 <section className="panel" key={m.id}>
                   <span className="feature-icon">
-                    {i === 0 ? <Flame /> : <Wind />}
+                    {i === 0 ? <Flame /> : i === 1 ? <Wind /> : <Wrench />}
                   </span>
                   <h2>{m.title[0]}</h2>
                   <p>{m.subtitle[0]}</p>
@@ -516,7 +566,7 @@ export default function Home() {
                     ))}
                   </ul>
                   <span className="pill">
-                    8 decisions · English & Hindi draft
+                    {m.questions.length} decisions · English & Hindi draft
                   </span>
                 </section>
               ))}
@@ -617,8 +667,8 @@ export default function Home() {
                 </span>
               </div>
               {selected.payload.events.map((e: any, i: number) => {
-                const q = curriculum.modules
-                  .find((m) => m.id === selected.payload.moduleId)!
+                const q = curriculumFor(selected.payload.contentVersion)!
+                  .modules.find((m) => m.id === selected.payload.moduleId)!
                   .questions.find((q) => q.id === e.questionId)!;
                 const o = q.options.find((o) => o.id === e.optionId)!;
                 return (

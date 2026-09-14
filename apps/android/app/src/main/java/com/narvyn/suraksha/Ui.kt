@@ -25,7 +25,7 @@ fun Context.column(padding: Int=0)=LinearLayout(this).apply { orientation=Linear
 fun LinearLayout.add(view: View,top: Int=0,bottom: Int=0) { addView(view,LinearLayout.LayoutParams(-1,-2).apply { topMargin=context.dp(top);bottomMargin=context.dp(bottom) }) }
 fun Context.card(colour: Int=Palette.surface)=column(20).apply {background=shape(colour,20,if(colour==Palette.surface) Palette.line else null)}
 fun Context.action(text: String,primary: Boolean=true,onClick: ()->Unit)=Button(this).apply {
-    this.text=text;isAllCaps=false;textSize=16f;setTextColor(if(primary)Color.WHITE else Palette.ink)
+    stateListAnimator=null;elevation=0f;this.text=text;isAllCaps=false;textSize=16f;setTextColor(if(primary)Color.WHITE else Palette.ink)
     background=shape(if(primary)Palette.blue else Palette.surface,14,if(primary)null else Palette.line)
     minHeight=dp(56);minimumHeight=dp(56);setPadding(dp(16),dp(12),dp(16),dp(12));setOnClickListener{onClick()}
 }

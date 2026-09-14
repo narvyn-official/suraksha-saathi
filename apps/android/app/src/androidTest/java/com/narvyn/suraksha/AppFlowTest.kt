@@ -46,4 +46,27 @@ class AppFlowTest {
   try{CredentialVerifier.verify(i.targetContext,"SURAKSHA:CREDENTIAL:"+p.joinToString("."));fail("Tampered credential accepted")}catch(expected:IllegalArgumentException){}
  }
  @Test fun hindiHomeRenders(){val c=InstrumentationRegistry.getInstrumentation().targetContext;Store(c).use{it.hi=true};ActivityScenario.launch(MainActivity::class.java).use{onView(withText("सुरक्षित रहना सीखें।")).check(matches(isDisplayed()));shot("hindi-home.png")};Store(c).use{it.hi=false}}
+
+ @Test fun machineryCriticalDecisionStopsAssessment(){
+  val c=InstrumentationRegistry.getInstrumentation().targetContext;Store(c).use{it.hi=false}
+  ActivityScenario.launch(MainActivity::class.java).use{s->
+   s.onActivity{a->val title=texts(a.window.decorView).first{it.text.toString()=="Machinery & isolation"};texts(title.parent as ViewGroup).first{it.text.toString()=="Start learning"}.performClick()}
+   tap(s,"Take an assessment");onView(withText("On-screen decisions")).inRoot(isDialog()).perform(click());onView(withText("I’m in a safe area")).inRoot(isDialog()).perform(click())
+   val q=Curriculum(c).module("machinery").getJSONArray("questions").getJSONObject(0)
+   tap(s,q.getJSONArray("options").objects().first{!it.optBoolean("correct")}.local("text",false))
+   Store(c).use{val a=it.attempts().first();assertEquals("machinery",a.getString("moduleId"));assertTrue(a.getBoolean("finished"));assertFalse(a.getJSONObject("result").getBoolean("passed"));assertEquals(1,a.getJSONArray("events").length())}
+   shot("machinery-critical-result.png")
+  }
+ }
+ @Test fun originalEquipmentModelsRenderAndRotate(){
+  val c=InstrumentationRegistry.getInstrumentation().targetContext;Store(c).use{it.hi=false}
+  for(module in listOf("fire","gas","machinery")){
+   ActivityScenario.launch<EquipmentActivity>(android.content.Intent(c,EquipmentActivity::class.java).putExtra("moduleId",module)).use{s->
+    onView(withText("Rotate right")).perform(click());onView(withText("Change zoom")).perform(click())
+    val done=java.util.concurrent.CountDownLatch(1);var result=-1
+    s.onActivity{a->val root=a.window.decorView;fun find(v:View):android.opengl.GLSurfaceView?{if(v is android.opengl.GLSurfaceView)return v;if(v is ViewGroup)for(i in 0 until v.childCount){find(v.getChildAt(i))?.let{return it}};return null};val surface=find(root)!!;val bitmap=Bitmap.createBitmap(surface.width,surface.height,Bitmap.Config.ARGB_8888);android.view.PixelCopy.request(surface,bitmap,{code->result=code;if(code==android.view.PixelCopy.SUCCESS){val colors=HashSet<Int>();for(x in 0 until bitmap.width step 10)for(y in 0 until bitmap.height step 10)colors.add(bitmap.getPixel(x,y));if(colors.size<8)result=-2;File(c.getExternalFilesDir(null),"model-$module.png").outputStream().use{bitmap.compress(Bitmap.CompressFormat.PNG,100,it)}};done.countDown()},android.os.Handler(android.os.Looper.getMainLooper()))}
+    assertTrue(done.await(10,java.util.concurrent.TimeUnit.SECONDS));assertEquals("A non-blank 3D model must render",android.view.PixelCopy.SUCCESS,result);shot("equipment-$module.png")
+   }
+  }
+ }
 }

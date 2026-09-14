@@ -1,21 +1,146 @@
-import assert from 'node:assert/strict';
-import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
-import {randomUUID} from 'node:crypto';
-const curriculum=JSON.parse(readFileSync(new URL('../lib/curriculum.json',import.meta.url)));
-async function call(path,body,method='POST',auth=true){const r=await fetch('http://localhost:5173/api/'+path,{method,headers:{'Content-Type':'application/json',...(auth?{Cookie:'__sites_local_auth=1'}:{})},body:body?JSON.stringify(body):undefined});return {status:r.status,data:await r.json()};}
-assert.equal((await call('records',undefined,'GET',false)).status,401);
-const now=Date.now(),worker={id:randomUUID(),name:'Demo learner · test record'};
-const attempts=curriculum.modules.map(m=>({id:randomUUID(),workerId:worker.id,moduleId:m.id,contentVersion:curriculum.version,kind:'assessment',mode:'screen',finished:true,startedAt:now,endedAt:now+9000,events:m.questions.map((q,j)=>({type:'answer',sequence:j+1,questionId:q.id,optionId:q.options.find(o=>o.correct).id,time:now+(j+1)*1000})),result:{score:2,passed:false}}));
-const batch={schemaVersion:1,worker,attempts};
-const first=await call('import',batch);assert.equal(first.status,200,JSON.stringify(first));assert.equal(first.data.imported,2);
-assert.equal((await call('import',batch)).data.unchanged,2);
-const rows=(await call('records',undefined,'GET')).data.attempts;assert.equal(rows.find(r=>r.id===attempts[0].id).payload.result.score,100);
-const altered=structuredClone(batch);altered.attempts[0].mode='arcore';assert.equal((await call('import',altered)).status,400);
-const invalid=structuredClone(batch);invalid.attempts[0].id=randomUUID();invalid.attempts[0].events[0].optionId='invented';assert.equal((await call('import',invalid)).status,400);
-const cert=await call('credentials',{attemptId:attempts[0].id});assert.equal(cert.status,200,JSON.stringify(cert));assert.equal((await call('credentials',{attemptId:attempts[0].id})).data.id,cert.data.id);
-assert.equal((await call('verify',{token:cert.data.token})).data.status,'active');
-const parts=cert.data.token.split('.');const p=JSON.parse(Buffer.from(parts[1],'base64url'));p.score=99;parts[1]=Buffer.from(JSON.stringify(p)).toString('base64url');assert.equal((await call('verify',{token:parts.join('.')})).status,400);
-assert.equal((await call('credentials',{id:cert.data.id,reason:'Integration test revocation'},'PATCH')).status,200);assert.equal((await call('verify',{token:cert.data.token})).data.status,'revoked');
-const active=await call('credentials',{attemptId:attempts[1].id});assert.equal(active.status,200);
-mkdirSync(new URL('../../../artifacts',import.meta.url),{recursive:true});writeFileSync(new URL('../../../artifacts/demo-training-record.json',import.meta.url),JSON.stringify(batch,null,2));writeFileSync(new URL('../../../artifacts/demo-credential.txt',import.meta.url),'SURAKSHA:CREDENTIAL:'+active.data.token);
-console.log('PASS: unauthenticated access, import, idempotency, score replay, conflicting record, unknown option, issuance, signature tamper, revocation. Demo records remain for preview.');
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+const curriculum = JSON.parse(
+  readFileSync(new URL("../lib/curriculum.json", import.meta.url)),
+);
+async function call(path, body, method = "POST", auth = true) {
+  const r = await fetch("http://localhost:5173/api/" + path, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      ...(auth ? { Cookie: "__sites_local_auth=1" } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { status: r.status, data: await r.json() };
+}
+assert.equal((await call("records", undefined, "GET", false)).status, 401);
+const now = Date.now(),
+  worker = {
+    id: randomUUID(),
+    name: "Demo learner · test record",
+    sector: "Mining",
+  };
+const attempts = curriculum.modules.map((m) => ({
+  id: randomUUID(),
+  workerId: worker.id,
+  moduleId: m.id,
+  contentVersion: curriculum.version,
+  kind: "assessment",
+  mode: "screen",
+  finished: true,
+  startedAt: now,
+  endedAt: now + 9000,
+  events: m.questions.map((q, j) => ({
+    type: "answer",
+    sequence: j + 1,
+    questionId: q.id,
+    optionId: q.options.find((o) => o.correct).id,
+    time: now + (j + 1) * 1000,
+  })),
+  result: { score: 2, passed: false },
+}));
+const batch = { schemaVersion: 1, worker, attempts };
+const first = await call("import", batch);
+assert.equal(first.status, 200, JSON.stringify(first));
+assert.equal(first.data.imported, attempts.length);
+assert.equal((await call("import", batch)).data.unchanged, attempts.length);
+const rows = (await call("records", undefined, "GET")).data.attempts;
+assert.equal(
+  rows.find((r) => r.id === attempts[0].id).payload.result.score,
+  100,
+);
+assert.equal(rows.find((r) => r.id === attempts[0].id).worker_sector, "Mining");
+const machinery = await call("credentials", { attemptId: attempts[2].id });
+assert.equal(machinery.status, 200);
+assert.equal(
+  (await call("verify", { token: machinery.data.token })).data.moduleId,
+  "machinery",
+);
+const old = structuredClone(batch);
+old.attempts = old.attempts
+  .slice(0, 2)
+  .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.1.0" }));
+assert.equal((await call("import", old)).status, 200);
+const unsupported = structuredClone(batch);
+unsupported.attempts = [
+  { ...unsupported.attempts[2], id: randomUUID(), contentVersion: "0.1.0" },
+];
+assert.equal((await call("import", unsupported)).status, 400);
+const failed = structuredClone(batch);
+failed.worker = {
+  id: randomUUID(),
+  name: "Demo retraining · test record",
+  sector: "Steel",
+};
+failed.attempts = [
+  {
+    ...failed.attempts[2],
+    id: randomUUID(),
+    workerId: failed.worker.id,
+    events: [
+      {
+        ...failed.attempts[2].events[0],
+        optionId: curriculum.modules[2].questions[0].options.find(
+          (o) => !o.correct,
+        ).id,
+      },
+    ],
+  },
+];
+assert.equal((await call("import", failed)).status, 200);
+assert.equal(
+  (await call("credentials", { attemptId: failed.attempts[0].id })).status,
+  400,
+);
+const altered = structuredClone(batch);
+altered.attempts[0].mode = "arcore";
+assert.equal((await call("import", altered)).status, 400);
+const invalid = structuredClone(batch);
+invalid.attempts[0].id = randomUUID();
+invalid.attempts[0].events[0].optionId = "invented";
+assert.equal((await call("import", invalid)).status, 400);
+const cert = await call("credentials", { attemptId: attempts[0].id });
+assert.equal(cert.status, 200, JSON.stringify(cert));
+assert.equal(
+  (await call("credentials", { attemptId: attempts[0].id })).data.id,
+  cert.data.id,
+);
+assert.equal(
+  (await call("verify", { token: cert.data.token })).data.status,
+  "active",
+);
+const parts = cert.data.token.split(".");
+const p = JSON.parse(Buffer.from(parts[1], "base64url"));
+p.score = 99;
+parts[1] = Buffer.from(JSON.stringify(p)).toString("base64url");
+assert.equal((await call("verify", { token: parts.join(".") })).status, 400);
+assert.equal(
+  (
+    await call(
+      "credentials",
+      { id: cert.data.id, reason: "Integration test revocation" },
+      "PATCH",
+    )
+  ).status,
+  200,
+);
+assert.equal(
+  (await call("verify", { token: cert.data.token })).data.status,
+  "revoked",
+);
+const active = await call("credentials", { attemptId: attempts[1].id });
+assert.equal(active.status, 200);
+mkdirSync(new URL("../../../artifacts", import.meta.url), { recursive: true });
+writeFileSync(
+  new URL("../../../artifacts/demo-training-record.json", import.meta.url),
+  JSON.stringify(batch, null, 2),
+);
+writeFileSync(
+  new URL("../../../artifacts/demo-credential.txt", import.meta.url),
+  "SURAKSHA:CREDENTIAL:" + active.data.token,
+);
+console.log(
+  "PASS: unauthenticated access, import, idempotency, score replay, conflicting record, unknown option, issuance, signature tamper, revocation. Demo records remain for preview.",
+);

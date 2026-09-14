@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.2.0",
+  "version": "0.1.0",
   "reviewStatus": "pilot-draft",
   "languages": {
     "en": "available",
@@ -10,10 +10,7 @@
   "modules": [
     {
       "id": "fire",
-      "title": [
-        "Fire safety",
-        "आग से सुरक्षा"
-      ],
+      "title": ["Fire safety", "आग से सुरक्षा"],
       "subtitle": [
         "Recognise danger. Choose a safe response.",
         "खतरा पहचानें। सुरक्षित कदम चुनें।"
@@ -37,10 +34,7 @@
       ],
       "lessons": [
         {
-          "title": [
-            "Your first action",
-            "आपका पहला कदम"
-          ],
+          "title": ["Your first action", "आपका पहला कदम"],
           "body": [
             "Raise the alarm when you recognise a fire. Follow the site's emergency plan. If smoke is growing, an escape route is threatened, or you are not trained and authorised, withdraw and notify the responsible person.",
             "आग पहचानते ही अलार्म बजाएँ। कार्यस्थल की आपात योजना का पालन करें। धुआँ बढ़ रहा हो, निकास पर खतरा हो, या आप प्रशिक्षित और अधिकृत न हों, तो पीछे हटें और ज़िम्मेदार व्यक्ति को बताएँ।"
@@ -57,10 +51,7 @@
           ]
         },
         {
-          "title": [
-            "Rehearse the sequence",
-            "चरणों का अभ्यास करें"
-          ],
+          "title": ["Rehearse the sequence", "चरणों का अभ्यास करें"],
           "body": [
             "For a suitable extinguisher and authorised scenario: pull the pin, aim at the base, squeeze the handle, and sweep across the base. Keep an escape route available and withdraw if conditions worsen. Screen practice does not replace supervised hands-on training.",
             "उपयुक्त अग्निशामक और अधिकृत परिस्थिति में: पिन निकालें, आग के आधार पर निशाना लगाएँ, हैंडल दबाएँ और आधार पर दाएँ-बाएँ चलाएँ। निकास खुला रखें और हालात बिगड़ने पर पीछे हटें। स्क्रीन पर अभ्यास, प्रशिक्षक के साथ वास्तविक अभ्यास का विकल्प नहीं है।"
@@ -101,17 +92,11 @@
             },
             {
               "id": "inspect",
-              "text": [
-                "Move closer to inspect",
-                "पास जाकर जाँच करें"
-              ]
+              "text": ["Move closer to inspect", "पास जाकर जाँच करें"]
             },
             {
               "id": "belongings",
-              "text": [
-                "Collect your belongings first",
-                "पहले अपना सामान लें"
-              ]
+              "text": ["Collect your belongings first", "पहले अपना सामान लें"]
             }
           ]
         },
@@ -138,10 +123,7 @@
             },
             {
               "id": "fight",
-              "text": [
-                "Try the extinguisher anyway",
-                "फिर भी अग्निशामक चलाएँ"
-              ]
+              "text": ["Try the extinguisher anyway", "फिर भी अग्निशामक चलाएँ"]
             }
           ]
         },
@@ -190,25 +172,16 @@
           "options": [
             {
               "id": "pin",
-              "text": [
-                "Pull the pin",
-                "पिन निकालें"
-              ],
+              "text": ["Pull the pin", "पिन निकालें"],
               "correct": true
             },
             {
               "id": "squeeze",
-              "text": [
-                "Squeeze immediately",
-                "तुरंत हैंडल दबाएँ"
-              ]
+              "text": ["Squeeze immediately", "तुरंत हैंडल दबाएँ"]
             },
             {
               "id": "turn",
-              "text": [
-                "Turn away from the fire",
-                "आग से मुँह मोड़ लें"
-              ]
+              "text": ["Turn away from the fire", "आग से मुँह मोड़ लें"]
             }
           ]
         },
@@ -227,18 +200,12 @@
           "options": [
             {
               "id": "base",
-              "text": [
-                "At the base of the fire",
-                "आग के आधार पर"
-              ],
+              "text": ["At the base of the fire", "आग के आधार पर"],
               "correct": true
             },
             {
               "id": "smoke",
-              "text": [
-                "At the smoke above it",
-                "ऊपर के धुएँ पर"
-              ]
+              "text": ["At the smoke above it", "ऊपर के धुएँ पर"]
             }
           ]
         },
@@ -257,10 +224,7 @@
           "options": [
             {
               "id": "retreat",
-              "text": [
-                "Stop and withdraw",
-                "रोकें और पीछे हटें"
-              ],
+              "text": ["Stop and withdraw", "रोकें और पीछे हटें"],
               "correct": true
             },
             {
@@ -287,18 +251,12 @@
           "options": [
             {
               "id": "exit-b",
-              "text": [
-                "Exit B — clear route",
-                "निकास B — खुला रास्ता"
-              ],
+              "text": ["Exit B — clear route", "निकास B — खुला रास्ता"],
               "correct": true
             },
             {
               "id": "exit-a",
-              "text": [
-                "Exit A — shorter route",
-                "निकास A — छोटा रास्ता"
-              ]
+              "text": ["Exit A — shorter route", "निकास A — छोटा रास्ता"]
             }
           ]
         },
@@ -325,10 +283,7 @@
             },
             {
               "id": "rescue",
-              "text": [
-                "Go back to search",
-                "ढूँढने के लिए वापस जाएँ"
-              ]
+              "text": ["Go back to search", "ढूँढने के लिए वापस जाएँ"]
             }
           ]
         }
@@ -336,10 +291,7 @@
     },
     {
       "id": "gas",
-      "title": [
-        "Gas & confined spaces",
-        "गैस और सीमित स्थान"
-      ],
+      "title": ["Gas & confined spaces", "गैस और सीमित स्थान"],
       "subtitle": [
         "Know when entry must be refused.",
         "जानें कि प्रवेश कब मना करना चाहिए।"
@@ -373,30 +325,21 @@
           ]
         },
         {
-          "title": [
-            "Check every prerequisite",
-            "हर शर्त जाँचें"
-          ],
+          "title": ["Check every prerequisite", "हर शर्त जाँचें"],
           "body": [
             "Entry requires the applicable site permit, isolation, authorised atmospheric assessment, ventilation where required, communication and viable rescue arrangements. The exact controls must come from the reviewed site procedure. A permit alone is not sufficient.",
             "प्रवेश के लिए कार्यस्थल का लागू अनुमति पत्र, अलगाव, अधिकृत वातावरण जाँच, आवश्यक वेंटिलेशन, संचार और बचाव की व्यवस्था चाहिए। सही नियंत्रण कार्यस्थल की जाँची गई प्रक्रिया से तय हों। केवल अनुमति पत्र काफ़ी नहीं है।"
           ]
         },
         {
-          "title": [
-            "People and protective equipment",
-            "लोग और सुरक्षा उपकरण"
-          ],
+          "title": ["People and protective equipment", "लोग और सुरक्षा उपकरण"],
           "body": [
             "The attendant stays outside with reliable communication. Sending both buddies inside removes that protection. PPE must suit the identified hazard and authorised role. A dust mask does not protect against oxygen deficiency or an unknown toxic atmosphere.",
             "निगरानी करने वाला व्यक्ति भरोसेमंद संचार के साथ बाहर रहता है। दोनों साथियों को अंदर भेजने से यह सुरक्षा हट जाती है। सुरक्षा उपकरण पहचाने गए खतरे और अधिकृत भूमिका के अनुरूप हों। धूल वाला मास्क ऑक्सीजन की कमी या अज्ञात जहरीले वातावरण से नहीं बचाता।"
           ]
         },
         {
-          "title": [
-            "Alarms and rescue",
-            "अलार्म और बचाव"
-          ],
+          "title": ["Alarms and rescue", "अलार्म और बचाव"],
           "body": [
             "Withdraw on the simulated alarm according to the site procedure. If a colleague becomes unresponsive, raise the alarm and summon trained rescue. Do not rush in: unplanned entry can create another casualty.",
             "काल्पनिक अलार्म बजने पर कार्यस्थल की प्रक्रिया के अनुसार बाहर आएँ। साथी बेहोश हो तो अलार्म बजाएँ और प्रशिक्षित बचाव दल बुलाएँ। जल्दबाज़ी में अंदर न जाएँ: बिना योजना प्रवेश से एक और व्यक्ति घायल हो सकता है।"
@@ -427,10 +370,7 @@
             },
             {
               "id": "quick",
-              "text": [
-                "Take a quick look inside",
-                "जल्दी से अंदर देख लें"
-              ]
+              "text": ["Take a quick look inside", "जल्दी से अंदर देख लें"]
             }
           ]
         },
@@ -479,10 +419,7 @@
           "options": [
             {
               "id": "refuse",
-              "text": [
-                "Do not enter",
-                "प्रवेश न करें"
-              ],
+              "text": ["Do not enter", "प्रवेश न करें"],
               "correct": true
             },
             {
@@ -509,18 +446,12 @@
           "options": [
             {
               "id": "no",
-              "text": [
-                "No — refuse entry",
-                "नहीं — प्रवेश से मना करें"
-              ],
+              "text": ["No — refuse entry", "नहीं — प्रवेश से मना करें"],
               "correct": true
             },
             {
               "id": "yes",
-              "text": [
-                "Yes, for a short time",
-                "हाँ, थोड़ी देर के लिए"
-              ]
+              "text": ["Yes, for a short time", "हाँ, थोड़ी देर के लिए"]
             }
           ]
         },
@@ -577,10 +508,7 @@
             },
             {
               "id": "none",
-              "text": [
-                "Nothing else is needed",
-                "और कुछ नहीं चाहिए"
-              ]
+              "text": ["Nothing else is needed", "और कुछ नहीं चाहिए"]
             }
           ]
         },
@@ -599,18 +527,12 @@
           "options": [
             {
               "id": "leave",
-              "text": [
-                "Withdraw and notify",
-                "बाहर जाएँ और जानकारी दें"
-              ],
+              "text": ["Withdraw and notify", "बाहर जाएँ और जानकारी दें"],
               "correct": true
             },
             {
               "id": "finish",
-              "text": [
-                "Finish the job first",
-                "पहले काम पूरा करें"
-              ]
+              "text": ["Finish the job first", "पहले काम पूरा करें"]
             }
           ]
         },
@@ -642,324 +564,6 @@
                 "निकालने के लिए तुरंत अंदर जाएँ"
               ]
             }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "machinery",
-      "title": [
-        "Machinery & isolation",
-        "मशीनें और ऊर्जा अलगाव"
-      ],
-      "subtitle": [
-        "Recognise moving parts. Respect isolation and authorisation.",
-        "चलते पुर्ज़े पहचानें। ऊर्जा अलगाव और अनुमति के नियम मानें।"
-      ],
-      "duration": "8–12",
-      "objectives": [
-        [
-          "Recognise entanglement and unexpected-start hazards.",
-          "उलझने और अचानक चालू होने के खतरे पहचानें।"
-        ],
-        [
-          "Distinguish stopping a machine from isolating its energy.",
-          "मशीन रोकने और उसकी ऊर्जा अलग करने का अंतर समझें।"
-        ],
-        [
-          "Know when to stop and call an authorised person.",
-          "जानें कब रुकना और अधिकृत व्यक्ति को बुलाना है।"
-        ]
-      ],
-      "lessons": [
-        {
-          "title": [
-            "Keep clear of moving parts",
-            "चलते पुर्ज़ों से दूर रहें"
-          ],
-          "body": [
-            "Stay outside barriers and guards. Do not reach into a machine to retrieve material or clear a jam. Report damaged guards and unexpected movement.",
-            "अवरोधों और सुरक्षा गार्डों के बाहर रहें। सामग्री निकालने या जाम हटाने के लिए मशीन में हाथ न डालें। टूटे गार्ड और अचानक गति की सूचना दें।"
-          ]
-        },
-        {
-          "title": [
-            "Stop is not isolation",
-            "रोकना ऊर्जा अलग करना नहीं है"
-          ],
-          "body": [
-            "An emergency stop can stop motion, but does not prove all hazardous energy is controlled. Electrical, pressure, gravity and stored energy may remain.",
-            "आपात स्टॉप गति रोक सकता है, लेकिन सभी खतरनाक ऊर्जा के नियंत्रित होने का प्रमाण नहीं है। बिजली, दबाव, गुरुत्व और संचित ऊर्जा रह सकती है।"
-          ]
-        },
-        {
-          "title": [
-            "Follow the authorised procedure",
-            "अधिकृत प्रक्रिया का पालन करें"
-          ],
-          "body": [
-            "Only trained, authorised people carry out the site’s equipment-specific isolation procedure. They control stored energy and verify isolation before servicing. This lesson does not authorise you to do that work.",
-            "केवल प्रशिक्षित, अधिकृत लोग स्थल की उपकरण-विशिष्ट अलगाव प्रक्रिया करते हैं। वे संचित ऊर्जा नियंत्रित करते हैं और मरम्मत से पहले अलगाव सत्यापित करते हैं। यह पाठ उस काम की अनुमति नहीं देता।"
-          ]
-        },
-        {
-          "title": [
-            "Restart needs a controlled handover",
-            "दोबारा चालू करने से पहले नियंत्रित हस्तांतरण"
-          ],
-          "body": [
-            "Do not remove another person’s lock or restart because a colleague says the job is finished. Follow the site’s clearance, lock-removal and notification procedure.",
-            "किसी और का ताला न हटाएँ। केवल साथी के कहने पर मशीन दोबारा चालू न करें। स्थल की जाँच, ताला हटाने और सूचना देने की प्रक्रिया मानें।"
-          ]
-        }
-      ],
-      "questions": [
-        {
-          "id": "machine-guard",
-          "scene": "guard",
-          "critical": true,
-          "prompt": [
-            "A guard is missing beside a rotating shaft. What do you do?",
-            "घूमते शाफ्ट के पास गार्ड नहीं है। आप क्या करेंगे?"
-          ],
-          "options": [
-            {
-              "id": "safe",
-              "text": [
-                "Keep clear and report the defect",
-                "दूर रहें और खराबी की सूचना दें"
-              ],
-              "correct": true
-            },
-            {
-              "id": "unsafe",
-              "text": [
-                "Continue with extra care",
-                "अधिक सावधानी से काम जारी रखें"
-              ],
-              "correct": false
-            }
-          ],
-          "explanation": [
-            "A missing guard requires action before exposure to moving parts.",
-            "चलते पुर्ज़ों के संपर्क से पहले गार्ड की खराबी का समाधान ज़रूरी है।"
-          ]
-        },
-        {
-          "id": "machine-jam",
-          "scene": "machine",
-          "critical": true,
-          "prompt": [
-            "Material is jammed in the conveyor. What is your first decision?",
-            "कन्वेयर में सामग्री फँसी है। आपका पहला निर्णय क्या है?"
-          ],
-          "options": [
-            {
-              "id": "safe",
-              "text": [
-                "Keep hands out; follow the stop-and-report procedure",
-                "हाथ बाहर रखें; रोकने और सूचना देने की प्रक्रिया मानें"
-              ],
-              "correct": true
-            },
-            {
-              "id": "unsafe",
-              "text": [
-                "Pull it free while the belt slows down",
-                "बेल्ट धीमा होने पर सामग्री खींच लें"
-              ],
-              "correct": false
-            }
-          ],
-          "explanation": [
-            "A slowing machine can still trap or pull you in.",
-            "धीमी होती मशीन भी फँसा सकती है या अंदर खींच सकती है।"
-          ]
-        },
-        {
-          "id": "machine-stop",
-          "scene": "isolation",
-          "critical": true,
-          "prompt": [
-            "The emergency stop is pressed. Is servicing now safe?",
-            "आपात स्टॉप दबा है। क्या अब मरम्मत सुरक्षित है?"
-          ],
-          "options": [
-            {
-              "id": "safe",
-              "text": [
-                "No. Authorised isolation and verification are still needed",
-                "नहीं। अधिकृत अलगाव और सत्यापन अभी चाहिए"
-              ],
-              "correct": true
-            },
-            {
-              "id": "unsafe",
-              "text": [
-                "Yes. The machine is no longer moving",
-                "हाँ। मशीन अब नहीं चल रही"
-              ],
-              "correct": false
-            }
-          ],
-          "explanation": [
-            "Stopping motion is not proof that all hazardous energy is controlled.",
-            "गति रुकना सभी खतरनाक ऊर्जा नियंत्रित होने का प्रमाण नहीं है।"
-          ]
-        },
-        {
-          "id": "machine-role",
-          "scene": "permit",
-          "critical": true,
-          "prompt": [
-            "You have not been authorised to isolate this machine. What next?",
-            "इस मशीन की ऊर्जा अलग करने की आपको अनुमति नहीं है। आगे क्या करेंगे?"
-          ],
-          "options": [
-            {
-              "id": "safe",
-              "text": [
-                "Stay clear and call the authorised person",
-                "दूर रहें और अधिकृत व्यक्ति को बुलाएँ"
-              ],
-              "correct": true
-            },
-            {
-              "id": "unsafe",
-              "text": [
-                "Copy a colleague’s isolation steps",
-                "साथी के अलगाव चरणों की नकल करें"
-              ],
-              "correct": false
-            }
-          ],
-          "explanation": [
-            "Equipment-specific competence and authorisation are required.",
-            "उपकरण-विशिष्ट दक्षता और अनुमति चाहिए।"
-          ]
-        },
-        {
-          "id": "machine-stored",
-          "scene": "isolation",
-          "critical": true,
-          "prompt": [
-            "A raised component can fall after power is disconnected. What does this mean?",
-            "बिजली हटने के बाद भी उठा पुर्ज़ा गिर सकता है। इसका क्या अर्थ है?"
-          ],
-          "options": [
-            {
-              "id": "safe",
-              "text": [
-                "Stored or gravity energy must be controlled by the procedure",
-                "प्रक्रिया से संचित या गुरुत्व ऊर्जा नियंत्रित करनी होगी"
-              ],
-              "correct": true
-            },
-            {
-              "id": "unsafe",
-              "text": [
-                "Disconnecting power removes every hazard",
-                "बिजली हटाना हर खतरा दूर कर देता है"
-              ],
-              "correct": false
-            }
-          ],
-          "explanation": [
-            "Different energy sources need appropriate controls.",
-            "अलग ऊर्जा स्रोतों के लिए उचित नियंत्रण चाहिए।"
-          ]
-        },
-        {
-          "id": "machine-verify",
-          "scene": "meter",
-          "critical": true,
-          "prompt": [
-            "Before servicing, what must the authorised person establish?",
-            "मरम्मत से पहले अधिकृत व्यक्ति को क्या सुनिश्चित करना है?"
-          ],
-          "options": [
-            {
-              "id": "safe",
-              "text": [
-                "Verify the specified energy-control measures are effective",
-                "निर्धारित ऊर्जा नियंत्रण प्रभावी हैं, यह सत्यापित करें"
-              ],
-              "correct": true
-            },
-            {
-              "id": "unsafe",
-              "text": [
-                "Assume a fitted lock proves isolation",
-                "मान लें कि लगा ताला अलगाव का प्रमाण है"
-              ],
-              "correct": false
-            }
-          ],
-          "explanation": [
-            "The presence of a lock alone does not verify effective isolation.",
-            "केवल ताला लगा होना प्रभावी अलगाव का सत्यापन नहीं है।"
-          ]
-        },
-        {
-          "id": "machine-lock",
-          "scene": "isolation",
-          "critical": true,
-          "prompt": [
-            "Another person’s lock is still attached. A colleague asks you to remove it.",
-            "दूसरे व्यक्ति का ताला लगा है। साथी उसे हटाने को कहता है।"
-          ],
-          "options": [
-            {
-              "id": "safe",
-              "text": [
-                "Refuse and follow the site’s authorised removal procedure",
-                "मना करें और स्थल की अधिकृत ताला-हटाने की प्रक्रिया मानें"
-              ],
-              "correct": true
-            },
-            {
-              "id": "unsafe",
-              "text": [
-                "Remove it to avoid delaying production",
-                "उत्पादन में देरी से बचने के लिए हटा दें"
-              ],
-              "correct": false
-            }
-          ],
-          "explanation": [
-            "Lock removal requires the specified authority and safeguards.",
-            "ताला हटाने के लिए निर्धारित अधिकार और सुरक्षा उपाय चाहिए।"
-          ]
-        },
-        {
-          "id": "machine-handover",
-          "scene": "assembly",
-          "critical": false,
-          "prompt": [
-            "How should a shift change during isolation be handled?",
-            "अलगाव के दौरान पाली बदलने पर क्या करना चाहिए?"
-          ],
-          "options": [
-            {
-              "id": "safe",
-              "text": [
-                "Use the documented handover that maintains protection",
-                "सुरक्षा बनाए रखने वाला लिखित हस्तांतरण अपनाएँ"
-              ],
-              "correct": true
-            },
-            {
-              "id": "unsafe",
-              "text": [
-                "Leave a verbal message and walk away",
-                "मौखिक संदेश देकर चले जाएँ"
-              ],
-              "correct": false
-            }
-          ],
-          "explanation": [
-            "A controlled handover prevents a gap in protection.",
-            "नियंत्रित हस्तांतरण सुरक्षा में अंतर आने से रोकता है।"
           ]
         }
       ]

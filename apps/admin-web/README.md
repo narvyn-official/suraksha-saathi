@@ -22,6 +22,7 @@ Import the Android JSON export, select **View**, and issue a pilot credential fo
 ## Checks
 
 ```sh
+npm test
 npx tsc --noEmit
 npm run build
 node tests/integration.mjs
@@ -37,4 +38,8 @@ Sites registration failed during this build. Discovery confirmed no Suraksha sit
 
 ## Pilot limitations
 
-The dashboard displays up to the latest 500 attempts and credentials per owner. Imports accept 1–100 completed attempts and files up to 1 MB. There are no bulk worker assignments, practical-assessment signing, automatic sync, organisation roles, analytics beyond counts, official certification, key rotation UI or public verification service yet. Imported event histories are consistency checked, not hardware attested.
+The dashboard displays up to the latest 500 attempts and credentials per owner. Imports accept 1–100 completed attempts and files up to 1 MB. There are no bulk worker assignments, practical-assessment signing, automatic sync, organisation roles, official certification, key rotation UI or public verification service yet. Imported event histories are consistency checked, not hardware attested.
+
+## Evidence analytics
+
+Overview uses each worker’s latest assessment per module. Practice does not count toward assessment coverage. Workers supports name/ID search, sector and status filters, history review and CSV export. Workers are created or updated by validated Android imports. The coverage notice discloses when the latest-500 limit truncates evidence. Curriculum versions 0.1.0 and 0.2.0 are supported explicitly; unknown versions are rejected.

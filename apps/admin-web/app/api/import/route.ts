@@ -36,8 +36,22 @@ export async function POST(request: Request) {
           ),
       );
     }
-    if (inserts.length) await db().batch(inserts);
-    return Response.json({ imported: inserts.length, unchanged });
+    const imported = inserts.length;
+    inserts.push(
+      db()
+        .prepare(
+          "INSERT INTO workers(owner,id,name,sector,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(owner,id) DO UPDATE SET name=excluded.name,sector=excluded.sector,updated_at=excluded.updated_at",
+        )
+        .bind(
+          who,
+          data.worker.id,
+          data.worker.name,
+          data.worker.sector,
+          Date.now(),
+        ),
+    );
+    await db().batch(inserts);
+    return Response.json({ imported, unchanged });
   } catch (e) {
     return failure(e);
   }

@@ -1,7 +1,17 @@
 import curriculum from "./curriculum.json" with { type: "json" };
+import legacy from "./archive/0.1.0.json" with { type: "json" };
 export { curriculum };
-export function grade(moduleId: string, events: unknown) {
-  const module = curriculum.modules.find((m) => m.id === moduleId);
+export function curriculumFor(version: string) {
+  if (version === curriculum.version) return curriculum;
+  if (version === legacy.version) return legacy;
+  throw new Error("Unsupported content version.");
+}
+export function grade(
+  moduleId: string,
+  events: unknown,
+  version = curriculum.version,
+) {
+  const module = curriculumFor(version).modules.find((m) => m.id === moduleId);
   if (!module) throw new Error("Unknown module.");
   if (!Array.isArray(events) || events.length > module.questions.length)
     throw new Error("Invalid answer sequence.");
@@ -50,6 +60,9 @@ export function validateImport(input: any) {
     throw new Error(
       "Invalid training export. Expected 1–100 completed attempts.",
     );
+  const sector = input.worker.sector ?? "Unspecified";
+  if (!["Unspecified", "Mining", "Steel", "Mica", "Other"].includes(sector))
+    throw new Error("Invalid work sector.");
   const ids = new Set();
   const attempts = input.attempts.map((a: any) => {
     if (
@@ -57,7 +70,7 @@ export function validateImport(input: any) {
       !uuid.test(a.id) ||
       ids.has(a.id) ||
       a.workerId !== input.worker.id ||
-      a.contentVersion !== curriculum.version ||
+      ![curriculum.version, legacy.version].includes(a.contentVersion) ||
       !["practice", "assessment"].includes(a.kind) ||
       !["screen", "arcore", "hybrid"].includes(a.mode) ||
       a.finished !== true ||
@@ -68,7 +81,7 @@ export function validateImport(input: any) {
     )
       throw new Error("Invalid or unsupported training attempt.");
     ids.add(a.id);
-    const result = grade(a.moduleId, a.events);
+    const result = grade(a.moduleId, a.events, a.contentVersion);
     if (
       a.events.some(
         (e: any, i: number) =>
@@ -92,5 +105,5 @@ export function validateImport(input: any) {
     }
     return { ...a, result };
   });
-  return { worker: input.worker, attempts };
+  return { worker: { ...input.worker, sector }, attempts };
 }
