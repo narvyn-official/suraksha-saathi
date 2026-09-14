@@ -1,5 +1,18 @@
 # Pilot validation — 15 September 2026
 
+## v0.4.0 verification
+
+- **23 JVM tests** passed. Added cross-version cases confirm that unchanged questions retain their review date, streak and round, changed questions cannot reuse the older answer, and an older success cannot hide a newer compatible review error.
+- **Nine web tests**, TypeScript checking, production build and API integration passed. Added coverage requires all five domains for complete worker coverage, blocks high-score critical failures, verifies archived 0.3 scope, issues/verifies emergency pilot credentials and rejects emergency records labelled as 0.3. Older 0.1/0.2 imports still replay against their archives. The client-bundle size warning remains.
+- **Thirteen Android instrumented tests** passed in the combined emulator run (130.481 seconds). New checks complete emergency practice and assessment in English/Hindi across recreation, stop and persist an unsafe entry decision, and verify a trainer-signed emergency token on Android. Existing app and component checks now exercise all five equipment models and 15 identification targets.
+- Shared JSON mirrors and exact 0.3 archives match; the earlier four module objects remain unchanged. Current curriculum contains five modules and 40 unique decisions. No issuer rotation or database schema change was needed.
+- Fresh English/Hindi lesson and result screens were inspected. Equipment review identified radio details offset from its front panel; the attachment geometry was corrected before release. Five targeted rendering, emergency and component-flow tests then passed (101.061 seconds). After the final recall compatibility correction, the native recall persistence test passed again (5.334 seconds). Rendered screens show generic illustrations, not operational equipment or certified site signage.
+- Debug APK and test APK builds passed. Final APK SHA-256: `844ad6c8ffdcbacacf44d484774e0e4907b6133fcbbbfd999f22396a9d8df017`.
+- The release MP4 is a 105-second emulator recording of the targeted run after the equipment geometry correction. It demonstrates English/Hindi emergency learning and equipment interactions, not physical-camera AR or field performance. The final internal recall compatibility correction does not alter the recorded interface.
+- Browser UI testing was not performed during this background run. The existing local trainer server was used for API checks; hosting remains unavailable for the previously documented reason.
+
+The emergency curriculum uses official ERSS and OSHA primary references recorded in [content/README.md](../content/README.md). Those are general reporting and planning principles, not proof of Indian statutory compliance. English/Hindi content still requires competent review. This release does not provide first-aid/rescue qualification or actual emergency dispatch.
+
 ## v0.3.1 verification
 
 - **21 JVM tests** passed: prior grading/recall tests plus nine component-learning tests. The new cases cover both-view completion, hint/error attribution, sticky description exposure, varied answer positions, restoration, content-version resets, due/early spacing and projection rejection.

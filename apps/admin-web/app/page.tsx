@@ -6,6 +6,7 @@ import {
   Flame,
   Wind,
   Wrench,
+  Siren,
   GraduationCap,
   Users,
   BadgeCheck,
@@ -562,6 +563,8 @@ export default function Home() {
                       <Wind />
                     ) : m.id === "machinery" ? (
                       <Wrench />
+                    ) : m.id === "emergency" ? (
+                      <Siren />
                     ) : (
                       <ShieldCheck />
                     )}

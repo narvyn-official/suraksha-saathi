@@ -1,6 +1,6 @@
 # Staged equipment-recognition practice
 
-Android app 0.3.1 adds a camera-free learning interaction using the same original meshes as AR placement. Curriculum remains 0.3.0; the component catalogue has its own version (1). The exercises identify 12 visible components across fire, gas, machinery and PPE illustrations. They do not add assessment questions or establish operational competence.
+Android app 0.3.1 adds a camera-free learning interaction using the same original meshes as AR placement. App 0.4.0 extends it to 15 visible components across fire, gas, machinery, PPE and emergency illustrations. The component catalogue remains version 1 because this adds new module IDs without changing any existing component content or schedule. Scored curriculum is versioned independently as 0.4.0. They do not add assessment questions or establish operational competence.
 
 ## Worker flow
 
@@ -32,4 +32,4 @@ A clean first round returns after one day. Clean reviews that start when due pro
 
 This implements the initial guided-identification and fading-label subset from [the learning evidence report](ar-learning-evidence.md). Spacing and retrieval are design foundations, not measured retention results for this application. The future field study must test delayed identification on different approved equipment and safe practical decisions with a competent assessor.
 
-The component texts describe the existing generic meshes and reuse the pilot content's equipment limitations. They do not introduce real equipment operating instructions. Hindi and safety content remain drafts pending competent review. Camera-based component practice, authored photoreal assets, a physical ARCore test and the fifth proposed emergency-response domain remain outstanding.
+The component texts describe the existing generic meshes and reuse the pilot content's equipment limitations. They do not introduce real equipment operating instructions. Hindi and safety content remain drafts pending competent review. Camera-based component practice, authored photoreal assets, a physical ARCore test and practical assessment remain outstanding. The fifth emergency/reporting domain is implemented as a draft; its reporting radio, closed aid case and assembly marker are illustrative.

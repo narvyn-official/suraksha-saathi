@@ -31,6 +31,10 @@ Reference source anchors: [active routes](https://github.com/nitikash4-svg/Ar--b
 
 ## Where superiority is not established
 
-The reference has browser-based worker flows; our worker training currently requires Android. There is no comparative usability study, retention trial, crash-rate benchmark, or measured device performance comparison. Real AR interaction is still decision-oriented rather than a validated physical extinguisher or isolation procedure. Three of five proposed domains are implemented. Reviewed Santali, practical assessment, automatic secure sync, multi-organisation roles, live dashboard hosting and production distribution remain open.
+The reference has browser-based worker flows; our worker training currently requires Android. There is no comparative usability study, retention trial, crash-rate benchmark, or measured device performance comparison. Real AR interaction is still decision-oriented rather than a validated physical extinguisher or isolation procedure. At the compared v0.2 milestone, three of five proposed domains were implemented. Reviewed Santali, practical assessment, automatic secure sync, multi-organisation roles, live dashboard hosting and production distribution remain open.
 
 Therefore “many times better in every aspect” is a target, not a verified result. Stronger evidence integrity and broader implemented native training are concrete improvements; learning effectiveness and field readiness require testing with workers and competent safety reviewers.
+
+## Subsequent native milestones
+
+Suraksha Saathi v0.4.0 implements all five proposed domains (40 decisions), five original equipment scenes, 15 component-recognition targets and local spaced review. See [current validation](validation.md) for evidence. The reference revision above has not been re-reviewed or tested comparatively; these additions do not establish a retention, usability or performance multiplier.

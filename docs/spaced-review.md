@@ -8,7 +8,7 @@ The Android v0.3 pilot adds **Review decisions over time** to the learning home.
 - A missed answered decision is initially due immediately. A correct answered decision is due one day after that assessment. Unanswered decisions are not treated as passed.
 - Successful reviews use pilot intervals of 1, 3, 7 and then 14 days; an incorrect or uncertain response returns after 10 minutes. Late reviews do not incur a penalty. These intervals are product hypotheses, not a proven optimal schedule for industrial skills.
 - The schedule, source attempt, response, correctness and successful-review count are saved locally in a separate SQLite table. Activity recreation preserves displayed feedback. Existing assessment histories and credentials are untouched.
-- Questions must match their archived source content before old answers seed the current schedule. Changed questions require fresh assessment evidence. A newer assessment resets the derived schedule for that question.
+- Questions must match their archived source content before old answers seed the current schedule. Changed questions require fresh assessment evidence. A newer assessment resets the derived schedule for that question. From app 0.4.0, an unchanged question also carries its prior review date, streak and round across curriculum versions when the source attempt matches; existing review rows remain preserved.
 - The screen offers at most 20 due decisions at once, with the next review date when caught up. It works in English/Hindi and without a network connection.
 
 ## Boundaries

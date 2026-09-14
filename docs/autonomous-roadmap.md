@@ -6,7 +6,7 @@ Updated 15 September 2026. The user has authorized ongoing autonomous developmen
 
 Public repository: https://github.com/narvyn-official/suraksha-saathi
 
-Current tested milestone: v0.3.1-pilot (source identified by the release tag). Four modules (fire, gas/confined spaces, machinery/isolation, PPE/exposure), 32 decisions, English/Hindi pilot text, native offline SQLite progress, ARCore anchors, detailed original 3D equipment with material lighting, local spaced retrieval review, staged component recognition, signed pilot credentials, and persistent trainer analytics are implemented. See build-status.md, validation.md and reference-benchmark.md for evidence and limitations. The local dashboard is http://localhost:5173/ when its development server is running.
+Current tested milestone: v0.4.0-pilot (source identified by the release tag). Five modules (fire, gas/confined spaces, machinery/isolation, PPE/exposure, emergency/reporting), 40 decisions, English/Hindi pilot text, native offline SQLite progress, ARCore anchors, detailed original 3D equipment with material lighting, local spaced retrieval review, staged component recognition, signed pilot credentials, and persistent trainer analytics are implemented. See build-status.md, validation.md and reference-benchmark.md for evidence and limitations. The local dashboard is http://localhost:5173/ when its development server is running.
 
 ## First work to pick up
 
@@ -14,13 +14,15 @@ Current user steering prioritizes realistic equipment and evidence-informed lear
 
 Continue realism through approved reference geometry, clearer component silhouettes and grounded contact/shadow cues. Investigate a maintainable authored asset pipeline before promising photorealism. Current models remain original procedural illustrations; real phone frame-time, lighting and tracking measurements are external validation gates.
 
-**Next implement the fifth proposed domain:** emergency reporting, evacuation and safe response around an injured coworker. Keep guidance appropriate to untrained workers; do not teach hazardous rescue or substitute for practical first-aid instruction. The original brief ended at “(3) Machinery”; the fourth/fifth domains are product proposals under the user’s design freedom, not claims about an unseen official brief.
+**Next implement richer camera-based practice:** extend the reviewed component-recognition interaction into AR using the existing renderer and catalogue. Keep a stationary screen alternative, record whether practice used camera or screen, stop interaction when tracking is unavailable, and preserve assistance/answer integrity across pause and recovery. Physical AR validation remains a separate gate. Prefer a bounded fire-module implementation with meaningful component selection and recovery behavior over adding more decorative effects.
+
+The fifth emergency/reporting domain is implemented in v0.4.0 with eight decisions, six critical gates, an original station scene, component practice and trainer evidence support. Its general reporting/evacuation lessons are not first-aid or hazardous-rescue qualification. The original brief ended at “(3) Machinery”; the fourth/fifth domains remain product proposals under the user’s design freedom, not claims about an unseen official brief.
 
 ## Prioritized backlog
 
 | Priority | Outcome | Completion evidence |
 |---|---|---|
-| 1 | All five domains integrated | Lessons, practice, critical-gated assessments, relevant scenes, history, imports and signed pilot records work for each module |
+| 1 | Five-domain pilot implemented in v0.4.0 | Lessons, practice, critical-gated assessments, scenes, history, imports and signed pilot records; content and field approval remain separate |
 | 2 | Adaptive practice and recall | Missed decisions feed a targeted practice queue; spaced review uses persistent dates; practice never silently counts as certification |
 | 3 | Richer AR interaction | Meaningful ordered actions and spatial interactions beyond answer cards; screen alternatives; interruption/camera/tracking recovery; real hardware measurements recorded separately |
 | 4 | Worker-friendly onboarding and accessibility | Large touch targets, plain language, readable Hindi, screen-reader labels, font-scaling checks, reduced-motion support where needed, clear offline/permission states |
@@ -44,7 +46,7 @@ Choose a smaller higher-value fix ahead of this order when a reproducible defect
 
 ## Release acceptance criteria
 
-- [ ] Five usable, coherent training domains with offline learning and recoverable assessments.
+- [x] Five pilot training domains with offline learning and recoverable assessments; content approval remains a separate gate.
 - [ ] Critical unsafe actions cannot be averaged away; assessment/practice/practical-observation scopes stay distinct.
 - [ ] Relevant original scenes and AR actions, with usable alternatives on unsupported phones.
 - [ ] English/Hindi terminology approved by competent reviewers; native-reviewed Santali text/audio available.
@@ -73,3 +75,5 @@ Choose a smaller higher-value fix ahead of this order when a reproducible defect
 - 2026-09-14: Completed v0.3 implementation and validation: PPE brings coverage to four domains/32 decisions; detailed geometry and material lighting work in the shared viewer/AR renderer; offline spaced review persists separately from assessment evidence. Twelve JVM, six web and seven emulator tests passed, with web build/API checks and visual equipment review. Added primary-source learning research and a practical-transfer study plan. Next: staged component identification with fading guidance and changed orientation.
 
 - 2026-09-15: Completed the initial staged component-recognition flow, database version 3 migration and English/Hindi alternatives. Review fixed answer-position predictability, hint attribution, mixed-mode attribution and early-repeat spacing inflation. Later review rounds begin without examples. All 21 JVM tests and the combined 10-test emulator suite passed; actual rendered-buffer checks cover recreation. Fresh views were inspected and an emulator demo captured. This feature is camera-free and keeps assessment/credential evidence unchanged. Next: fifth emergency/reporting domain with primary-source content and explicit competent-review gates; then extend reviewed component interactions to the AR camera path with recovery checks.
+
+- 2026-09-15: Added emergency/reporting as the fifth domain (40 total decisions, six new critical gates), original radio/closed aid-case/assembly scene, and three component targets (15 total). Preserved byte-identical 0.3 archives and unchanged earlier module content; compatible decision reviews retain their dates/streaks. Trainer support includes five-domain coverage, old-version replay, emergency issuance/verification and native signed-token verification. Source and test evidence are in validation.md. Next: bounded camera-based component practice with tracking/pause recovery.

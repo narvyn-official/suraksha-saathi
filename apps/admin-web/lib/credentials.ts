@@ -66,7 +66,9 @@ export async function verify(raw: string) {
     payload.iss !== trust.issuer ||
     payload.kind !== "pilot-simulation" ||
     typeof payload.id !== "string" ||
-    !["fire", "gas", "machinery", "ppe"].includes(payload.moduleId) ||
+    !["fire", "gas", "machinery", "ppe", "emergency"].includes(
+      payload.moduleId,
+    ) ||
     payload.practical !== "not-assessed" ||
     !Number.isSafeInteger(payload.iat)
   )

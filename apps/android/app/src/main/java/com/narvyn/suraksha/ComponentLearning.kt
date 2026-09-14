@@ -37,6 +37,14 @@ object ComponentCatalog {
             Part("lock", "Illustrative lock", "काल्पनिक ताला", "Blue block with a metal loop below the controls", "नियंत्रण के नीचे धातु के छल्ले वाला नीला खंड",
                 "The lock is a separate part of this illustration. A fitted lock alone does not prove effective isolation.", "ताला इस चित्र का अलग पुर्ज़ा है। केवल लगा ताला प्रभावी अलगाव साबित नहीं करता।", floatArrayOf(.287f,.237f,.140f))
         ),
+        "emergency" to listOf(
+            Part("radio", "Reporting radio", "सूचना रेडियो", "Yellow and dark handset with an antenna", "एंटीना वाला पीला और गहरा हैंडसेट",
+                "This generic radio cannot transmit. Use the site's approved reporting method from a safe place.", "यह सामान्य रेडियो प्रसारण नहीं कर सकता। सुरक्षित जगह से स्थल का स्वीकृत सूचना तरीका उपयोग करें।", floatArrayOf(-.255f,.218f,.106f)),
+            Part("aid-case", "First-aid case", "प्राथमिक सहायता किट", "Closed green case with a handle and white plus", "हैंडल और सफ़ेद जोड़ चिह्न वाली बंद हरी किट",
+                "This case represents supplies for a trained first aider. Identifying it does not teach treatment or rescue.", "यह किट प्रशिक्षित प्राथमिक सहायक की सामग्री दिखाती है। इसकी पहचान उपचार या बचाव नहीं सिखाती।", floatArrayOf(0f,.156f,.156f)),
+            Part("assembly", "Assembly marker", "एकत्र होने की जगह का चिह्न", "Green sign showing people on a tall metal post", "ऊँचे धातु खंभे पर लोगों वाला हरा चिह्न",
+                "The marker represents an assembly point. Follow the actual site's assigned safe route and accountability procedure.", "चिह्न एकत्र होने की जगह दिखाता है। असली स्थल का निर्धारित सुरक्षित रास्ता और उपस्थिति प्रक्रिया मानें।", floatArrayOf(.26f,.401f,-.048f))
+        ),
         "ppe" to listOf(
             Part("helmet", "Helmet shell", "हेलमेट का खोल", "Rounded yellow crown above the lenses", "लेंस के ऊपर गोल पीला ऊपरी हिस्सा",
                 "The shell is the outer part of the helmet. Actual equipment needs damage and fit checks; this model is not an approval mark.", "खोल हेलमेट का बाहरी हिस्सा है। असली उपकरण में नुकसान और फिट जाँचें; यह मॉडल स्वीकृति चिह्न नहीं है।", floatArrayOf(.055f,.434f,.145f)),

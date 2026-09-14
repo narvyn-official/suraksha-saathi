@@ -65,11 +65,41 @@ assert.equal(
   (await call("verify", { token: ppeCertificate.data.token })).data.moduleId,
   "ppe",
 );
+const emergencyAttempt = attempts.find((a) => a.moduleId === "emergency");
+assert.ok(emergencyAttempt, "Emergency assessment fixture is required");
+const emergencyCertificate = await call("credentials", {
+  attemptId: emergencyAttempt.id,
+});
+assert.equal(
+  emergencyCertificate.status,
+  200,
+  JSON.stringify(emergencyCertificate),
+);
+const verifiedEmergency = await call("verify", {
+  token: emergencyCertificate.data.token,
+});
+assert.equal(verifiedEmergency.status, 200);
+assert.equal(verifiedEmergency.data.moduleId, "emergency");
+assert.equal(verifiedEmergency.data.status, "active");
+const v03 = structuredClone(batch);
+v03.attempts = v03.attempts
+  .filter((a) => ["fire", "gas", "machinery", "ppe"].includes(a.moduleId))
+  .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.3.0" }));
+const importedV03 = await call("import", v03);
+assert.equal(importedV03.status, 200, JSON.stringify(importedV03));
+assert.equal(importedV03.data.imported, 4);
+const falseEmergencyVersion = structuredClone(batch);
+falseEmergencyVersion.attempts = [
+  { ...emergencyAttempt, id: randomUUID(), contentVersion: "0.3.0" },
+];
+assert.equal((await call("import", falseEmergencyVersion)).status, 400);
 const previous = structuredClone(batch);
 previous.attempts = previous.attempts
-  .filter((a) => a.moduleId !== "ppe")
+  .filter((a) => ["fire", "gas", "machinery"].includes(a.moduleId))
   .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.2.0" }));
-assert.equal((await call("import", previous)).status, 200);
+const importedV02 = await call("import", previous);
+assert.equal(importedV02.status, 200, JSON.stringify(importedV02));
+assert.equal(importedV02.data.imported, 3);
 const falseVersion = structuredClone(batch);
 falseVersion.attempts = [
   { ...ppeAttempt, id: randomUUID(), contentVersion: "0.2.0" },
@@ -77,7 +107,7 @@ falseVersion.attempts = [
 assert.equal((await call("import", falseVersion)).status, 400);
 const old = structuredClone(batch);
 old.attempts = old.attempts
-  .slice(0, 2)
+  .filter((a) => ["fire", "gas"].includes(a.moduleId))
   .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.1.0" }));
 assert.equal((await call("import", old)).status, 200);
 const unsupported = structuredClone(batch);
@@ -109,6 +139,40 @@ failed.attempts = [
 assert.equal((await call("import", failed)).status, 200);
 assert.equal(
   (await call("credentials", { attemptId: failed.attempts[0].id })).status,
+  400,
+);
+const emergencyModule = curriculum.modules.find((m) => m.id === "emergency");
+const criticalIndex = emergencyModule.questions.findIndex((q) => q.critical);
+assert.ok(criticalIndex >= 0);
+const failedEmergency = structuredClone(batch);
+failedEmergency.worker = {
+  id: randomUUID(),
+  name: "Demo emergency retraining · test record",
+  sector: "Mica",
+};
+failedEmergency.attempts = [
+  {
+    ...emergencyAttempt,
+    id: randomUUID(),
+    workerId: failedEmergency.worker.id,
+    events: emergencyAttempt.events.slice(0, criticalIndex + 1).map((e, i) => ({
+      ...e,
+      optionId:
+        i === criticalIndex
+          ? emergencyModule.questions[i].options.find((o) => !o.correct).id
+          : e.optionId,
+    })),
+  },
+];
+const importedFailedEmergency = await call("import", failedEmergency);
+assert.equal(
+  importedFailedEmergency.status,
+  200,
+  JSON.stringify(importedFailedEmergency),
+);
+assert.equal(
+  (await call("credentials", { attemptId: failedEmergency.attempts[0].id }))
+    .status,
   400,
 );
 const altered = structuredClone(batch);
@@ -158,6 +222,10 @@ writeFileSync(
   new URL("../../../artifacts/demo-credential.txt", import.meta.url),
   "SURAKSHA:CREDENTIAL:" + active.data.token,
 );
+writeFileSync(
+  new URL("../../../artifacts/demo-emergency-credential.txt", import.meta.url),
+  "SURAKSHA:CREDENTIAL:" + emergencyCertificate.data.token,
+);
 console.log(
-  "PASS: unauthenticated access, import, idempotency, score replay, conflicting record, unknown option, issuance, signature tamper, revocation. Demo records remain for preview.",
+  "PASS: five-domain import, 0.1/0.2/0.3 archive compatibility, false-version rejection, emergency critical gate and signed verification, unauthenticated rejection, idempotency, score replay, conflict rejection, invalid answers, issuance, signature tamper and revocation. Demo records remain for preview.",
 );

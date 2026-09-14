@@ -15,7 +15,7 @@ object CredentialVerifier {
   val key=KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(Base64.decode(trust.getString("spki"),Base64.DEFAULT)))
   val verifier=Signature.getInstance("SHA256withECDSA");verifier.initVerify(key);verifier.update("${p[0]}.${p[1]}".toByteArray(Charsets.US_ASCII));require(verifier.verify(toDer(decode(p[2])))){"Invalid signature"}
   val payload=JSONObject(String(decode(p[1])));require(payload.getString("iss")==trust.getString("issuer")&&payload.getString("kind")=="pilot-simulation"&&payload.getString("practical")=="not-assessed"){"Invalid scope"}
-  require(payload.getString("moduleId") in listOf("fire","gas","machinery","ppe"));payload.getString("id");payload.getLong("iat")
+  require(payload.getString("moduleId") in listOf("fire","gas","machinery","ppe","emergency"));payload.getString("id");payload.getLong("iat")
   return payload.put("token",token)
  }
  fun toDer(raw:ByteArray):ByteArray {

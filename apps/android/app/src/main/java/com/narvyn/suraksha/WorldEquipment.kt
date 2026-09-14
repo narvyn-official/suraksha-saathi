@@ -20,7 +20,7 @@ class WorldEquipment {
  private val glass=Material(floatArrayOf(.14f,.39f,.48f),.12f,.25f)
  private val dark=Material(floatArrayOf(.10f,.15f,.20f),.49f)
  private val screen=Material(floatArrayOf(.43f,.75f,.57f),.28f,0f,.23f)
- private val scenes=mapOf("fire" to fire(),"gas" to gas(),"machinery" to machinery(),"ppe" to ppe())
+ private val scenes=mapOf("fire" to fire(),"gas" to gas(),"machinery" to machinery(),"ppe" to ppe(),"emergency" to emergency())
  private var program=0
  private var position=0;private var normal=0;private var color=0;private var surface=0
  private var mvpLocation=0;private var modelLocation=0;private var eyeLocation=0;private var lightingLocation=0
@@ -163,6 +163,38 @@ class WorldEquipment {
   for(x in listOf(-.16f,.16f)){rod(floatArrayOf(x,.28f,.162f),floatArrayOf(x,.28f,-.073f),.0045f,dark);bolt(this,x,.28f,.175f)}
   for(x in listOf(-.252f,.252f)){box(x,.245f,-.004f,.063f,.143f,.116f,.026f,rubber);box(x*1.07f,.245f,-.004f,.035f,.119f,.091f,.020f,blue);rod(floatArrayOf(x,.31f,-.004f),floatArrayOf(x*.91f,.405f,-.004f),.005f,metal)}
   tube(listOf(floatArrayOf(-.23f,.395f,-.015f),floatArrayOf(-.18f,.468f,-.015f),floatArrayOf(-.09f,.51f,-.015f),floatArrayOf(.09f,.51f,-.015f),floatArrayOf(.18f,.468f,-.015f),floatArrayOf(.23f,.395f,-.015f)),.011f,rubber)
+ }.finish()
+ private fun emergency():FloatBuffer=Builder().apply{
+  base(this)
+  // Generic reporting radio: no transmitted signal or operational display.
+  box(-.255f,.178f,.045f,.135f,.257f,.084f,.019f,rubber)
+  box(-.255f,.18f,.091f,.113f,.226f,.012f,.011f,yellow)
+  box(-.255f,.218f,.100f,.088f,.068f,.008f,.005f,screen)
+  simLabel(this,-.287f,.223f,.105f,.009f)
+  for(i in 0..4)box(-.255f,.158f-i*.013f,.098f,.087f,.004f,.004f,.002f,dark)
+  cylinder(-.28f,.355f,.035f,.013f,.123f,rubber)
+  cylinder(-.224f,.316f,.035f,.028f,.035f,dark)
+  cylinder(-.255f,.092f,.100f,.018f,.009f,blue,rx=90f)
+  for(x in listOf(-.3f,-.21f))for(y in listOf(.072f,.271f))bolt(this,x,y,.099f)
+  // Closed first-aid case; contents and treatment skills are not represented.
+  val green=Material(floatArrayOf(.045f,.38f,.24f),.46f)
+  box(.0f,.149f,.074f,.25f,.197f,.13f,.013f,green)
+  box(.0f,.149f,.143f,.235f,.18f,.010f,.008f,green)
+  box(0f,.156f,.151f,.075f,.022f,.004f,.002f,white)
+  box(0f,.156f,.152f,.023f,.074f,.004f,.002f,white)
+  tube(listOf(floatArrayOf(-.051f,.249f,.075f),floatArrayOf(-.051f,.278f,.075f),floatArrayOf(.051f,.278f,.075f),floatArrayOf(.051f,.249f,.075f)),.008f,rubber)
+  for(x in listOf(-.086f,.086f)){box(x,.249f,.113f,.034f,.016f,.028f,.003f,metal);box(x,.076f,.01f,.035f,.012f,.016f,.002f,metal)}
+  // Muster marker: a generic training symbol, never a real route or validated site location.
+  cylinder(.26f,.264f,-.074f,.018f,.45f,metal)
+  box(.26f,.401f,-.07f,.201f,.158f,.016f,.005f,white)
+  box(.26f,.401f,-.058f,.184f,.141f,.007f,.003f,green)
+  for(x in listOf(.232f,.26f,.288f)){sphere(x,.421f,-.05f,.014f,.014f,.005f,white);box(x,.4f,-.05f,.015f,.021f,.004f,.004f,white);rod(floatArrayOf(x-.004f,.39f,-.05f),floatArrayOf(x-.007f,.375f,-.05f),.002f,white);rod(floatArrayOf(x+.004f,.39f,-.05f),floatArrayOf(x+.007f,.375f,-.05f),.002f,white)}
+  for(sign in listOf(-1f,1f)){
+   val start=.26f+sign*.077f;val end=.26f+sign*.048f
+   rod(floatArrayOf(start,.449f,-.05f),floatArrayOf(end,.432f,-.05f),.0027f,white)
+   rod(floatArrayOf(end,.432f,-.05f),floatArrayOf(end+sign*.002f,.445f,-.05f),.0027f,white)
+   rod(floatArrayOf(end,.432f,-.05f),floatArrayOf(end+sign*.014f,.434f,-.05f),.0027f,white)
+  }
  }.finish()
  private fun bolt(b:Builder,x:Float,y:Float,z:Float){b.cylinder(x,y,z,.012f,.004f,metal,rx=90f);b.box(x,y,z+.003f,.007f,.0018f,.001f,0f,dark,rz=25f)}
  private fun simLabel(b:Builder,x:Float,y:Float,z:Float,s:Float){

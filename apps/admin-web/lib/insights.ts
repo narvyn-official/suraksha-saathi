@@ -78,6 +78,7 @@ export function insights(
             gas: "Gas / confined",
             machinery: "Machinery",
             ppe: "PPE",
+            emergency: "Emergency",
           } as Record<string, string>
         )[m.id] ?? m.title[0],
       passed: rows.filter((r) => r.payload.result.passed).length,

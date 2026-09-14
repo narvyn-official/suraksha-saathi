@@ -13,4 +13,19 @@ class RecallPlannerTest{
  @Test fun changedContentDoesNotReuseOldAnswer(){assertTrue(RecallPlanner.plan(curriculum("v2","Changed"),mapOf("v1" to curriculum()),listOf(attempt()),emptyMap()).isEmpty());assertEquals(1,RecallPlanner.plan(curriculum("v2"),mapOf("v1" to curriculum()),listOf(attempt()),emptyMap()).size)}
  @Test fun spacingGrowsWithSuccessfulRecallAndResetsOnError(){assertEquals(RecallPlanner.DAY,RecallPlanner.delay(true,1));assertEquals(3*RecallPlanner.DAY,RecallPlanner.delay(true,2));assertEquals(14*RecallPlanner.DAY,RecallPlanner.delay(true,9));assertEquals(600_000L,RecallPlanner.delay(false,9))}
  @Test fun optionSeedChangesAfterReviewButIsStableDuringRound(){val first=plan(attempt()).single();assertEquals(RecallPlanner.optionSeed(first),RecallPlanner.optionSeed(plan(attempt()).single()));val record=RecallPlanner.record(first,false,500);val next=plan(attempt(),mapOf(first.key to record)).single();assertEquals(1,next.round);assertNotEquals(RecallPlanner.optionSeed(first),RecallPlanner.optionSeed(next))}
+ @Test fun unchangedQuestionsKeepTheirReviewScheduleAcrossContentVersions(){
+  val a=attempt();val item=plan(a).single();val saved=RecallPlanner.record(item,true,500)
+  val next=RecallPlanner.plan(curriculum("v2"),mapOf("v1" to curriculum(),"v2" to curriculum("v2")),listOf(a),mapOf(item.key to saved)).single()
+  assertEquals("v2:fire:a",next.key);assertEquals(saved.getLong("dueAt"),next.dueAt);assertEquals(1,next.streak);assertEquals(1,next.round)
+  val changedArchive=curriculum("v1","Changed")
+  assertTrue(RecallPlanner.plan(curriculum("v2"),mapOf("v1" to changedArchive),listOf(a),mapOf(item.key to saved)).isEmpty())
+ }
+ @Test fun mostRecentCompatibleReviewWinsEvenIfWrittenByAnOlderApp(){
+  val a=attempt();val initial=plan(a).single()
+  val current=RecallPlanner.plan(curriculum("v2"),mapOf("v1" to curriculum()),listOf(a),emptyMap()).single()
+  val currentSuccess=RecallPlanner.record(current,true,500)
+  val newerOldVersionError=RecallPlanner.record(initial,false,700)
+  val result=RecallPlanner.plan(curriculum("v2"),mapOf("v1" to curriculum()),listOf(a),mapOf(current.key to currentSuccess,initial.key to newerOldVersionError)).single()
+  assertEquals(700L+600_000L,result.dueAt);assertEquals(0,result.streak)
+ }
 }

@@ -13,3 +13,5 @@ The offline viewer supports drag rotation and tilt, pinch zoom, accessible rotat
 Visual realism still needs validation against approved site equipment, competent safety review and representative Android hardware. Manufacturer-specific photogrammetry or authored PBR assets would be a later, separately reviewed step. Better shading alone does not establish dimensional accuracy, practical competence or operational suitability.
 
 App 0.3.1 adds [staged recognition practice](component-practice.md) with the same meshes, fixed viewing angles and projected callouts. This is currently camera-free; the callouts are not a real-equipment detector or mesh manipulation system.
+
+App 0.4.0 adds an original emergency station: a detailed generic reporting radio with simulated display, a closed first-aid case and an assembly marker. It is used in the offline viewer, AR decision station and component-recognition practice. It cannot transmit a report, locate people, assess a route or teach treatment.

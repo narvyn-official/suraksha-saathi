@@ -1,7 +1,8 @@
 import curriculum from "./curriculum.json" with { type: "json" };
 import legacy from "./archive/0.1.0.json" with { type: "json" };
 import v02 from "./archive/0.2.0.json" with { type: "json" };
-const supported = [curriculum, v02, legacy];
+import v03 from "./archive/0.3.0.json" with { type: "json" };
+const supported = [curriculum, v03, v02, legacy];
 export { curriculum };
 export function curriculumFor(version: string) {
   const found = supported.find((c) => c.version === version);

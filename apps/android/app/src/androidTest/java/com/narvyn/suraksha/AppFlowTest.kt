@@ -60,7 +60,7 @@ class AppFlowTest {
  }
  @Test fun originalEquipmentModelsRenderAndRotate(){
   val c=InstrumentationRegistry.getInstrumentation().targetContext;Store(c).use{it.hi=false}
-  for(module in listOf("fire","gas","machinery","ppe")){
+  for(module in listOf("fire","gas","machinery","ppe","emergency")){
    ActivityScenario.launch<EquipmentActivity>(android.content.Intent(c,EquipmentActivity::class.java).putExtra("moduleId",module)).use{s->
     onView(withText("Rotate right")).perform(click());onView(withText("Change zoom")).perform(click())
     val done=java.util.concurrent.CountDownLatch(1);var result=-1

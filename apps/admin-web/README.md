@@ -28,7 +28,7 @@ npm run build
 node tests/integration.mjs
 ```
 
-Integration checks require the localhost development server and migrations. They create clearly named demo records in the local database. They cover unauthenticated rejection, imports, score replay, idempotency, conflict rejection, invalid answers, issuance, tampering, and revocation.
+Integration checks require the localhost development server and migrations. They create clearly named demo records in the local database. They cover all five domains, archived curriculum compatibility, false-version rejection, the emergency critical-error gate, unauthenticated rejection, imports, score replay, idempotency, conflict rejection, invalid answers, signed issuance/verification, tampering and revocation. An active emergency pilot credential is saved to ignored `artifacts/demo-emergency-credential.txt` for native verifier checks. It contains a signed demo token, not the private issuer key.
 
 D1 migrations are in `drizzle/`. The private issuer runtime value is `ISSUER_PRIVATE_JWK`; configure it in the deployment platform's secret storage. The public file is `lib/trusted-issuer.json`. Never put private values in `.openai/hosting.json`, source control or browser code.
 
@@ -42,4 +42,4 @@ The dashboard displays up to the latest 500 attempts and credentials per owner. 
 
 ## Evidence analytics
 
-Overview uses each worker’s latest assessment per module. Practice does not count toward assessment coverage. Workers supports name/ID search, sector and status filters, history review and CSV export. Workers are created or updated by validated Android imports. The coverage notice discloses when the latest-500 limit truncates evidence. Curriculum versions 0.1.0, 0.2.0 and 0.3.0 are supported explicitly; unknown versions are rejected.
+Overview uses each worker’s latest assessment per module. Practice does not count toward assessment coverage. Workers supports name/ID search, sector and status filters, history review and CSV export. Workers are created or updated by validated Android imports. The coverage notice discloses when the latest-500 limit truncates evidence. Current curriculum 0.4.0 covers Fire, Gas / confined space, Machinery, PPE and Emergency response. All five latest module assessments must pass for complete coverage. Versions 0.1.0, 0.2.0 and 0.3.0 replay against their preserved archives; unknown versions and modules attributed to versions that did not contain them are rejected.

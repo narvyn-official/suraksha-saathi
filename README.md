@@ -1,16 +1,16 @@
 # Suraksha Saathi
 
-A working **v0.3.1 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
+A working **v0.4.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
 
-[Download the APK and emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.3.1-pilot).
+[Download the APK and emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.4.0-pilot).
 
 ## What you can use now
 
-- Android app with English and Hindi lessons, guided practice and assessments for fire response, gas/confined spaces, machinery/isolation and PPE/exposure (32 decisions).
+- Android app with English and Hindi lessons, guided practice and assessments for fire response, gas/confined spaces, machinery/isolation, PPE/exposure and emergency/reporting (40 decisions).
 - Offline SQLite progress, interrupted-attempt recovery, critical-error assessment gates, installed offline voice support and PDF completion receipts.
 - Original inspectable illustrations, detailed material-lit offline rotatable 3D equipment and ARCore camera mode with tracked equipment and decision cards on supported phones; screen practice on other Android 10+ phones.
 - Trainer dashboard with a worker directory, sector/status filters, latest-assessment charts, practice follow-up, CSV export, persistent records, answer-by-answer review, signed pilot credentials, QR downloads, signature checks and revocation.
-- Offline decision recall with corrective feedback, self-explanation prompts and scheduled return visits; assessment evidence remains unchanged.
+- Offline decision recall with corrective feedback, self-explanation prompts and scheduled return visits that survive compatible curriculum updates; assessment evidence remains unchanged.
 - Staged equipment identification: examples, hidden labels, changed viewing angles, English/Hindi description alternatives and local review scheduling.
 - Android credential wallet with pinned-issuer signature verification offline.
 
@@ -24,7 +24,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/suraksha-saathi-0.3.1-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
+The debug-signed APK is copied to `artifacts/suraksha-saathi-0.4.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs
@@ -47,12 +47,12 @@ See [dashboard setup](apps/admin-web/README.md) for issuer configuration, tests 
 
 ## Validation
 
-Run `bash scripts/build-android.sh` for grading unit tests and APK build. Android instrumented tests are in `apps/android/app/src/androidTest` and exercise an assessment across activity recreation, Hindi home rendering, signed credentials, critical failure, all four 3D equipment models, staged component recognition, assistance tracking and database migration. The web checks are `npm test`, `npx tsc --noEmit`, `npm run build`, and `node tests/integration.mjs` with the local server running. Integration tests create explicitly labelled demo records.
+Run `bash scripts/build-android.sh` for grading unit tests and APK build. Android instrumented tests are in `apps/android/app/src/androidTest` and exercise an assessment across activity recreation, Hindi home rendering, signed credentials, critical failure, all five 3D equipment models, staged component recognition, assistance tracking and database migration. The web checks are `npm test`, `npx tsc --noEmit`, `npm run build`, and `node tests/integration.mjs` with the local server running. Integration tests create explicitly labelled demo records.
 
 See the [source-based reference comparison](docs/reference-benchmark.md) and [current implementation and remaining work](docs/build-status.md). Target architecture and delivery plans are in [solution blueprint](docs/solution-blueprint.md), [engineering specification](docs/engineering-specification.md), [delivery plan](docs/delivery-and-demo.md), and [design system](docs/design-system.md). Those plans include features not yet implemented.
 
 ## Before field release
 
-Reviewed Santali text/audio, safety-content approval, real AR phone testing, the remaining emergency-response domain, richer physical AR actions, practical assessment, secure automatic sync, organisation roles and production distribution are still required. The supplied brief was truncated at “(3) Machinery”; domains 3–5 in the design documents are proposals.
+Reviewed Santali text/audio, safety-content approval, real AR phone testing, richer physical AR actions, practical assessment, secure automatic sync, organisation roles and production distribution are still required. The supplied brief was truncated at “(3) Machinery”; domains 3–5 in the design documents are proposals.
 
 See [learning research and six interaction designs](docs/ar-learning-evidence.md), [implemented spaced review](docs/spaced-review.md), and [staged component practice](docs/component-practice.md). The pilot does not claim measured learning gains.

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { insights, workerCsv, type TrainingRow } from "../lib/insights";
-import { curriculum, grade } from "../lib/grading";
+import { curriculum, curriculumFor, grade } from "../lib/grading";
 function row(
   id: string,
   moduleId = "fire",
@@ -92,4 +92,65 @@ test("PPE has its own analytics label, critical gate and version scope", () => {
   const data = insights([row("ppe", "ppe")], []);
   assert.equal(data.modules.find((m) => m.id === "ppe")?.name, "PPE");
   assert.equal(data.fullyPassed, 0);
+});
+
+test("all five current domains are required for complete coverage", () => {
+  assert.deepEqual(
+    curriculum.modules.map((m) => m.id),
+    ["fire", "gas", "machinery", "ppe", "emergency"],
+  );
+  const firstFour = curriculum.modules
+    .filter((m) => m.id !== "emergency")
+    .map((m) => row(m.id, m.id));
+  const incomplete = insights(firstFour, []);
+  assert.equal(incomplete.fullyPassed, 0);
+  assert.equal(incomplete.workers[0].status, "In progress");
+  assert.equal(
+    incomplete.modules.find((m) => m.id === "emergency")?.notAssessed,
+    1,
+  );
+  const completed = insights([...firstFour, row("emergency", "emergency")], []);
+  assert.equal(completed.fullyPassed, 1);
+  assert.equal(completed.workers[0].passed, 5);
+  assert.equal(
+    completed.modules.find((m) => m.id === "emergency")?.name,
+    "Emergency",
+  );
+});
+
+test("an emergency critical error cannot be averaged into a pass", () => {
+  const r = row("emergency", "emergency");
+  assert.equal(grade("emergency", r.payload.events).passed, true);
+  const module = curriculum.modules.find((m) => m.id === "emergency")!;
+  const index = module.questions.findIndex((q) => q.critical);
+  assert.ok(index >= 0);
+  r.payload.events[index].optionId = module.questions[index].options.find(
+    (o) => !o.correct,
+  )!.id;
+  const result = grade("emergency", r.payload.events);
+  assert.ok(result.score >= 80);
+  assert.equal(result.passed, false);
+  assert.deepEqual(result.criticalFailures, [module.questions[index].id]);
+});
+
+test("0.3.0 replays its four archived domains and cannot claim emergency evidence", () => {
+  const archived = curriculumFor("0.3.0");
+  assert.deepEqual(
+    archived.modules.map((m) => m.id),
+    ["fire", "gas", "machinery", "ppe"],
+  );
+  for (const m of archived.modules) {
+    const events = m.questions.map((q, i) => ({
+      type: "answer",
+      sequence: i + 1,
+      questionId: q.id,
+      optionId: q.options.find((o) => o.correct)!.id,
+      time: i + 1,
+    }));
+    assert.equal(grade(m.id, events, "0.3.0").passed, true);
+  }
+  assert.throws(
+    () => grade("emergency", row("new", "emergency").payload.events, "0.3.0"),
+    /Unknown module/,
+  );
 });

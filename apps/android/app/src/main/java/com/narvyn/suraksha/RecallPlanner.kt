@@ -18,7 +18,11 @@ object RecallPlanner {
     if(oldQuestion?.toString()!=q.toString())return@mapNotNull null
     val e=a.getJSONArray("events").objects().firstOrNull{it.optString("questionId")==q.getString("id")}?:return@mapNotNull null
     val option=q.getJSONArray("options").objects().firstOrNull{it.optString("id")==e.optString("optionId")}?:return@mapNotNull null
-    val key="${current.getString("version")}:${module.getString("id")}:${q.getString("id")}";val review=reviews[key]?.takeIf{it.optString("source")==a.getString("id")}
+    val key="${current.getString("version")}:${module.getString("id")}:${q.getString("id")}";val source=a.getString("id")
+    val review=(versions + (current.getString("version") to current)).entries.mapNotNull { (version,archive) ->
+     val previousQuestion=archive.getJSONArray("modules").objects().firstOrNull{it.optString("id")==module.getString("id")}?.getJSONArray("questions")?.objects()?.firstOrNull{it.optString("id")==q.getString("id")}
+     if(previousQuestion?.toString()!=q.toString()) null else reviews["$version:${module.getString("id")}:${q.getString("id")}"]?.takeIf{it.optString("source")==source}
+    }.maxByOrNull{it.optLong("reviewedAt")}
     Item(key,module,q,a.getString("id"),review?.optLong("dueAt")?:a.getLong("endedAt")+(if(option.optBoolean("correct"))DAY else 0),review?.optInt("streak")?:0,review?.optInt("round")?:0)
    }
   }.sortedWith(compareBy<Item>{it.dueAt}.thenBy{it.key})
