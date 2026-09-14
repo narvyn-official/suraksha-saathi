@@ -42,4 +42,4 @@ The dashboard displays up to the latest 500 attempts and credentials per owner. 
 
 ## Evidence analytics
 
-Overview uses each worker’s latest assessment per module. Practice does not count toward assessment coverage. Workers supports name/ID search, sector and status filters, history review and CSV export. Workers are created or updated by validated Android imports. The coverage notice discloses when the latest-500 limit truncates evidence. Curriculum versions 0.1.0 and 0.2.0 are supported explicitly; unknown versions are rejected.
+Overview uses each worker’s latest assessment per module. Practice does not count toward assessment coverage. Workers supports name/ID search, sector and status filters, history review and CSV export. Workers are created or updated by validated Android imports. The coverage notice discloses when the latest-500 limit truncates evidence. Curriculum versions 0.1.0, 0.2.0 and 0.3.0 are supported explicitly; unknown versions are rejected.

@@ -1,9 +1,11 @@
 import curriculum from "./curriculum.json" with { type: "json" };
 import legacy from "./archive/0.1.0.json" with { type: "json" };
+import v02 from "./archive/0.2.0.json" with { type: "json" };
+const supported = [curriculum, v02, legacy];
 export { curriculum };
 export function curriculumFor(version: string) {
-  if (version === curriculum.version) return curriculum;
-  if (version === legacy.version) return legacy;
+  const found = supported.find((c) => c.version === version);
+  if (found) return found;
   throw new Error("Unsupported content version.");
 }
 export function grade(
@@ -70,7 +72,7 @@ export function validateImport(input: any) {
       !uuid.test(a.id) ||
       ids.has(a.id) ||
       a.workerId !== input.worker.id ||
-      ![curriculum.version, legacy.version].includes(a.contentVersion) ||
+      !supported.some((c) => c.version === a.contentVersion) ||
       !["practice", "assessment"].includes(a.kind) ||
       !["screen", "arcore", "hybrid"].includes(a.mode) ||
       a.finished !== true ||

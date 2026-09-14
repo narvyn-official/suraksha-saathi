@@ -47,7 +47,7 @@ test("latest failure replaces earlier pass; practice cannot inflate coverage", (
   assert.ok(data.hotspots[0].critical);
   assert.equal(data.hotspots[0].answered, 1);
 });
-test("all three latest assessments required and revoked credentials excluded", () => {
+test("all available latest assessments required and revoked credentials excluded", () => {
   const rows = curriculum.modules.map((m) => row(m.id, m.id));
   const data = insights(rows, [
     { id: "a", attempt_id: "fire", revoked_at: 1 },
@@ -76,4 +76,20 @@ test("archived content accepts its modules but rejects a new module or unknown v
   assert.equal(grade("fire", row("one").payload.events, "0.1.0").passed, true);
   assert.throws(() => grade("machinery", [], "0.1.0"));
   assert.throws(() => grade("fire", [], "99.0.0"));
+});
+
+test("PPE has its own analytics label, critical gate and version scope", () => {
+  const correct = row("ppe", "ppe");
+  assert.equal(grade("ppe", correct.payload.events).passed, true);
+  assert.throws(() => grade("ppe", correct.payload.events, "0.2.0"));
+  assert.equal(
+    grade("machinery", row("old", "machinery").payload.events, "0.2.0").passed,
+    true,
+  );
+  const q = curriculum.modules.find((m) => m.id === "ppe")!.questions[0];
+  correct.payload.events[0].optionId = q.options.find((o) => !o.correct)!.id;
+  assert.equal(grade("ppe", correct.payload.events).passed, false);
+  const data = insights([row("ppe", "ppe")], []);
+  assert.equal(data.modules.find((m) => m.id === "ppe")?.name, "PPE");
+  assert.equal(data.fullyPassed, 0);
 });

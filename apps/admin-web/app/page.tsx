@@ -556,7 +556,15 @@ export default function Home() {
               {curriculum.modules.map((m, i) => (
                 <section className="panel" key={m.id}>
                   <span className="feature-icon">
-                    {i === 0 ? <Flame /> : i === 1 ? <Wind /> : <Wrench />}
+                    {m.id === "fire" ? (
+                      <Flame />
+                    ) : m.id === "gas" ? (
+                      <Wind />
+                    ) : m.id === "machinery" ? (
+                      <Wrench />
+                    ) : (
+                      <ShieldCheck />
+                    )}
                   </span>
                   <h2>{m.title[0]}</h2>
                   <p>{m.subtitle[0]}</p>

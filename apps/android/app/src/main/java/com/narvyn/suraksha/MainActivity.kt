@@ -85,6 +85,7 @@ class MainActivity: Activity() {
         val history=store.attempts();val latest=curriculum.modules.associate{m->m.getString("id") to history.firstOrNull{it.optString("moduleId")==m.getString("id")&&it.optString("kind")=="assessment"&&it.optBoolean("finished")}}
         val passed=latest.values.count{it?.optJSONObject("result")?.optBoolean("passed")==true}
         body.add(label(t("$passed / ${curriculum.modules.size} module assessments passed","$passed / ${curriculum.modules.size} पाठ मूल्यांकन पास"),14f,Palette.muted),bottom=16)
+        body.add(action(t("Review decisions over time","समय के साथ निर्णय दोहराएँ"),false){startActivity(Intent(this,RecallActivity::class.java))},bottom=18)
         val active=history.firstOrNull{!it.optBoolean("finished")}
         if(active!=null)body.add(action(t("Continue saved training","सहेजा गया प्रशिक्षण जारी रखें"),false){session=TrainingSession(active,curriculum.module(active.getString("moduleId")));selected=active.getString("moduleId");go("training")},bottom=20)
         curriculum.modules.forEachIndexed{i,m->
@@ -188,7 +189,7 @@ class MainActivity: Activity() {
         listOf(t("1. Choose a lesson and learn the steps.","1. पाठ चुनें और चरण सीखें।"),t("2. Practise with guidance, then try an assessment.","2. निर्देशों के साथ अभ्यास करें, फिर मूल्यांकन करें।"),t("3. Your progress is saved after every answer.","3. हर उत्तर के बाद प्रगति सहेजी जाती है।"),t("4. Export records for your trainer. Completed practice does not authorise hazardous work.","4. प्रशिक्षक के लिए रिकॉर्ड भेजें। अभ्यास पूरा करना खतरनाक काम की अनुमति नहीं है।")).forEach{body.add(card().apply{add(label(it))},bottom=12)}
         body.add(action(t("Choose language","भाषा चुनें"),false){language()},top=8,bottom=12)
         body.add(action(t("Check AR support","AR समर्थन जाँचें"),false){ArCoreApk.getInstance().checkAvailabilityAsync(this){a->notice(t("AR support","AR समर्थन"),a.name)}},bottom=12)
-        body.add(label(t("Version 0.2.0 • Pilot content requires safety review. Santali lessons await native-speaker review. Audio uses installed offline Android voices.","संस्करण 0.2.0 • पायलट सामग्री की सुरक्षा समीक्षा ज़रूरी है। संताली पाठों की स्थानीय वक्ता समीक्षा बाकी है। आवाज़ Android की इंस्टॉल ऑफ़लाइन आवाज़ से आती है।"),14f,Palette.muted))
+        body.add(label(t("Version 0.3.0 • Pilot content requires safety review. Santali lessons await native-speaker review. Audio uses installed offline Android voices.","संस्करण 0.3.0 • पायलट सामग्री की सुरक्षा समीक्षा ज़रूरी है। संताली पाठों की स्थानीय वक्ता समीक्षा बाकी है। आवाज़ Android की इंस्टॉल ऑफ़लाइन आवाज़ से आती है।"),14f,Palette.muted))
     }
     private fun verifyPage(){
         title(t("Verify a record","रिकॉर्ड जाँचें"),t("Scan a receipt or signed training credential.","रसीद या हस्ताक्षरित प्रशिक्षण प्रमाणपत्र स्कैन करें।"))

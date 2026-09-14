@@ -29,6 +29,8 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private var widthPx=1;private var heightPx=1
     private var texture=0;private var program=0
     private val equipment=WorldEquipment()
+    private val lightCorrection=floatArrayOf(1f,1f,1f,1f)
+    private val estimatedLight=FloatArray(4)
     private var message=""
     @Volatile private var tapped: Pair<Float,Float>?=null
     @Volatile private var canAnswer=false
@@ -67,7 +69,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         try{
             if(ar==null){
                 if(ArCoreApk.getInstance().requestInstall(this,!installRequested)==ArCoreApk.InstallStatus.INSTALL_REQUESTED){installRequested=true;return}
-                ar=Session(this).apply{configure(Config(this).apply{planeFindingMode=Config.PlaneFindingMode.HORIZONTAL;updateMode=Config.UpdateMode.LATEST_CAMERA_IMAGE})}
+                ar=Session(this).apply{configure(Config(this).apply{planeFindingMode=Config.PlaneFindingMode.HORIZONTAL;updateMode=Config.UpdateMode.LATEST_CAMERA_IMAGE;lightEstimationMode=Config.LightEstimationMode.AMBIENT_INTENSITY})}
             }
             ar?.resume();surface.onResume()
         }catch(e:Exception){android.app.AlertDialog.Builder(this).setTitle(t("AR is not ready","AR तैयार नहीं है")).setMessage(t("Use on-screen practice on this device. AR needs a supported phone and installed Google Play Services for AR.","इस उपकरण पर स्क्रीन अभ्यास करें। AR के लिए समर्थित फ़ोन और Google Play Services for AR चाहिए।")).setPositiveButton("OK"){_,_->finish()}.setOnCancelListener{finish()}.show()}
@@ -108,7 +110,12 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
             val projection=FloatArray(16);val view=FloatArray(16);val model=FloatArray(16);val vp=FloatArray(16);val mvp=FloatArray(16)
             frame.camera.getProjectionMatrix(projection,0,.1f,30f);frame.camera.getViewMatrix(view,0);a.pose.toMatrix(model,0)
             android.opengl.Matrix.multiplyMM(vp,0,projection,0,view,0);android.opengl.Matrix.multiplyMM(mvp,0,vp,0,model,0)
-            equipment.draw(vp,model,training.data.getString("moduleId"))
+            // Bounded ambient adaptation preserves readability; this is not environmental HDR rendering.
+            if(frame.lightEstimate.state==LightEstimate.State.VALID){
+                frame.lightEstimate.getColorCorrection(estimatedLight,0)
+                for(i in 0..3){val value=estimatedLight[i];if(value.isFinite())lightCorrection[i]=lightCorrection[i]*.9f+value.coerceIn(.65f,1.35f)*.1f}
+            }
+            equipment.draw(vp,model,training.data.getString("moduleId"),frame.camera.pose.translation,lightCorrection)
             val currentOptions=options
             overlay.targets=currentOptions.mapIndexedNotNull{i,option->
                 val point=FloatArray(4);val x=(i-(currentOptions.size-1)/2f)*.5f

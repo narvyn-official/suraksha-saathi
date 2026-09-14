@@ -58,6 +58,23 @@ assert.equal(
   (await call("verify", { token: machinery.data.token })).data.moduleId,
   "machinery",
 );
+const ppeAttempt = attempts.find((a) => a.moduleId === "ppe");
+const ppeCertificate = await call("credentials", { attemptId: ppeAttempt.id });
+assert.equal(ppeCertificate.status, 200);
+assert.equal(
+  (await call("verify", { token: ppeCertificate.data.token })).data.moduleId,
+  "ppe",
+);
+const previous = structuredClone(batch);
+previous.attempts = previous.attempts
+  .filter((a) => a.moduleId !== "ppe")
+  .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.2.0" }));
+assert.equal((await call("import", previous)).status, 200);
+const falseVersion = structuredClone(batch);
+falseVersion.attempts = [
+  { ...ppeAttempt, id: randomUUID(), contentVersion: "0.2.0" },
+];
+assert.equal((await call("import", falseVersion)).status, 400);
 const old = structuredClone(batch);
 old.attempts = old.attempts
   .slice(0, 2)

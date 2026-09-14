@@ -13,6 +13,7 @@ class Curriculum(context: Context) {
     val json = JSONObject(context.assets.open("curriculum.json").bufferedReader().use { it.readText() })
     val modules = json.getJSONArray("modules").objects()
     val version = json.getString("version")
+    val versions:Map<String,JSONObject> = buildMap{put(version,json);context.assets.list("archive").orEmpty().filter{it.endsWith(".json")}.forEach{name->val old=JSONObject(context.assets.open("archive/$name").bufferedReader().use{it.readText()});put(old.getString("version"),old)}}
     fun module(id: String) = modules.first { it.getString("id") == id }
 }
 

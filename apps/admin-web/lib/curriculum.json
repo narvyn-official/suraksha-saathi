@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "reviewStatus": "pilot-draft",
   "languages": {
     "en": "available",
@@ -960,6 +960,324 @@
           "explanation": [
             "A controlled handover prevents a gap in protection.",
             "नियंत्रित हस्तांतरण सुरक्षा में अंतर आने से रोकता है।"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ppe",
+      "title": [
+        "PPE & workplace exposure",
+        "पीपीई और कार्यस्थल के हानिकारक संपर्क"
+      ],
+      "subtitle": [
+        "Choose suitable protection. Know its limits.",
+        "उपयुक्त सुरक्षा साधन चुनें। उनकी सीमाएँ जानें।"
+      ],
+      "duration": "8–12",
+      "objectives": [
+        [
+          "Recognise when protection or exposure controls are unsuitable.",
+          "पहचानें कि सुरक्षा साधन या हानिकारक संपर्क रोकने के उपाय कब अनुपयुक्त हैं।"
+        ],
+        [
+          "Distinguish respirator selection, fit testing and daily seal checks.",
+          "श्वसन सुरक्षा उपकरण चुनने, फिट परीक्षण और हर बार सील जाँच का अंतर समझें।"
+        ],
+        [
+          "Stop, leave exposure safely and report damaged or failing protection.",
+          "रुकें, हानिकारक क्षेत्र से सुरक्षित निकलें और खराब सुरक्षा साधनों की सूचना दें।"
+        ]
+      ],
+      "lessons": [
+        {
+          "title": [
+            "Match protection to the task",
+            "काम के अनुसार सुरक्षा साधन चुनें"
+          ],
+          "body": [
+            "The site’s hazard assessment determines suitable head, eye, hearing, hand, foot and respiratory protection for each task. A helmet alone is not a complete kit. Confirm the required equipment and correct fit with your supervisor before starting. Inspect it and report damage; do not improvise repairs.",
+            "हर काम के लिए सिर, आँख, सुनने की क्षमता, हाथ, पैर और साँस की उपयुक्त सुरक्षा स्थल के खतरा आकलन से तय होती है। केवल हेलमेट पूरी सुरक्षा नहीं है। काम से पहले पर्यवेक्षक से ज़रूरी उपकरण और सही फिट की पुष्टि करें। उपकरण जाँचें और खराबी बताएँ; अस्थायी जुगाड़ से मरम्मत न करें।"
+          ]
+        },
+        {
+          "title": [
+            "Control exposure at its source",
+            "हानिकारक संपर्क को स्रोत पर नियंत्रित करें"
+          ],
+          "body": [
+            "Enclosures, dust extraction and safe work methods reduce exposure before it reaches you. PPE supplements these controls; it does not excuse a failed extraction system. If a control fails or conditions change, stop your task, keep clear and report it using the site procedure. Do not select a stronger respirator yourself to continue.",
+            "बंद आवरण, धूल खींचने की व्यवस्था और सुरक्षित कार्य विधियाँ हानिकारक पदार्थों का संपर्क घटाती हैं। पीपीई इन उपायों के साथ काम करता है; यह खराब धूल नियंत्रण के बावजूद काम करने की अनुमति नहीं है। नियंत्रण खराब हो या परिस्थिति बदले तो काम रोकें, दूर रहें और स्थल की प्रक्रिया के अनुसार सूचना दें। काम जारी रखने के लिए खुद अधिक शक्तिशाली श्वसन उपकरण न चुनें।"
+          ]
+        },
+        {
+          "title": [
+            "Respirators have specific limits",
+            "श्वसन सुरक्षा उपकरणों की सीमाएँ हैं"
+          ],
+          "body": [
+            "A particulate-only filter does not protect against gases or supply oxygen. A competent person must select protection for the assessed exposure. Before required respirator use, complete the site programme’s medical evaluation, training and applicable fit test. A user seal check each time a tight-fitting respirator is worn is not a substitute for a fit test. Do not enter if readiness or fit is uncertain.",
+            "केवल कण छानने वाला फ़िल्टर गैस से सुरक्षा नहीं देता और ऑक्सीजन नहीं देता। आकलित खतरे के लिए योग्य व्यक्ति सुरक्षा उपकरण चुने। जहाँ श्वसन उपकरण ज़रूरी हो, उपयोग से पहले स्थल की व्यवस्था के अनुसार चिकित्सकीय मूल्यांकन, प्रशिक्षण और लागू फिट परीक्षण पूरा करें। कसकर फिट होने वाला उपकरण हर बार पहनने पर सील जाँचना फिट परीक्षण का विकल्प नहीं है। तैयारी या फिट पर संदेह हो तो प्रवेश न करें।"
+          ]
+        },
+        {
+          "title": [
+            "Respond to failure and care for your kit",
+            "खराबी पर कार्रवाई और उपकरण की देखभाल"
+          ],
+          "body": [
+            "If a respirator leaks or breathing becomes difficult, leave the exposure area safely according to your training and alert the supervisor. Do not remove it while still exposed or continue until a break. Get help if unwell. Follow the manufacturer’s and site’s cleaning, storage and replacement procedure; keep clean equipment protected from dust and damage.",
+            "श्वसन उपकरण से रिसाव हो या साँस लेने में कठिनाई हो तो प्रशिक्षण के अनुसार हानिकारक क्षेत्र से सुरक्षित निकलें और पर्यवेक्षक को बताएँ। खतरे वाले क्षेत्र में उपकरण न उतारें और विश्राम तक काम जारी न रखें। अस्वस्थ हों तो सहायता लें। सफाई, भंडारण और बदलने के लिए निर्माता और स्थल की प्रक्रिया मानें; साफ उपकरण को धूल और नुकसान से बचाएँ।"
+          ]
+        }
+      ],
+      "questions": [
+        {
+          "id": "ppe-select",
+          "scene": "ppe",
+          "critical": true,
+          "prompt": [
+            "You are assigned a new task in a steel or mica unit. You have a helmet. What should happen before starting?",
+            "स्टील या अभ्रक इकाई में आपको नया काम मिला है। आपके पास हेलमेट है। शुरू करने से पहले क्या होना चाहिए?"
+          ],
+          "options": [
+            {
+              "id": "safe",
+              "text": [
+                "Confirm the task-specific protection and its fit with the supervisor",
+                "पर्यवेक्षक से काम के लिए ज़रूरी सुरक्षा साधन और उनके फिट की पुष्टि करें"
+              ],
+              "correct": true
+            },
+            {
+              "id": "unsafe",
+              "text": [
+                "Start now; one item of PPE is enough for any task",
+                "अभी शुरू करें; हर काम के लिए एक सुरक्षा साधन पर्याप्त है"
+              ],
+              "correct": false
+            }
+          ],
+          "explanation": [
+            "Different hazards need suitable protection; a helmet does not cover every exposure.",
+            "अलग खतरों के लिए उपयुक्त सुरक्षा चाहिए; हेलमेट हर हानिकारक संपर्क से नहीं बचाता।"
+          ]
+        },
+        {
+          "id": "ppe-damage",
+          "scene": "helmet",
+          "critical": true,
+          "prompt": [
+            "Your helmet shell is cracked before the shift. What do you do?",
+            "पाली शुरू होने से पहले हेलमेट के खोल में दरार है। आप क्या करेंगे?"
+          ],
+          "options": [
+            {
+              "id": "safe",
+              "text": [
+                "Keep it out of use, report it and obtain a suitable replacement",
+                "उसका उपयोग न करें, सूचना दें और उपयुक्त नया हेलमेट लें"
+              ],
+              "correct": true
+            },
+            {
+              "id": "unsafe",
+              "text": [
+                "Cover the crack with tape and use it for this shift",
+                "दरार पर टेप लगाकर इस पाली में उपयोग करें"
+              ],
+              "correct": false
+            }
+          ],
+          "explanation": [
+            "Damaged protective equipment must not be relied on. A temporary repair does not prove protection.",
+            "खराब सुरक्षा उपकरण पर भरोसा न करें। अस्थायी मरम्मत सुरक्षा का प्रमाण नहीं है।"
+          ]
+        },
+        {
+          "id": "ppe-controls",
+          "scene": "controls",
+          "critical": true,
+          "prompt": [
+            "Dust extraction stops while material is being handled. You are wearing the assigned respirator. What next?",
+            "सामग्री सँभालते समय धूल खींचने की व्यवस्था बंद हो जाती है। आपने निर्धारित श्वसन उपकरण पहना है। अब क्या करेंगे?"
+          ],
+          "options": [
+            {
+              "id": "safe",
+              "text": [
+                "Stop your task, keep clear and report the failed control",
+                "अपना काम रोकें, दूर रहें और खराब नियंत्रण की सूचना दें"
+              ],
+              "correct": true
+            },
+            {
+              "id": "unsafe",
+              "text": [
+                "Continue because the respirator replaces dust extraction",
+                "काम जारी रखें क्योंकि श्वसन उपकरण धूल नियंत्रण की जगह लेता है"
+              ],
+              "correct": false
+            }
+          ],
+          "explanation": [
+            "PPE supplements exposure controls. A changed condition needs review before work continues.",
+            "पीपीई हानिकारक संपर्क रोकने के उपायों के साथ काम करता है। काम जारी रखने से पहले बदली परिस्थिति की समीक्षा चाहिए।"
+          ]
+        },
+        {
+          "id": "ppe-filter",
+          "scene": "respirator",
+          "critical": true,
+          "prompt": [
+            "A colleague offers a particulate-only dust respirator for a suspected gas leak. What do you decide?",
+            "संभावित गैस रिसाव के लिए साथी केवल धूल के कण छानने वाला श्वसन उपकरण देता है। आपका निर्णय क्या है?"
+          ],
+          "options": [
+            {
+              "id": "safe",
+              "text": [
+                "Do not enter; keep clear and follow the gas-leak reporting procedure",
+                "प्रवेश न करें; दूर रहें और गैस रिसाव की सूचना देने की प्रक्रिया मानें"
+              ],
+              "correct": true
+            },
+            {
+              "id": "unsafe",
+              "text": [
+                "Wear it and enter because all respirators protect against gas",
+                "उसे पहनकर प्रवेश करें क्योंकि सभी श्वसन उपकरण गैस से बचाते हैं"
+              ],
+              "correct": false
+            }
+          ],
+          "explanation": [
+            "Particulate-only filters do not protect against gases or supply oxygen. Do not improvise entry protection.",
+            "केवल कण छानने वाले फ़िल्टर गैस से नहीं बचाते और ऑक्सीजन नहीं देते। प्रवेश की सुरक्षा का जुगाड़ न करें।"
+          ]
+        },
+        {
+          "id": "ppe-readiness",
+          "scene": "fit",
+          "critical": true,
+          "prompt": [
+            "A job requires a tight-fitting respirator, but you have not completed the site programme’s medical evaluation, training or fit test. What next?",
+            "काम के लिए कसकर फिट होने वाला श्वसन उपकरण चाहिए, लेकिन आपने स्थल की व्यवस्था के अनुसार चिकित्सकीय मूल्यांकन, प्रशिक्षण या फिट परीक्षण पूरा नहीं किया है। अब क्या करेंगे?"
+          ],
+          "options": [
+            {
+              "id": "safe",
+              "text": [
+                "Stay out of the exposure area and ask the supervisor to arrange the requirements",
+                "हानिकारक क्षेत्र से बाहर रहें और पर्यवेक्षक से ज़रूरी प्रक्रिया पूरी कराने को कहें"
+              ],
+              "correct": true
+            },
+            {
+              "id": "unsafe",
+              "text": [
+                "Borrow a colleague’s respirator and start work",
+                "साथी का श्वसन उपकरण लेकर काम शुरू करें"
+              ],
+              "correct": false
+            }
+          ],
+          "explanation": [
+            "A borrowed respirator does not establish suitability, medical readiness, training or fit.",
+            "उधार का श्वसन उपकरण उपयुक्तता, चिकित्सकीय तैयारी, प्रशिक्षण या सही फिट साबित नहीं करता।"
+          ]
+        },
+        {
+          "id": "ppe-seal",
+          "scene": "fit",
+          "critical": true,
+          "prompt": [
+            "You passed a fit test for your assigned tight-fitting respirator. Do you still need a user seal check each time you put it on?",
+            "आपने निर्धारित कसकर फिट होने वाले श्वसन उपकरण का फिट परीक्षण पास किया है। क्या हर बार पहनने पर सील जाँच भी चाहिए?"
+          ],
+          "options": [
+            {
+              "id": "safe",
+              "text": [
+                "Yes; follow the trained seal-check procedure before exposure",
+                "हाँ; हानिकारक संपर्क से पहले सिखाई गई सील-जाँच प्रक्रिया मानें"
+              ],
+              "correct": true
+            },
+            {
+              "id": "unsafe",
+              "text": [
+                "No; a previous fit test removes the need for further checks",
+                "नहीं; पहले का फिट परीक्षण आगे की जाँच की ज़रूरत समाप्त कर देता है"
+              ],
+              "correct": false
+            }
+          ],
+          "explanation": [
+            "A fit test and a user seal check serve different purposes. One does not replace the other.",
+            "फिट परीक्षण और उपयोगकर्ता की सील जाँच के उद्देश्य अलग हैं। एक दूसरे का विकल्प नहीं है।"
+          ]
+        },
+        {
+          "id": "ppe-leak",
+          "scene": "boundary",
+          "critical": true,
+          "prompt": [
+            "Your respirator begins leaking while you are in an exposure area. What is the safe response?",
+            "हानिकारक क्षेत्र में आपके श्वसन उपकरण से रिसाव शुरू होता है। सुरक्षित कार्रवाई क्या है?"
+          ],
+          "options": [
+            {
+              "id": "safe",
+              "text": [
+                "Leave safely as trained, keep protection on while exposed and report the problem",
+                "प्रशिक्षण के अनुसार सुरक्षित निकलें, हानिकारक क्षेत्र में सुरक्षा उपकरण पहने रहें और समस्या बताएँ"
+              ],
+              "correct": true
+            },
+            {
+              "id": "unsafe",
+              "text": [
+                "Remove it in the exposure area to make adjustments",
+                "ठीक करने के लिए हानिकारक क्षेत्र में ही उतार दें"
+              ],
+              "correct": false
+            }
+          ],
+          "explanation": [
+            "Do not remove respiratory protection while exposed. Leave safely and follow the site’s response procedure.",
+            "हानिकारक क्षेत्र में श्वसन सुरक्षा न उतारें। सुरक्षित निकलें और स्थल की कार्रवाई प्रक्रिया मानें।"
+          ]
+        },
+        {
+          "id": "ppe-storage",
+          "scene": "storage",
+          "critical": false,
+          "prompt": [
+            "Where should clean reusable PPE go after the required care procedure?",
+            "ज़रूरी देखभाल प्रक्रिया के बाद साफ, दोबारा उपयोग होने वाला पीपीई कहाँ रखना चाहिए?"
+          ],
+          "options": [
+            {
+              "id": "safe",
+              "text": [
+                "In the designated protected storage, following site and manufacturer instructions",
+                "निर्माता और स्थल के निर्देश के अनुसार निर्धारित सुरक्षित भंडारण में"
+              ],
+              "correct": true
+            },
+            {
+              "id": "unsafe",
+              "text": [
+                "On a dusty workbench beside the process",
+                "प्रक्रिया के पास धूल भरी मेज़ पर"
+              ],
+              "correct": false
+            }
+          ],
+          "explanation": [
+            "Protected storage helps prevent contamination and damage before the next use.",
+            "सुरक्षित भंडारण अगले उपयोग से पहले गंदगी और नुकसान से बचाने में मदद करता है।"
           ]
         }
       ]

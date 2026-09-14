@@ -6,13 +6,15 @@ Updated 14 September 2026. The user has authorized ongoing autonomous developmen
 
 Public repository: https://github.com/narvyn-official/suraksha-saathi
 
-Current tested release: v0.2.0-pilot, source 643972e78478d1b0a50ea310350941ae3f0686b3. Three modules (fire, gas/confined spaces, machinery/isolation), 24 decisions, English/Hindi pilot text, native offline SQLite progress, ARCore anchors, original 3D equipment, signed pilot credentials, and persistent trainer analytics are implemented. See build-status.md, validation.md and reference-benchmark.md for evidence and limitations. The local dashboard is http://localhost:5173/ when its development server is running.
+Current tested milestone: v0.3.0-pilot (source identified by the release tag). Four modules (fire, gas/confined spaces, machinery/isolation, PPE/exposure), 32 decisions, English/Hindi pilot text, native offline SQLite progress, ARCore anchors, detailed original 3D equipment with material lighting, local spaced retrieval review, signed pilot credentials, and persistent trainer analytics are implemented. See build-status.md, validation.md and reference-benchmark.md for evidence and limitations. The local dashboard is http://localhost:5173/ when its development server is running.
 
 ## First work to pick up
 
-Implement the fourth complete domain: PPE selection and workplace exposure awareness. Include coherent learning, guided practice, assessment with critical gates, English/Hindi draft text, original relevant equipment illustrations/3D assets, offline persistence and trainer evidence support. Preserve old curriculum versions and signed credentials. Generalize module-specific switches where required; do not render a machinery model or title for a new module. Test the actual integrated Android flow and server regrading, not just JSON presence. Use current primary safety references and mark review status honestly.
+Current user steering prioritizes realistic equipment and evidence-informed learning. The v0.3 milestone adds the fourth PPE/exposure domain, detailed equipment renderer and local spaced-review loop. Next implement staged component inspection: guided labels, independent component selection, explanation and an orientation change. Link this to the existing review schedule without changing certification evidence. See ar-learning-evidence.md and spaced-review.md for research and boundaries.
 
-Then implement the fifth proposed domain: emergency reporting, evacuation and safe response around an injured coworker. Keep guidance appropriate to untrained workers; do not teach hazardous rescue or substitute for practical first-aid instruction. The original brief ended at “(3) Machinery”; these two domains are product proposals under the user’s design freedom, not claims about an unseen official brief.
+Continue realism through approved reference geometry, clearer component silhouettes and grounded contact/shadow cues. Investigate a maintainable authored asset pipeline before promising photorealism. Current models remain original procedural illustrations; real phone frame-time, lighting and tracking measurements are external validation gates.
+
+Then implement the fifth proposed domain: emergency reporting, evacuation and safe response around an injured coworker. Keep guidance appropriate to untrained workers; do not teach hazardous rescue or substitute for practical first-aid instruction. The original brief ended at “(3) Machinery”; the fourth/fifth domains are product proposals under the user’s design freedom, not claims about an unseen official brief.
 
 ## Prioritized backlog
 
@@ -67,3 +69,5 @@ Choose a smaller higher-value fix ahead of this order when a reproducible defect
 ## Run log
 
 - 2026-09-14: Enabled recurring continuation in this task and established this roadmap. Baseline v0.2 remains the latest released application. Next implementation: integrated PPE/exposure domain.
+
+- 2026-09-14: Completed v0.3 implementation and validation: PPE brings coverage to four domains/32 decisions; detailed geometry and material lighting work in the shared viewer/AR renderer; offline spaced review persists separately from assessment evidence. Twelve JVM, six web and seven emulator tests passed, with web build/API checks and visual equipment review. Added primary-source learning research and a practical-transfer study plan. Next: staged component identification with fading guidance and changed orientation.

@@ -72,11 +72,14 @@ export function insights(
     return {
       id: m.id,
       name:
-        m.id === "fire"
-          ? "Fire"
-          : m.id === "gas"
-            ? "Gas / confined"
-            : "Machinery",
+        (
+          {
+            fire: "Fire",
+            gas: "Gas / confined",
+            machinery: "Machinery",
+            ppe: "PPE",
+          } as Record<string, string>
+        )[m.id] ?? m.title[0],
       passed: rows.filter((r) => r.payload.result.passed).length,
       needsPractice: rows.filter((r) => !r.payload.result.passed).length,
       notAssessed: list.length - rows.length,
