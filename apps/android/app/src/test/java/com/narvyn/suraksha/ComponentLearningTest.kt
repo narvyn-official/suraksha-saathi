@@ -98,6 +98,65 @@ class ComponentLearningTest {
         assertEquals("mixed",event.getString("mode")); assertTrue(event.getBoolean("descriptionExposed"))
         assertEquals(0,session.data.getInt("visualCorrect")); assertEquals(1,session.data.getInt("descriptionCorrect"))
     }
+    @Test fun cameraAndScreenExposureStayMixedAcrossRecreationAndResetForNextDecision() {
+        val session = ComponentSession.start("fire",null)
+        session.notePresentation("screen") // instructional example is not retrieval exposure
+        session.advance(1)
+        session.notePresentation("camera")
+        val restored = ComponentSession.restore("fire",session.data)
+        restored.notePresentation("screen")
+        restored.choose(restored.target.id,2,"camera")
+        val event = restored.data.getJSONArray("events").getJSONObject(0)
+        assertEquals("visual-markers",event.getString("mode")); assertEquals("mixed",event.getString("presentation"))
+        assertEquals(1,restored.data.getInt("mixedPresentationCorrect")); assertEquals(0,restored.data.getInt("cameraCorrect"))
+        restored.advance(3)
+        restored.choose(restored.target.id,4,"camera")
+        assertEquals("camera",restored.data.getJSONArray("events").getJSONObject(1).getString("presentation"))
+        assertEquals(1,restored.data.getInt("cameraCorrect")); assertEquals(2,restored.data.getInt("visualCorrect"))
+    }
+    @Test fun descriptionUseNeverCreatesCameraRecognitionCredit() {
+        val session = ComponentSession.start("fire",null)
+        session.advance(1); session.notePresentation("camera"); session.useDescriptions(true)
+        session.choose(session.target.id,2,"camera")
+        assertEquals("description",session.data.getJSONArray("events").getJSONObject(0).getString("presentation"))
+        assertEquals(0,session.data.getInt("cameraCorrect")); assertEquals(1,session.data.getInt("descriptionCorrect"))
+        session.advance(3); session.useDescriptions(false); session.choose(session.target.id,4,"camera")
+        val event = session.data.getJSONArray("events").getJSONObject(1)
+        assertEquals("mixed",event.getString("mode")); assertEquals("camera",event.getString("presentation"))
+        assertEquals(0,session.data.getInt("cameraCorrect")); assertEquals(2,session.data.getInt("descriptionCorrect"))
+    }
+    @Test fun invalidPresentationAndAnswersCannotCreateExposureOrEvents() {
+        val session = ComponentSession.start("fire",null)
+        session.advance(1); session.notePresentation("untracked")
+        session.choose(session.target.id,2,"untracked"); session.choose("unknown",3,"camera")
+        assertNull(session.answer); assertFalse(session.data.getBoolean("cameraSeen")); assertFalse(session.data.getBoolean("screenSeen"))
+        assertEquals(0,session.data.getJSONArray("events").length())
+        session.choose(session.target.id,4)
+        assertEquals("screen",session.data.getJSONArray("events").getJSONObject(0).getString("presentation"))
+        assertEquals(1,session.data.getInt("screenCorrect"))
+        session.notePresentation("camera"); session.choose(session.target.id,5,"camera")
+        assertFalse(session.data.getBoolean("cameraSeen")); assertEquals(1,session.data.getJSONArray("events").length())
+    }
+    @Test fun legacyActiveDecisionIsConservativelyScreenExposedWithoutRewritingHistory() {
+        val session = ComponentSession.start("fire",null)
+        session.advance(1); session.choose(session.target.id,2); session.advance(3)
+        session.data.remove("screenSeen"); session.data.remove("cameraSeen")
+        val historical = session.data.getJSONArray("events").getJSONObject(0).toString()
+        val restored = ComponentSession.restore("fire",session.data)
+        restored.choose(restored.target.id,4,"camera")
+        assertEquals(historical,restored.data.getJSONArray("events").getJSONObject(0).toString())
+        assertEquals("mixed",restored.data.getJSONArray("events").getJSONObject(1).getString("presentation"))
+        assertEquals(0,restored.data.getInt("cameraCorrect"))
+    }
+    @Test fun wrongAnswerRetryRetainsPresentationExposureAndCannotGainUnaidedCredit() {
+        val session = ComponentSession.start("fire",null)
+        session.advance(1); session.choose("_unsure",2,"camera"); session.advance(3)
+        session.choose(session.target.id,4,"screen")
+        val retry = session.data.getJSONArray("events").getJSONObject(1)
+        assertEquals("mixed",retry.getString("presentation")); assertTrue(retry.getBoolean("helped"))
+        assertEquals(0,session.data.getInt("cameraCorrect")); assertEquals(0,session.data.getInt("screenCorrect"))
+        assertEquals(0,session.data.getInt("mixedPresentationCorrect"))
+    }
     @Test fun projectionRejectsBehindCameraOffscreenAndInvalidCoordinates() {
         val identity = FloatArray(16) { if (it%5==0) 1f else 0f }
         assertEquals(ComponentProjection.Point(100f,50f),ComponentProjection.project(floatArrayOf(0f,0f,0f),identity,200,100))

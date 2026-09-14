@@ -1,8 +1,8 @@
 # Suraksha Saathi
 
-A working **v0.4.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
+A working **v0.4.1 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
 
-[Download the APK and emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.4.0-pilot).
+[Download the APK and emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.4.1-pilot).
 
 ## What you can use now
 
@@ -11,7 +11,7 @@ A working **v0.4.0 pilot** for Android safety learning and trainer review, built
 - Original inspectable illustrations, detailed material-lit offline rotatable 3D equipment and ARCore camera mode with tracked equipment and decision cards on supported phones; screen practice on other Android 10+ phones.
 - Trainer dashboard with a worker directory, sector/status filters, latest-assessment charts, practice follow-up, CSV export, persistent records, answer-by-answer review, signed pilot credentials, QR downloads, signature checks and revocation.
 - Offline decision recall with corrective feedback, self-explanation prompts and scheduled return visits that survive compatible curriculum updates; assessment evidence remains unchanged.
-- Staged equipment identification: examples, hidden labels, changed viewing angles, English/Hindi description alternatives and local review scheduling.
+- Staged equipment identification: examples, hidden labels, changed viewing angles, English/Hindi description alternatives and local review scheduling. Fire has optional camera-based component practice with tracking gates, preserved screen fallback and separate presentation attribution. Physical AR validation remains pending.
 - Android credential wallet with pinned-issuer signature verification offline.
 
 **Pilot scope:** these are simulation learning records, not statutory safety certificates, identity verification, practical competence or permission to work. Santali is visibly pending native review. Actual AR tracking needs physical-phone validation.
@@ -24,7 +24,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/suraksha-saathi-0.4.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
+The debug-signed APK is copied to `artifacts/suraksha-saathi-0.4.1-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs

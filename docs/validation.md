@@ -1,5 +1,17 @@
 # Pilot validation — 15 September 2026
 
+## v0.4.1 verification
+
+- **32 JVM tests** passed: grading (5), decision recall (9), component learning (14), and camera readiness/freshness/viewing geometry (4). New cases cover camera/screen/mixed attribution, description exposure, legacy restoration, stale revisions, repeated images, an advancing image after pause, and rejection of unreadable viewing angles.
+- **Four Android instrumented tests** passed together on the API 36 ARM64 emulator (83.444 seconds). The component suite exercised all five models/15 parts, changed views, rendered-buffer checks, Hindi descriptions, saved assistance, assessment/credential isolation and database migration. The new camera fallback test verified English/Hindi permission denial, hidden/disabled camera targets, activity recreation and preserved screen/text answers without camera credit.
+- After adding the final Android permission-settings shortcut, the updated fallback test passed again (36.035 seconds). The final APK and test APK built successfully. APK SHA-256: `29309cdeeb3012d9d6bc91b761088ecce9650c8f060485d4bbc59842860ed8b5`.
+- The first fallback-test runs exposed test-harness handling of Android's two different denial buttons and the paused permission-dialog lifecycle. The harness now dismisses both denial variants and waits for resumed activity before recreating it; the final runs above passed.
+- Code review corrected repeated-image eligibility, cached pre-pause image reuse, explicit retry after AR installation refusal, offscreen presentation attribution and repeated per-frame JSON serialization. Screen exposure is rechecked on scroll as well as rendering. These checks do not substitute for real-device tests.
+- Fresh English/Hindi camera-unavailable screens and the completion summary were visually inspected. The new MP4 is a **40-second emulator recovery walkthrough** from the final fallback test, not positive camera tracking or an AR field demonstration.
+- Curriculum 0.4.0, all content archives, geometry/shaders, assessment/credential paths and dashboard source remain unchanged. No database migration or issuer rotation was needed. The previous web evidence below remains current; web tests and browser inspection were not repeated for this Android-only increment.
+
+See [camera component practice](camera-component-practice.md) for scope, primary technical references and device acceptance checks. Only fire has the new camera interaction. Actual placement, marker alignment, readable tracking, installation UI/retry, permission enablement through system settings and physical pause/recovery remain unverified. Scored AR decision stations retain their older implementation; applying these new freshness/revision guards there is the next software priority.
+
 ## v0.4.0 verification
 
 - **23 JVM tests** passed. Added cross-version cases confirm that unchanged questions retain their review date, streak and round, changed questions cannot reuse the older answer, and an older success cannot hide a newer compatible review error.

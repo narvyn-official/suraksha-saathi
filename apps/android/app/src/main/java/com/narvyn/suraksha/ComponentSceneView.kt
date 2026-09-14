@@ -15,10 +15,12 @@ import javax.microedition.khronos.opengles.GL10
 /** Fixed, reviewed viewing angles keep the selected recognition anchors in front of the model. */
 class ComponentSceneView(context: Context, private val module: String): FrameLayout(context) {
     private data class Scene(val revision: Int, val yaw: Float, val order: List<ComponentCatalog.Part>)
+    var onVisible: () -> Unit = {}
     private val surface = GLSurfaceView(context)
     private val markers = mutableListOf<Button>()
     private val leaders = LeaderLines(context)
     private var revision = 0
+    private var projected = emptyList<ComponentProjection.Point?>()
     @Volatile private var scene = Scene(0, 20f, ComponentCatalog.modules.getValue(module))
     private var viewportWidth = 1
     private var viewportHeight = 1
@@ -53,14 +55,14 @@ class ComponentSceneView(context: Context, private val module: String): FrameLay
                 equipment.draw(vp,model,module,eye)
                 Matrix.multiplyMM(mvp,0,vp,0,model,0)
                 val points = snapshot.order.map { ComponentProjection.project(it.point,mvp,viewportWidth,viewportHeight) }
-                post { if (scene.revision == snapshot.revision) positionMarkers(points) }
+                post { if (scene.revision == snapshot.revision) { projected=points; positionMarkers(points); reportVisibility() } }
             }
         })
         surface.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
     }
 
     fun configure(session: ComponentSession, hi: Boolean, select: (String) -> Unit) {
-        revision++
+        revision++; projected=emptyList()
         scene = Scene(revision,session.yaw,session.order)
         markers.forEachIndexed { i, button ->
             val part = session.order[i]; val letter = ('A'.code+i).toChar().toString()
@@ -106,6 +108,10 @@ class ComponentSceneView(context: Context, private val module: String): FrameLay
             }
         }
         leaders.lines = lines; leaders.invalidate()
+    }
+    fun reportVisibility() {
+        val visible=android.graphics.Rect()
+        if(isShown && projected.size==3 && getLocalVisibleRect(visible) && projected.all { it!=null && visible.contains(it.x.toInt(),it.y.toInt()) }) onVisible()
     }
     fun resume() { surface.onResume(); surface.requestRender() }
     fun pause() { surface.onPause() }

@@ -10,5 +10,5 @@ fi
 cd "$PROJECT_ROOT/apps/android"
 ./gradlew testDebugUnitTest assembleDebug "$@"
 mkdir -p "$PROJECT_ROOT/artifacts"
-cp app/build/outputs/apk/debug/app-debug.apk "$PROJECT_ROOT/artifacts/suraksha-saathi-0.4.0-debug.apk"
-shasum -a 256 "$PROJECT_ROOT/artifacts/suraksha-saathi-0.4.0-debug.apk"
+cp app/build/outputs/apk/debug/app-debug.apk "$PROJECT_ROOT/artifacts/suraksha-saathi-0.4.1-debug.apk"
+shasum -a 256 "$PROJECT_ROOT/artifacts/suraksha-saathi-0.4.1-debug.apk"

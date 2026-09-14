@@ -80,28 +80,42 @@ class ComponentSession private constructor(val data: JSONObject) {
             if (value && stage in 1..2) data.put("descriptionSeen", true)
         }
     }
+    /** Record an actually displayed model, not a requested camera mode or an untracked frame. */
+    fun notePresentation(presentation: String) {
+        if (stage !in 1..2 || answer != null || descriptions) return
+        when (presentation) {
+            "screen" -> data.put("screenSeen", true)
+            "camera" -> data.put("cameraSeen", true)
+        }
+    }
     fun hint() { if (!done && stage > 0 && answer == null) { data.put("helped", true); data.put("clean", false) } }
-    fun choose(id: String, now: Long) {
-        if (stage !in 1..2 || answer != null || (id != "_unsure" && parts.none { it.id == id })) return
+    fun choose(id: String, now: Long, presentation: String = "screen") {
+        if (presentation !in listOf("screen", "camera") || stage !in 1..2 || answer != null || (id != "_unsure" && parts.none { it.id == id })) return
+        notePresentation(presentation)
         val success = id == target.id
         val descriptionSeen = descriptions || data.optBoolean("descriptionSeen")
+        val displayed = if (descriptions) "description" else if (data.optBoolean("screenSeen") && data.optBoolean("cameraSeen")) "mixed" else if (data.optBoolean("cameraSeen")) "camera" else "screen"
         val events = data.getJSONArray("events")
         if (events.length() >= 200) events.remove(0)
         events.put(JSONObject().put("part", target.id).put("stage", stage).put("answer", id).put("correct", success)
-            .put("helped", helped).put("mode", if (descriptions) "description" else if (descriptionSeen) "mixed" else "visual-markers").put("descriptionExposed", descriptionSeen).put("at", now))
+            .put("helped", helped).put("mode", if (descriptions) "description" else if (descriptionSeen) "mixed" else "visual-markers").put("descriptionExposed", descriptionSeen).put("presentation", displayed).put("at", now))
         if (!success || helped) data.put("clean", false)
         if (success && !helped) {
             val key = if (descriptionSeen) "descriptionCorrect" else "visualCorrect"
             data.put(key, data.optInt(key) + 1)
+            if (!descriptionSeen) {
+                val presentationKey = when (displayed) { "camera" -> "cameraCorrect"; "mixed" -> "mixedPresentationCorrect"; else -> "screenCorrect" }
+                data.put(presentationKey, data.optInt(presentationKey) + 1)
+            }
         }
         data.put("answer", id)
     }
     fun advance(now: Long) {
         if (done) return
-        if (stage == 0) { data.put("stage", 1).put("descriptionSeen", descriptions); return }
+        if (stage == 0) { data.put("stage", 1).put("descriptionSeen", descriptions).put("screenSeen", false).put("cameraSeen", false); return }
         if (answer == null) return
         if (!correct) { data.put("answer", ""); data.put("helped", true); return }
-        data.put("answer", "").put("helped", false).put("descriptionSeen", descriptions)
+        data.put("answer", "").put("helped", false).put("descriptionSeen", descriptions).put("screenSeen", false).put("cameraSeen", false)
         if (stage == 1) data.put("stage", 2)
         else if (index < parts.lastIndex) data.put("index", index + 1).put("stage", if (data.getInt("round") > 0) 1 else 0)
         else {
@@ -117,7 +131,12 @@ class ComponentSession private constructor(val data: JSONObject) {
             require(ComponentCatalog.modules.containsKey(module))
             if (record != null && record.optInt("catalogVersion") == ComponentCatalog.VERSION && record.optString("module") == module
                 && record.optInt("index", -1) in ComponentCatalog.modules.getValue(module).indices && record.optInt("stage", -1) in 0..3) {
-                return ComponentSession(JSONObject(record.toString()))
+                val restored = JSONObject(record.toString())
+                // Older versions displayed the screen model. Do not relabel that exposure as camera-only.
+                if (!restored.has("screenSeen") || !restored.has("cameraSeen")) {
+                    restored.put("screenSeen", restored.optInt("stage") in 1..2).put("cameraSeen", false)
+                }
+                return ComponentSession(restored)
             }
             return start(module, null)
         }
@@ -128,7 +147,8 @@ class ComponentSession private constructor(val data: JSONObject) {
                 .put("index", 0).put("stage", if (compatible == null) 0 else 1).put("answer", "").put("helped", false).put("descriptions", false).put("descriptionSeen", false)
                 .put("preservedDueAt", compatible?.optLong("dueAt")?.takeIf { it > now } ?: 0L)
                 .put("round", (compatible?.optInt("round") ?: -1) + 1).put("previousStreak", compatible?.optInt("streak") ?: 0)
-                .put("clean", true).put("visualCorrect", 0).put("descriptionCorrect", 0).put("events", JSONArray()))
+                .put("clean", true).put("visualCorrect", 0).put("descriptionCorrect", 0)
+                .put("screenSeen", false).put("cameraSeen", false).put("cameraCorrect", 0).put("screenCorrect", 0).put("mixedPresentationCorrect", 0).put("events", JSONArray()))
         }
     }
 }
