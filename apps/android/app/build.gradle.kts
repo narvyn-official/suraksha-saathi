@@ -7,8 +7,8 @@ android {
         applicationId = "com.narvyn.suraksha"
         minSdk = 29
         targetSdk = 36
-        versionCode = 14
-        versionName = "0.5.4"
+        versionCode = 15
+        versionName = "0.5.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
@@ -19,7 +19,7 @@ android {
 }
 dependencies {
     implementation("androidx.core:core:1.17.0")
-    implementation("com.google.ar:core:1.50.0")
+    implementation("com.google.ar:core:1.56.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")

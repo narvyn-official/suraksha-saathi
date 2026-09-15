@@ -1,5 +1,9 @@
 # Pilot validation — 15 September 2026
 
+## v0.5.5 AR technology candidate
+
+See [AR technology and validation](ar-technology-and-validation.md). Updated to ARCore 1.56.0; corrected pose-relative facing, texture registration and session retirement; added full-size previews, surface clipping, coverage/range checks and stable-frame placement. **118 JVM tests and eleven Android methods passed** on the emulator. English/Hindi 200% preview overlays and final mission captures were inspected. These are synthetic/screen/recovery checks; physical AR placement and completion remain unverified. The [coverage report](ar-problem-statement-coverage.md) explicitly tracks missing fire/gas objectives, Santali, trainer integration and real-phone delivery proof.
+
 ## v0.5.4 rendering and placement candidate
 
 See [rendering and placement validation](ar-rendering-and-placement.md). The earlier screen sweep failure was reproduced under software graphics emulation; the same full fire/gas tests pass using hardware graphics acceleration. The camera feed from the physical phone still has not yielded verified placement, and no phone was connected during this increment. Preserve that distinction.
