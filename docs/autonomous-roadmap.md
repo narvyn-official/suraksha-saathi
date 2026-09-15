@@ -6,7 +6,7 @@ Updated 15 September 2026. The user has authorized ongoing autonomous developmen
 
 Public repository: https://github.com/narvyn-official/suraksha-saathi
 
-Current implementation milestone: v0.5.6 recall challenge candidate. Public downloads remain v0.5.0-pilot; v0.5.1-pilot is held as a draft after user feedback on the AR experience. Five modules (fire, gas/confined spaces, machinery/isolation, PPE/exposure, emergency/reporting), 40 decisions, English/Hindi pilot text, native offline SQLite progress, ARCore anchors, detailed original 3D equipment with material lighting, local spaced retrieval review, staged component recognition, signed pilot credentials, and persistent trainer analytics are implemented. See build-status.md, validation.md and reference-benchmark.md for evidence and limitations. The local dashboard is http://localhost:5173/ when its development server is running.
+Current implementation milestone: v0.5.6 recall challenge candidate. Public downloads now include v0.5.6-pilot as an explicitly unverified-camera prerelease; v0.5.1-pilot is held as a draft after user feedback on the AR experience. Five modules (fire, gas/confined spaces, machinery/isolation, PPE/exposure, emergency/reporting), 40 decisions, English/Hindi pilot text, native offline SQLite progress, ARCore anchors, detailed original 3D equipment with material lighting, local spaced retrieval review, staged component recognition, signed pilot credentials, and persistent trainer analytics are implemented. See build-status.md, validation.md and reference-benchmark.md for evidence and limitations. The local dashboard is http://localhost:5173/ when its development server is running.
 
 ## First work to pick up
 

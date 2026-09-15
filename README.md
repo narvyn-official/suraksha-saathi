@@ -1,14 +1,14 @@
 # Suraksha Saathi
 
-A working **v0.5.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
+A **v0.5.6 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
 
-**Latest release: [v0.5.0 pilot](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.5.0-pilot)**
+**Latest download: [v0.5.6 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.5.6-pilot)**
 
-- [Download the Android APK — v0.5.0](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-debug.apk) · Android 10+, debug-signed pilot.
-- [Watch the v0.5.0 emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-demo.mp4) · Fire/gas screen procedure walkthrough; physical-phone AR validation remains pending.
-- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/SHA256SUMS-0.5.0.txt).
+- [Download the Android APK — v0.5.6](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.6-pilot/suraksha-saathi-0.5.6-debug.apk) · Android 10+, debug-signed pilot.
+- [Watch the older v0.5.0 emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-demo.mp4) · Historical fire/gas screen walkthrough; it does not show the new recall challenge or verified physical AR.
+- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.6-pilot/SHA256SUMS-0.5.6.txt).
 
-**Development update:** the 0.5.6 candidate adds **Remember, then do**, a fire/gas recall challenge with hidden action cues, seven-second recorded hints and a debrief of actions needing help. See [recall challenge and verification](docs/ar-recall-challenge.md), [AR technology](docs/ar-technology-and-validation.md) and the [problem-statement coverage report](docs/ar-problem-statement-coverage.md). Physical-phone AR validation remains pending; public downloads remain 0.5.0 and 0.5.1 stays a draft.
+**In this version:** 0.5.6 adds **Remember, then do**, a fire/gas recall challenge with hidden action cues, seven-second recorded hints and a debrief of actions needing help. See [recall challenge and verification](docs/ar-recall-challenge.md), [AR technology](docs/ar-technology-and-validation.md) and the [problem-statement coverage report](docs/ar-problem-statement-coverage.md). Physical-phone AR validation remains pending. Version 0.5.6 is published for pilot testing, not as an AR-verified field release; 0.5.1 stays a draft.
 
 ## What you can use now
 

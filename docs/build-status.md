@@ -1,6 +1,6 @@
 # Implementation status — 15 September 2026
 
-This document describes the implemented v0.5.6 recall challenge candidate (public downloads remain 0.5.0; 0.5.1 is held as a draft) (curriculum 0.4.0). Earlier architecture documents describe the target system; they are not claims that every feature is shipped.
+This document describes the implemented v0.5.6 recall challenge candidate (0.5.6 is publicly downloadable as a pilot prerelease; 0.5.1 remains a draft) (curriculum 0.4.0). Earlier architecture documents describe the target system; they are not claims that every feature is shipped.
 
 See [current AR engineering work](ar-technology-and-validation.md) and [full problem-statement coverage](ar-problem-statement-coverage.md) for implemented changes and remaining acceptance gates.
 
