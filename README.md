@@ -1,14 +1,14 @@
 # Suraksha Saathi
 
-A working **v0.5.1 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
+A working **v0.5.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
 
-**Latest release: [v0.5.1 pilot](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.5.1-pilot)**
+**Latest release: [v0.5.0 pilot](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.5.0-pilot)**
 
-- [Download the Android APK — v0.5.1](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.1-pilot/suraksha-saathi-0.5.1-debug.apk) · Android 10+, debug-signed pilot.
-- [Watch the v0.5.1 emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.1-pilot/suraksha-saathi-0.5.1-demo.mp4) · Staged fire/gas spatial-target excerpts on an emulator; physical-phone AR validation remains pending.
-- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.1-pilot/SHA256SUMS-0.5.1.txt).
+- [Download the Android APK — v0.5.0](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-debug.apk) · Android 10+, debug-signed pilot.
+- [Watch the v0.5.0 emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-demo.mp4) · Fire/gas screen procedure walkthrough; physical-phone AR validation remains pending.
+- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/SHA256SUMS-0.5.0.txt).
 
-This update adds five spatial target-hold steps to the fire/gas procedures, replay-validated interaction records and a fix for scrolling to scene action buttons. Camera and screen practice remain separately attributed. See [what spatial practice measures](docs/spatial-procedure-practice.md).
+**Development update:** spatial procedure practice is implemented in source. The 0.5.1 release is held as a draft following user feedback; the camera workspace and target interaction are being revised for 0.5.2. The downloads above remain the earlier published 0.5.0 pilot. See [what spatial practice measures](docs/spatial-procedure-practice.md).
 
 ## What you can use now
 
@@ -36,7 +36,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/suraksha-saathi-0.5.1-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
+The debug-signed APK is copied to `artifacts/suraksha-saathi-0.5.2-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs
