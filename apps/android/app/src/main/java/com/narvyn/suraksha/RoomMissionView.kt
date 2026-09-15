@@ -1,0 +1,239 @@
+package com.narvyn.suraksha
+
+import android.Manifest
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.graphics.*
+import android.opengl.*
+import android.opengl.Matrix
+import android.os.SystemClock
+import android.view.*
+import android.widget.FrameLayout
+import com.google.ar.core.*
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
+
+/** Three independently placed stations. Touch gestures never relocate an existing station. */
+class RoomMissionView(private val host:Activity, val module:String, val camera:Boolean, private val hindi:Boolean):FrameLayout(host),GLSurfaceView.Renderer {
+    data class Image(val revision:Int,val at:Long,val placement:Int,val tracked:Boolean,val message:String,
+                     val targets:Map<String,ComponentProjection.Point> = emptyMap(),val inverse:FloatArray?=null,val frameWidth:Int=0,val frameHeight:Int=0,val phase:String="")
+    private data class Visual(val phase:String="ALARM",val progress:Float=0f,val held:Boolean=false)
+    private val surface=GLSurfaceView(host)
+    private val overlay=Overlay()
+    private val equipment=WorldEquipment()
+    private val geometry=RoomMissionGeometry()
+    private val gate=ComponentCameraGate()
+    private val freshness=ComponentCameraFreshness()
+    private val placement=AtomicBoolean(false)
+    private val mailbox=AtomicReference<Image?>(null)
+    private val posted=AtomicBoolean(false)
+    private val anchors=mutableListOf<Anchor>() // GL owner; detach only after surface pause.
+    private val facing=mutableListOf<Float>()
+    @Volatile private var revision=0
+    @Volatile private var foreground=false
+    @Volatile private var visual=Visual()
+    private var session:Session?=null
+    private var running=false
+    private val frameTicker=object:Runnable{override fun run(){if(foreground&&running){surface.requestRender();postDelayed(this,33)}}}
+    private var installRequested=false
+    private var texture=0;private var program=0;private var w=1;private var h=1
+    private val vertices=floats(floatArrayOf(-1f,-1f,1f,-1f,-1f,1f,1f,1f));private val uv=floats(FloatArray(8))
+    private val projection=FloatArray(16);private val view=FloatArray(16);private val vp=FloatArray(16)
+    private var image:Image?=null // UI owner
+    private var down:Pair<Float,Float>?=null
+    private var downAt=0L
+    private var gestureSerial=0L
+    private var gestureTarget:String?=null
+    private var screenCursor:Pair<Float,Float>?=null
+    var onImage:(Image)->Unit={}
+    var onAim:(Float,Float,Boolean,Long,Boolean)->Unit={_,_,_,_,_->}
+    var onAction:(String)->Unit={}
+    var onRelease:()->Unit={}
+    var onCancel:()->Unit={}
+    val ready get()=foreground && image?.let { it.revision==revision && it.frameWidth==width && it.frameHeight==height && it.phase==visual.phase && it.placement==3 && it.tracked && (!camera || SystemClock.elapsedRealtime()-it.at in 0..150) }==true
+    private fun t(en:String,hi:String)=if(hindi)hi else en
+    init {
+        surface.setEGLContextClientVersion(2);surface.setEGLConfigChooser(8,8,8,8,16,0)
+        surface.preserveEGLContextOnPause=true;surface.tag="room-mission-surface"
+        surface.importantForAccessibility=IMPORTANT_FOR_ACCESSIBILITY_NO
+        addView(surface,LayoutParams(-1,-1));addView(overlay,LayoutParams(-1,-1));overlay.setBackgroundColor(Palette.canvas)
+        surface.setRenderer(this);surface.renderMode=GLSurfaceView.RENDERMODE_WHEN_DIRTY;surface.onPause()
+        overlay.contentDescription=t("Interactive mission scene. Use screen procedure for text controls.","इंटरैक्टिव मिशन दृश्य। लिखित नियंत्रणों के लिए स्क्रीन प्रक्रिया उपयोग करें।")
+    }
+    fun update(phase:String,progress:Float,held:Boolean) { visual=Visual(phase,progress,held);overlay.invalidate() }
+    fun place() { if(foreground && camera)placement.set(true) }
+    fun resume() {
+        if(running)return
+        foreground=true;revision=gate.configure();gate.activate()
+        if(camera) {
+            if(host.checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) { unavailable(t("Enable camera access to place your training stations.","प्रशिक्षण स्थल रखने के लिए कैमरा अनुमति दें।"));return }
+            try {
+                if(session==null) {
+                    if(ArCoreApk.getInstance().requestInstall(host,!installRequested)==ArCoreApk.InstallStatus.INSTALL_REQUESTED) {installRequested=true;unavailable(t("Finish AR installation, then return.","AR स्थापना पूरी करके वापस आएँ।"));return}
+                    session=Session(host).apply {configure(Config(this).apply {planeFindingMode=Config.PlaneFindingMode.HORIZONTAL;updateMode=Config.UpdateMode.LATEST_CAMERA_IMAGE;lightEstimationMode=Config.LightEstimationMode.AMBIENT_INTENSITY})}
+                }
+                freshness.requireNewImage();session!!.resume()
+            }catch(_:Exception) {unavailable(t("Camera AR unavailable. Screen missions are available from Options.","कैमरा AR उपलब्ध नहीं है। विकल्प में स्क्रीन मिशन चुनें।"));return}
+        }
+        running=true;surface.onResume();removeCallbacks(frameTicker);post(frameTicker)
+    }
+    fun pause() {removeCallbacks(frameTicker);visual=visual.copy(held=false);foreground=false;gate.pause();revision=gate.configure();placement.set(false);image=null;down=null;screenCursor=null;gestureTarget=null
+        if(running){surface.onPause();if(camera)try{session?.pause()}catch(_:Exception){};running=false}
+    }
+    fun close(){pause();anchors.forEach{it.detach()};anchors.clear();session?.close();session=null}
+    private fun unavailable(message:String) { val state=Image(revision,SystemClock.elapsedRealtime(),if(camera)anchors.size else 3,false,message);image=state;overlay.setBackgroundColor(Palette.canvas);onImage(state);overlay.invalidate() }
+    override fun onSurfaceCreated(gl:GL10?,config:EGLConfig?) {
+        equipment.prepareProcedure(module);equipment.create();geometry.create()
+        val textures=IntArray(1);GLES20.glGenTextures(1,textures,0);texture=textures[0];GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
+        for(p in listOf(GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_TEXTURE_MAG_FILTER))GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,p,GLES20.GL_LINEAR)
+        for(p in listOf(GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_TEXTURE_WRAP_T))GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,p,GLES20.GL_CLAMP_TO_EDGE)
+        val vs=shader(GLES20.GL_VERTEX_SHADER,"attribute vec2 p;attribute vec2 uv;varying vec2 tex;void main(){gl_Position=vec4(p,0.,1.);tex=uv;}")
+        val fs=shader(GLES20.GL_FRAGMENT_SHADER,"#extension GL_OES_EGL_image_external : require\nprecision mediump float;uniform samplerExternalOES camera;varying vec2 tex;void main(){gl_FragColor=texture2D(camera,tex);}")
+        program=GLES20.glCreateProgram();GLES20.glAttachShader(program,vs);GLES20.glAttachShader(program,fs);GLES20.glLinkProgram(program);GLES20.glDeleteShader(vs);GLES20.glDeleteShader(fs)
+    }
+    override fun onSurfaceChanged(gl:GL10?,width:Int,height:Int){w=width;h=height;GLES20.glViewport(0,0,w,h);placement.set(false);revision=gate.configure();val resizedAtRevision=revision;post{if(revision==resizedAtRevision){down=null;gestureTarget=null;screenCursor=null;onCancel()}}}
+    override fun onDrawFrame(gl:GL10?) {
+        GLES20.glClearColor(.94f,.97f,.98f,1f);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+        if(!foreground)return
+        val rev=revision;val state=visual;val models=mutableListOf<FloatArray>();var at=SystemClock.elapsedRealtime();val eye:FloatArray
+        val light=floatArrayOf(1f,1f,1f,1f)
+        try {
+            if(camera) {
+                val ar=session?:return;ar.setCameraTextureName(texture);ar.setDisplayGeometry(host.windowManager.defaultDisplay.rotation,w,h)
+                val frame=ar.update();drawCamera(frame)
+                val receipt=freshness.observedAt(frame.timestamp,at)
+                if(receipt==null || frame.camera.trackingState!=TrackingState.TRACKING) {
+                    placement.set(false);publish(Image(rev,at,anchors.size,false,t("Tracking paused. Move slowly over a well-lit, detailed floor.","ट्रैकिंग रुकी है। रोशनी वाले विवरणयुक्त फ़र्श पर फ़ोन धीरे घुमाएँ।")));return
+                };at=receipt
+                if(placement.getAndSet(false) && anchors.size<3) {
+                    val hit=frame.hitTest(w/2f,h/2f).firstOrNull{(it.trackable as? Plane)?.let{p->p.type==Plane.Type.HORIZONTAL_UPWARD_FACING && p.trackingState==TrackingState.TRACKING && p.isPoseInPolygon(it.hitPose)}==true}
+                    if(hit!=null) {
+                        val separated=anchors.withIndex().all{(i,a)-> val dx=a.pose.tx()-hit.hitPose.tx();val dz=a.pose.tz()-hit.hitPose.tz();kotlin.math.hypot(dx,dz)>if(anchors.size==2&&i==1)1f else .5f}
+                        if(separated) {
+                            val next=hit.createAnchor();var accepted=false
+                            gate.withCurrentRevision(rev){if(foreground && revision==rev && SystemClock.elapsedRealtime()-at in 0..150){anchors.add(next);facing.add(Math.toDegrees(kotlin.math.atan2((frame.camera.pose.tx()-next.pose.tx()).toDouble(),(frame.camera.pose.tz()-next.pose.tz()).toDouble())).toFloat());accepted=true}}
+                            if(!accepted)next.detach()
+                        }else {publish(Image(rev,at,anchors.size,false,t("Choose a separate clear training point. Keep the green point away from the simulated hazard.","अलग खाली प्रशिक्षण बिंदु चुनें। हरा बिंदु काल्पनिक खतरे से दूर रखें।")));return}
+                    }
+                }
+                if(anchors.any{it.trackingState!=TrackingState.TRACKING}) {publish(Image(rev,at,anchors.size,false,t("Recovering placed stations. Keep the floor in view; restart from Options if tracking does not return.","रखे स्थल फिर खोज रहे हैं। फ़र्श दृश्य में रखें; ट्रैकिंग न लौटे तो विकल्प से फिर शुरू करें।")));return}
+                frame.camera.getProjectionMatrix(projection,0,.05f,30f);frame.camera.getViewMatrix(view,0);eye=frame.camera.pose.translation
+                anchors.forEachIndexed{i,a->models.add(FloatArray(16).apply{Matrix.setIdentityM(this,0);Matrix.translateM(this,0,a.pose.tx(),a.pose.ty(),a.pose.tz());Matrix.rotateM(this,0,facing[i],0f,1f,0f)})}
+                if(frame.lightEstimate.state==LightEstimate.State.VALID){frame.lightEstimate.getColorCorrection(light,0);for(i in light.indices)light[i]=if(light[i].isFinite())light[i].coerceIn(.6f,1.4f)else 1f}
+            }else {
+                eye=floatArrayOf(0f,1.5f,3.7f);Matrix.perspectiveM(projection,0,if(w>h*1.4f)if(module=="fire")22f else 32f else 55f,w.toFloat()/h.coerceAtLeast(1),.05f,30f);Matrix.setLookAtM(view,0,eye[0],eye[1],eye[2],0f,.3f,-.5f,0f,1f,0f)
+                for(p in listOf(floatArrayOf(-.6f,0f,0f),floatArrayOf(.1f,0f,-1f),floatArrayOf(.85f,0f,.3f)))models.add(FloatArray(16).apply{Matrix.setIdentityM(this,0);Matrix.translateM(this,0,p[0],p[1],p[2])})
+            }
+            Matrix.multiplyMM(vp,0,projection,0,view,0)
+            val targets=mutableMapOf<String,ComponentProjection.Point>();var inverse:FloatArray?=null
+            fun target(id:String,index:Int,p:FloatArray){if(index>=models.size)return;val mvp=FloatArray(16);Matrix.multiplyMM(mvp,0,vp,0,models[index],0);ComponentProjection.project(p,mvp,w,h)?.let{targets[id]=it}}
+            models.getOrNull(0)?.let { m ->
+                val flags=buildSet<String>{
+                    if(module=="gas")add("room-mission")
+                    if(module=="fire"&&state.phase in listOf("AIM","SWEEP","WITHDRAW","COMPLETE"))add("fire-pin")
+                    if(module=="fire"&&state.phase in listOf("SWEEP","WITHDRAW","COMPLETE"))add("fire-aim")
+                    if(module=="fire"&&state.held&&state.phase=="SWEEP")add("fire-squeeze")
+                }
+                equipment.draw(vp,m,module,eye,light,flags,false)
+                val alarm=m.copyOf();Matrix.translateM(alarm,0,.26f,.32f,0f);geometry.draw(vp,alarm,"alarm",at/1000f)
+                target("alarm",0,floatArrayOf(.26f,.40f,0f));target("pin",0,floatArrayOf(-.055f,.478f,.015f));target("pin-out",0,floatArrayOf(-.20f,.478f,.015f));target("meter",0,floatArrayOf(0f,.30f,.085f))
+            }
+            models.getOrNull(1)?.let {m ->
+                if(module=="gas")geometry.draw(vp,m,"confined-zone",at/1000f)
+                geometry.draw(vp,m,if(module=="fire")"fire" else "barrier",at/1000f,if(state.phase=="SWEEP")state.progress*.5f else 0f,if(module=="fire")state.phase in listOf("WITHDRAW","COMPLETE") else state.phase in listOf("ATTENDANT","REFUSE","COMPLETE"))
+                target("base",1,floatArrayOf(0f,.08f,0f));target("left",1,floatArrayOf(-.45f,.08f,0f));target("right",1,floatArrayOf(.45f,.08f,0f))
+                target("barrier-left",1,floatArrayOf(-.36f,.73f,0f));target("barrier-right",1,floatArrayOf(.36f,.73f,0f))
+                val mvp=FloatArray(16);Matrix.multiplyMM(mvp,0,vp,0,m,0);val inv=FloatArray(16);if(Matrix.invertM(inv,0,mvp,0))inverse=inv
+            }
+            models.getOrNull(2)?.let{m->geometry.draw(vp,m,"safe-point",at/1000f);if(module=="gas"&&state.phase in listOf("REFUSE","COMPLETE"))geometry.draw(vp,m,"attendant",at/1000f);target("safe",2,floatArrayOf(0f,.15f,0f))}
+            val needed=when(state.phase){"ALARM"->"alarm";"PIN"->"pin";"GAS_CHECK","ATTENDANT"->"meter";"BARRIER"->"barrier-left";"WITHDRAW","REFUSE"->"safe";else->"base"}
+            val orientationHint=if(camera&&models.size==3&&needed !in targets)t("Turn the phone slowly towards "+(if(needed=="safe")"your green withdrawal point." else if(needed in listOf("alarm","pin","meter"))"the equipment station." else "the virtual hazard."),"फ़ोन धीरे घुमाकर "+(if(needed=="safe")"हरा वापसी बिंदु खोजें।" else if(needed in listOf("alarm","pin","meter"))"उपकरण स्थल खोजें।" else "काल्पनिक खतरा खोजें।"))else null
+            publish(Image(rev,at,models.size,true,orientationHint?:if(models.size<3)t("Scan the floor, aim the centre cross, then place the next station.","फ़र्श स्कैन करें, बीच का निशाना रखें, फिर अगला स्थल रखें।")else t("Stations anchored · stay in your clear practice area", "स्थल जुड़े हैं · अपने खाली अभ्यास क्षेत्र में रहें"),targets,inverse,w,h,state.phase))
+        }catch(_:Exception){placement.set(false);publish(Image(rev,at,anchors.size,false,t("Scene interrupted. Retry the mission from Options.","दृश्य बाधित हुआ। विकल्प से मिशन फिर शुरू करें।")))}
+    }
+    private fun publish(value:Image){mailbox.set(value);if(posted.compareAndSet(false,true))post{posted.set(false);val next=mailbox.getAndSet(null)?:return@post;if(!foreground||next.revision!=revision)return@post
+        val previous=image;image=next;overlay.background=null
+        if(!next.tracked || (camera&&SystemClock.elapsedRealtime()-next.at>150)){down=null;gestureTarget=null;screenCursor=null}
+        onImage(next);overlay.invalidate()
+        if(camera && next.tracked && next.placement==3 && next.at!=previous?.at && SystemClock.elapsedRealtime()-next.at in 0..150) {
+            val cursor=if(camera)w/2f to h/2f else if(down!=null)screenCursor else null
+            val point=cursor?.let{ray(it.first,it.second,next.inverse)}
+            onAim(point?.first?:Float.NaN,point?.second?:Float.NaN,if(camera)visual.held else down!=null,next.at,true)
+        }else if(camera && (!next.tracked || SystemClock.elapsedRealtime()-next.at>150))onAim(Float.NaN,Float.NaN,false,SystemClock.elapsedRealtime(),false)
+    }}
+    /** Offline pointer practice samples the displayed static geometry, independently of GPU frame rate.
+     * Camera mode never uses this path or receives screen-mode evidence. */
+    private fun sampleScreen(serial:Long){
+        if(camera || serial!=gestureSerial || down==null || !ready)return
+        val cursor=screenCursor;val point=cursor?.let{ray(it.first,it.second,image?.inverse)}
+        onAim(point?.first?:Float.NaN,point?.second?:Float.NaN,true,SystemClock.elapsedRealtime(),true)
+        postDelayed({sampleScreen(serial)},50)
+    }
+    private fun ray(x:Float,y:Float,inverse:FloatArray?):Pair<Float,Float>? {
+        if(inverse==null)return null
+        fun unproject(z:Float):FloatArray {val p=FloatArray(4);Matrix.multiplyMV(p,0,inverse,0,floatArrayOf(2*x/w-1,1-2*y/h,z,1f),0);return FloatArray(3){p[it]/p[3]}}
+        val a=unproject(-1f);val b=unproject(1f);val dz=b[2]-a[2];if(kotlin.math.abs(dz)<.00001f)return null
+        val fraction=-a[2]/dz;if(fraction !in 0f..1f)return null
+        return (a[0]+(b[0]-a[0])*fraction)/.45f to (a[1]+(b[1]-a[1])*fraction-.08f)/.4f
+    }
+    private fun drawCamera(frame:Frame){
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST);vertices.position(0);uv.position(0);frame.transformCoordinates2d(Coordinates2d.OPENGL_NORMALIZED_DEVICE_COORDINATES,vertices,Coordinates2d.TEXTURE_NORMALIZED,uv)
+        GLES20.glUseProgram(program);val p=GLES20.glGetAttribLocation(program,"p");val u=GLES20.glGetAttribLocation(program,"uv")
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture);GLES20.glUniform1i(GLES20.glGetUniformLocation(program,"camera"),0)
+        GLES20.glVertexAttribPointer(p,2,GLES20.GL_FLOAT,false,0,vertices);GLES20.glVertexAttribPointer(u,2,GLES20.GL_FLOAT,false,0,uv);GLES20.glEnableVertexAttribArray(p);GLES20.glEnableVertexAttribArray(u);GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);GLES20.glDisableVertexAttribArray(p);GLES20.glDisableVertexAttribArray(u)
+    }
+    private inner class Overlay:View(host){
+        private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+        private fun radius()=host.dp(28).toFloat()
+        private fun near(id:String,x:Float,y:Float)=image?.targets?.get(id)?.let{kotlin.math.hypot(x-it.x,y-it.y)<=radius()*1.4f}==true
+        override fun onDraw(c:Canvas){
+            val state=visual;val img=image;paint.strokeWidth=host.dp(2).toFloat();paint.style=Paint.Style.STROKE
+            val cursor=if(camera)width/2f to height/2f else screenCursor
+            cursor?.let{(x,y)->paint.color=Color.WHITE;c.drawCircle(x,y,host.dp(10).toFloat(),paint);c.drawLine(x-20,y,x+20,y,paint);c.drawLine(x,y-20,x,y+20,paint);if(visual.phase in listOf("AIM","SWEEP")){paint.color=Palette.teal;val r=host.dp(19).toFloat();c.drawArc(RectF(x-r,y-r,x+r,y+r),-90f,360f*visual.progress,false,paint)}}
+            val ids=when(state.phase){"ALARM"->listOf("alarm");"PIN"->listOf("pin");"GAS_CHECK"->listOf("meter");"BARRIER"->listOf("barrier-left","barrier-right");"ATTENDANT"->listOf("meter","safe");"WITHDRAW","REFUSE"->listOf("safe");else->listOf("left","right")}
+            if(img?.tracked==true&&img.placement==3){
+                paint.color=if(state.phase=="WITHDRAW")Palette.danger else Palette.teal
+                for(id in ids)img.targets[id]?.let{p->c.drawCircle(p.x,p.y,radius(),paint)}
+                if(state.phase in listOf("AIM","SWEEP")){val a=img.targets["left"];val b=img.targets["right"];if(a!=null&&b!=null)c.drawLine(a.x,a.y,b.x,b.y,paint)}
+                if(state.held&&state.phase=="SWEEP"&&cursor!=null){paint.color=0xffc9eefa.toInt();paint.strokeWidth=host.dp(9).toFloat();c.drawLine(width*.7f,height.toFloat(),cursor.first,cursor.second,paint)}
+                down?.let{start->screenCursor?.let{end->paint.color=Palette.violet;c.drawLine(start.first,start.second,end.first,end.second,paint)}}
+            }
+        }
+        private fun outward(dx:Float,dy:Float):Boolean {
+            val a=image?.targets?.get("pin")?:return false;val b=image?.targets?.get("pin-out")?:return false
+            val length=kotlin.math.hypot(b.x-a.x,b.y-a.y);return length>1f && (dx*(b.x-a.x)+dy*(b.y-a.y))/length>=host.dp(56)
+        }
+        override fun onTouchEvent(e:MotionEvent):Boolean {
+            if(!ready){val hadPointer=down!=null;down=null;screenCursor=null;if(hadPointer&&e.actionMasked==MotionEvent.ACTION_UP)onRelease();return true}
+            when(e.actionMasked){
+                MotionEvent.ACTION_DOWN->{down=e.x to e.y;screenCursor=down;downAt=SystemClock.elapsedRealtime();gestureSerial++;if(!camera)sampleScreen(gestureSerial);gestureTarget=when(visual.phase){"ALARM"->"alarm";"PIN"->"pin";"GAS_CHECK"->"meter";"BARRIER"->"barrier-left";"ATTENDANT"->"meter";"WITHDRAW","REFUSE"->"safe";else->null}?.takeIf{near(it,e.x,e.y)};parent.requestDisallowInterceptTouchEvent(true)}
+                MotionEvent.ACTION_MOVE->{screenCursor=e.x to e.y}
+                MotionEvent.ACTION_UP->{
+                    val start=down;val elapsed=SystemClock.elapsedRealtime()-downAt
+                    if(start!=null && (!camera||image!!.at>=downAt) && elapsed>=80){val target=gestureTarget;val dist=kotlin.math.hypot(e.x-start.first,e.y-start.second)
+                        val action=when {
+                            target=="alarm"&&near(target,e.x,e.y)->"alarm"
+                            target=="pin"&&dist>=host.dp(64)&&elapsed>=180&&outward(e.x-start.first,e.y-start.second)->"pin-drag"
+                            target=="meter"&&visual.phase=="GAS_CHECK"&&near(target,e.x,e.y)&&elapsed>=450->"inspect-meter"
+                            target=="barrier-left"&&near("barrier-right",e.x,e.y)&&elapsed>=300->"close-barrier"
+                            target=="meter"&&visual.phase=="ATTENDANT"&&near("safe",e.x,e.y)&&elapsed>=300->"place-attendant-outside"
+                            target=="safe"&&near(target,e.x,e.y)&&visual.phase=="WITHDRAW"->"withdraw"
+                            target=="safe"&&near(target,e.x,e.y)&&visual.phase=="REFUSE"->"refuse-entry"
+                            else->null
+                        };if(action!=null)onAction(action)
+                    };down=null;gestureTarget=null;screenCursor=null;onRelease();performClick();parent.requestDisallowInterceptTouchEvent(false)
+                }
+                MotionEvent.ACTION_CANCEL,MotionEvent.ACTION_POINTER_DOWN->{down=null;gestureTarget=null;screenCursor=null;onCancel()}
+            };invalidate();return true
+        }
+        override fun performClick():Boolean{super.performClick();return true}
+    }
+    companion object {
+        private fun floats(v:FloatArray)=ByteBuffer.allocateDirect(v.size*4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply{put(v);position(0)}
+        private fun shader(type:Int,s:String)=GLES20.glCreateShader(type).also{GLES20.glShaderSource(it,s);GLES20.glCompileShader(it)}
+    }
+}

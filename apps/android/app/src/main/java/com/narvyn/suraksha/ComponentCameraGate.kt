@@ -11,6 +11,11 @@ class ComponentCameraGate {
     @Synchronized fun frame(version: Int, ready: Boolean, now: Long) {
         if (version == revision) lastReadyAt = if (active && ready) now else null
     }
+    /** Linearize a placement commit with configure/pause; the callback must not wait on the UI thread. */
+    @Synchronized fun withCurrentRevision(version:Int, commit:()->Unit):Boolean {
+        if(!active || version!=revision)return false
+        commit();return true
+    }
     @Synchronized fun allows(version: Int, now: Long): Boolean {
         val at = lastReadyAt ?: return false
         return active && version == revision && now >= at && now - at <= 500L

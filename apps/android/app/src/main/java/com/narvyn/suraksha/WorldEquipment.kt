@@ -88,9 +88,9 @@ class WorldEquipment {
    val direction=if("fire-sweep-return" in completedActions)-1 else if("fire-sweep-right" in completedActions)1 else if("fire-sweep-left" in completedActions)-1 else 0
    val key=if(!pin)0 else if(!aimed)1 else 2+(direction+1)*2+if(pressed)1 else 0
    listOf(procedureFire.getValue(key)) + if(procedureMode)listOf(fireProcedureProps[if("fire-sweep-return" in completedActions)1 else 0])else emptyList()
-  }else if(module=="gas" && procedureMode){
+  }else if(module=="gas" && (procedureMode || completedActions.isNotEmpty())){
    val key=(if("gas-boundary" in completedActions)1 else 0)+(if("gas-attendant" in completedActions)2 else 0)
-   listOf(procedureGas,gasProcedureProps[key])
+   listOf(procedureGas) + if(procedureMode)listOf(gasProcedureProps[key])else emptyList()
   }else listOf(original)
   GLES20.glEnable(GLES20.GL_DEPTH_TEST);GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT);GLES20.glUseProgram(program)
   Matrix.multiplyMM(mvp,0,vp,0,anchor,0)

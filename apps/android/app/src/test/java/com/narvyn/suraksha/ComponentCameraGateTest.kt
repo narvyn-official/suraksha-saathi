@@ -4,6 +4,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ComponentCameraGateTest {
+    @Test fun placementCommitCannotCrossARevisionOrPause() {
+        val g=ComponentCameraGate();val revision=g.configure();var commits=0
+        assertFalse(g.withCurrentRevision(revision){commits++})
+        g.activate();assertTrue(g.withCurrentRevision(revision){commits++})
+        g.configure();assertFalse(g.withCurrentRevision(revision){commits++})
+        val next=g.configure();g.pause();assertFalse(g.withCurrentRevision(next){commits++})
+        assertEquals(1,commits)
+    }
     @Test fun onlyFreshActiveReadyFramesAllowInteraction() {
         val g=ComponentCameraGate(); val v=g.configure()
         g.frame(v,true,100); assertFalse(g.allows(v,100))

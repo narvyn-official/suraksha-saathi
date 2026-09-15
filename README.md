@@ -8,12 +8,13 @@ A working **v0.5.0 pilot** for Android safety learning and trainer review, built
 - [Watch the v0.5.0 emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-demo.mp4) · Fire/gas screen procedure walkthrough; physical-phone AR validation remains pending.
 - [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/SHA256SUMS-0.5.0.txt).
 
-**Development update:** spatial procedure practice is implemented in source. The 0.5.1 release is held as a draft following user feedback; the camera workspace and target interaction are being revised for 0.5.2. The downloads above remain the earlier published 0.5.0 pilot. See [what spatial practice measures](docs/spatial-procedure-practice.md).
+**Development update:** the 0.5.2 candidate adds [room AR missions](docs/room-ar-missions.md): three separate training anchors, pin removal, continuous aiming/sweeping, worsening-fire withdrawal, and a deployed gas barrier/outside attendant. Mission actions have separate local records. Physical-phone AR validation remains pending; 0.5.1 stays a draft and the public downloads above remain 0.5.0.
 
 ## What you can use now
 
 - Android app with English and Hindi lessons, guided practice and assessments for fire response, gas/confined spaces, machinery/isolation, PPE/exposure and emergency/reporting (40 decisions).
 - Offline SQLite progress, interrupted-attempt recovery, critical-error assessment gates, installed offline voice support and PDF completion receipts.
+- Fire/gas room missions led by equipment gestures and scene consequences, with camera and screen records kept separate. See [mission scope](docs/room-ar-missions.md).
 - Original inspectable illustrations, detailed material-lit offline rotatable 3D equipment and ARCore camera mode with tracked equipment and decision cards on supported phones; screen practice on other Android 10+ phones.
 - Trainer dashboard with a worker directory, sector/status filters, latest-assessment charts, practice follow-up, CSV export, persistent records, answer-by-answer review, signed pilot credentials, QR downloads, signature checks and revocation.
 - Offline decision recall with corrective feedback, self-explanation prompts and scheduled return visits that survive compatible curriculum updates; assessment evidence remains unchanged.

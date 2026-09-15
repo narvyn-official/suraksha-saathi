@@ -38,7 +38,10 @@ class ProcedureSpatialFlowTest {
                 val r=Rect();if(it.isEnabled && it.getGlobalVisibleRect(r) && r.height()>=it.height) { it.performClick();done=true }
             } }
             instrumentation.waitForIdleSync();if(done) { Thread.sleep(120);return };Thread.sleep(80)
-        };fail("Missing action: $text")
+        };s.onActivity { a ->
+            var v:View?=views(a.window.decorView).filterIsInstance<Button>().firstOrNull { it.text.toString()==text }
+            while(v!=null) { val r=Rect();v.getGlobalVisibleRect(r);android.util.Log.i("SpatialLayout", "${v.javaClass.simpleName} top=${v.top} h=${v.height} measured=${v.measuredHeight} scroll=${v.scrollY} visible=$r");v=v.parent as? View }
+        };screenshot("workspace-unreachable");fail("Missing action: $text")
     }
     /** Read rendered target positions, then exercise real touch delivery; never invoke the learning callback. */
     private fun target(s:ActivityScenario<ProcedureActivity>,index:Int):Pair<View,ComponentProjection.Point> {
@@ -123,8 +126,12 @@ class ProcedureSpatialFlowTest {
                 Thread.sleep(80)
             }
             val before=saved("fire").data.toString()
+            click(s,"Options")
+            val option=instrumentation.uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText("Use centre aiming").first()
+            assertTrue(option.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK))
+            instrumentation.waitForIdleSync()
             var control:View?=null
-            s.onActivity { a -> control=views(a.window.decorView).first { it.tag=="procedure-hold-aim" };control!!.requestRectangleOnScreen(Rect(0,0,control!!.width,control!!.height),true) }
+            s.onActivity { a -> control=views(a.window.decorView).first { it.tag=="procedure-hold-aim" };assertTrue(control!!.isShown);control!!.requestRectangleOnScreen(Rect(0,0,control!!.width,control!!.height),true) }
             touch(s,control!! to ComponentProjection.Point(control!!.width/2f,control!!.height/2f),900)
             assertEquals(before,saved("fire").data.toString())
             s.recreate();assertEquals(before,saved("fire").data.toString())

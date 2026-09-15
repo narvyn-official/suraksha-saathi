@@ -43,6 +43,13 @@ class ProcedureSpatialTest {
         for(t in 1850L..2400L step 50)assertNull(hold.sample(hit,t))
         assertNotNull(hold.sample(hit,2450))
     }
+    @Test fun cachedImageBeforeTouchCannotShortenACameraHold() {
+        val hold=ProcedureSpatialHold();val hit=ProcedureSpatial.Hit("fire-aim",0f)
+        assertNull(hold.sample(hit,1000,1100))
+        for(t in 1120L..1720L step 50)assertNull(hold.sample(hit,t,1100))
+        val result=hold.sample(hit,1770,1100)!!
+        assertEquals(650L,result.samples.last().elapsed)
+    }
     @Test fun missSwitchInvalidErrorAndExplicitResetDiscardIncompleteHold() {
         for(reset in 0..4) {
             val h=ProcedureSpatialHold();val hit=ProcedureSpatial.Hit("fire-aim",.1f)
@@ -78,6 +85,8 @@ class ProcedureSpatialTest {
     @Test fun fabricatedOrMisattributedSpatialProofCannotBeReplayed() {
         val s=session("fire-aim");val valid=proof("fire-aim").json();val now=s.data.getLong("updatedAt")+1
         invalid { s.choose("fire-aim","description",now,valid) }
+        invalid { s.choose("fire-aim","screen",now,JSONObject(valid.toString()).put("input","centre-aim")) }
+        invalid { s.choose("fire-aim","camera",now,JSONObject(valid.toString()).put("input","invented")) }
         invalid { s.choose("fire-aim-unsafe","camera",now,valid) }
         invalid { val other=session("fire-label");other.choose("fire-label","screen",other.data.getLong("updatedAt")+1,valid) }
         for(mutation in 0..4) {

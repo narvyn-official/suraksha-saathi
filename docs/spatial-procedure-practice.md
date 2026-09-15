@@ -2,7 +2,7 @@
 
 Five existing procedure steps now offer spatial target selection: fire aim, left/right/return target positions, and gas attendant positioning. Other steps retain their ordered action controls. Both safe and unsafe choices have neutral target rings. Spatial selection is the default on supported steps; the worker can explicitly switch to button or text actions.
 
-In screen practice, touch and hold a ring, moving the finger to correct alignment. In camera practice, place the tabletop scene, aim the phone's centre cross at a target, then hold the native aiming control. Only the phone moves; the app does not require the worker to walk into any area. Gas targets designate positions for a miniature attendant, not actual safe locations. All placement and targeting must happen in a cleared training area.
+In screen practice, touch and hold a ring, moving the finger to correct alignment. In the 0.5.2 camera workspace, place the scene explicitly and touch/hold its virtual targets. Optional centre aiming is available from Options. Target touches never reposition the scene. See [camera workspace](camera-training-workspace.md). Only the phone moves; the app does not require the worker to walk into any area. Gas targets designate positions for a miniature attendant, not actual safe locations. All placement and targeting must happen in a cleared training area.
 
 ## What is measured
 
@@ -14,7 +14,7 @@ The numbered rings approximate the projection of spherical targets. They are sym
 
 ## Evidence and compatibility
 
-Completed holds attach a versioned `spatial` object to the existing procedure action event. It identifies `target-hold`, the action and bounded sample data. Replay rejects unsupported steps, action mismatches, text-mode attribution, invalid errors, non-increasing times, gaps and insufficient duration. Older procedure journals replay unchanged and receive no spatial credit. Changing a session still saves before advancing the interface, with learner ownership checked by the host activity.
+New 0.5.2 holds also distinguish direct touch from camera-centre aiming with an optional `input` field; older records retain their original attribution. Completed holds attach a versioned `spatial` object to the existing procedure action event. It identifies `target-hold`, the action and bounded sample data. Replay rejects unsupported steps, action mismatches, text-mode attribution, invalid errors, non-increasing times, gaps and insufficient duration. Older procedure journals replay unchanged and receive no spatial credit. Changing a session still saves before advancing the interface, with learner ownership checked by the host activity.
 
 Screen and camera attribution remain explicit. The result shows spatial-hold counts alongside the existing action-mode counts. These are client-generated practice records, not cryptographic sensor attestation. Procedure journals remain on the phone and are not currently trainer-import or credential evidence.
 

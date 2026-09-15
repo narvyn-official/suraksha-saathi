@@ -19,6 +19,12 @@ class ProcedureActivity: Activity() {
     private lateinit var header: LinearLayout
     private lateinit var lower: LinearLayout
     private lateinit var scroll: ScrollView
+    private lateinit var screenBody: LinearLayout
+    private lateinit var cameraBody: LinearLayout
+    private lateinit var footer: Button
+    private var cameraBudget=CameraWorkspaceLayout.budget(0,1f)
+    private var immersive=false
+    private var centreAim=false
     private var status: TextView?=null
     private var active=false
     private var camera=false
@@ -37,20 +43,28 @@ class ProcedureActivity: Activity() {
             session=evidence.latest(module,guided)?.let { ProcedureSession.restore(it) } ?: ProcedureSession.create(module,identity.workerId,guided).also { evidence.save(it.data) }
         } catch(_:Exception) { notice(t("Saved procedure unavailable","सहेजी प्रक्रिया उपलब्ध नहीं"),t("This record could not be resumed. It has been preserved.","यह रिकॉर्ड जारी नहीं हो सका। इसे सुरक्षित रखा गया है।"));finish();return }
         val sameLearner=state?.getString("workerId")==identity.workerId
-        safeArea=sameLearner && state?.getBoolean("safeArea")==true;camera=sameLearner && state?.getBoolean("camera")==true;descriptions=sameLearner && state?.getBoolean("descriptions")==true
+        safeArea=sameLearner && state?.getBoolean("safeArea")==true;camera=if(sameLearner)state?.getBoolean("camera")==true else intent.getBooleanExtra("camera",false);descriptions=sameLearner && state?.getBoolean("descriptions")==true
         spatial=if(sameLearner)state?.getBoolean("spatial",true)!=false else true
+        centreAim=sameLearner && state?.getBoolean("centreAim")==true
         val root=column(16).apply { setBackgroundColor(Palette.canvas) }
         root.setOnApplyWindowInsetsListener { v,i ->
             if(android.os.Build.VERSION.SDK_INT>=30) { val b=i.getInsets(WindowInsets.Type.systemBars());v.setPadding(dp(16)+b.left,dp(12)+b.top,dp(16)+b.right,dp(12)+b.bottom) }
             else v.setPadding(dp(16)+i.systemWindowInsetLeft,dp(12)+i.systemWindowInsetTop,dp(16)+i.systemWindowInsetRight,dp(12)+i.systemWindowInsetBottom)
             i
         }
-        val body=column();header=column();lower=column();scene=ProcedureSceneView(this)
+        screenBody=column();header=column();lower=column();scene=ProcedureSceneView(this)
         scene.onStatus={ message -> status?.text=message }
-        body.add(header);body.addView(scene,LinearLayout.LayoutParams(-1,-2));body.add(lower,top=12)
-        scroll=ScrollView(this).apply { isFillViewport=true;addView(body) }
+        screenBody.add(header);screenBody.addView(scene,LinearLayout.LayoutParams(-1,-2));screenBody.add(lower,top=12)
+        scroll=ScrollView(this).apply { isFillViewport=true;addView(screenBody) }
         root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-        root.add(action(t("Save & return","सहेजें और लौटें"),false,role=ActionRole.NEUTRAL) { finish() },top=12)
+        cameraBody=object:LinearLayout(this) {
+            override fun onMeasure(w:Int,h:Int) { cameraBudget=CameraWorkspaceLayout.budget(View.MeasureSpec.getSize(h),resources.displayMetrics.density);super.onMeasure(w,h) }
+        }.apply { orientation=LinearLayout.VERTICAL;visibility=View.GONE };root.addView(cameraBody,LinearLayout.LayoutParams(-1,0,1f))
+        footer=action(t("Save & return","सहेजें और लौटें"),false,role=ActionRole.NEUTRAL) {
+            if(immersive && session.feedback)change { it.advance() }
+            else if(immersive) { camera=false;render() }else finish()
+        }
+        root.add(footer,top=12)
         setContentView(root);render()
     }
     override fun onResume() {
@@ -61,7 +75,7 @@ class ProcedureActivity: Activity() {
     }
     override fun onPause() { active=false;revision++;if(::scene.isInitialized)scene.pause();super.onPause() }
     override fun onDestroy() { if(::scene.isInitialized)scene.close();if(::evidence.isInitialized)evidence.close();if(::identity.isInitialized)identity.close();super.onDestroy() }
-    override fun onSaveInstanceState(out: Bundle) { out.putString("workerId",identity.workerId);out.putBoolean("safeArea",safeArea);out.putBoolean("camera",camera);out.putBoolean("descriptions",descriptions);out.putBoolean("spatial",spatial);super.onSaveInstanceState(out) }
+    override fun onSaveInstanceState(out: Bundle) { out.putString("workerId",identity.workerId);out.putBoolean("safeArea",safeArea);out.putBoolean("camera",camera);out.putBoolean("descriptions",descriptions);out.putBoolean("spatial",spatial);out.putBoolean("centreAim",centreAim);super.onSaveInstanceState(out) }
     override fun onRequestPermissionsResult(code:Int, permissions:Array<out String>,results:IntArray) {
         super.onRequestPermissionsResult(code,permissions,results)
         if(code==61 && active && camera) { scene.useCamera(true);render();if(safeArea && !descriptions && !session.done && !session.feedback)scene.resume() }
@@ -75,9 +89,71 @@ class ProcedureActivity: Activity() {
             evidence.save(candidate.data);session=candidate;render()
         } catch(_:Exception) { render();notice(t("Could not save","सहेजा नहीं जा सका"),t("Your last saved step is preserved. Check storage and try again.","आपका पिछला सहेजा चरण सुरक्षित है। स्टोरेज जाँचकर फिर कोशिश करें।")) }
     }
+    private fun requestCameraPermission() {
+        if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)requestPermissions(arrayOf(Manifest.permission.CAMERA),61)
+    }
+    private fun arrangeCamera(value:Boolean) {
+        footer.text=if(value)if(session.feedback)t("Continue procedure","प्रक्रिया जारी रखें")else t("Continue on screen","स्क्रीन पर जारी रखें")else t("Save & return","सहेजें और लौटें")
+        footer.actionRole(if(value && session.feedback)ActionRole.PRIMARY else if(value)ActionRole.LEARN else ActionRole.NEUTRAL)
+        if(immersive==value)return
+        immersive=value
+        for(v in listOf(header,scene,lower))(v.parent as? android.view.ViewGroup)?.removeView(v)
+        cameraBody.removeAllViews();screenBody.removeAllViews()
+        if(value) {
+            val top=object:ScrollView(this) { override fun onMeasure(w:Int,h:Int) { super.onMeasure(w,View.MeasureSpec.makeMeasureSpec(cameraBudget.header,View.MeasureSpec.AT_MOST)) } }.apply { addView(header,FrameLayout.LayoutParams(-1,-2)) }
+            val bottom=object:ScrollView(this) { override fun onMeasure(w:Int,h:Int) { super.onMeasure(w,View.MeasureSpec.makeMeasureSpec(cameraBudget.feedback,View.MeasureSpec.AT_MOST)) } }.apply { addView(lower,FrameLayout.LayoutParams(-1,-2)) }
+            cameraBody.add(top);cameraBody.addView(scene,LinearLayout.LayoutParams(-1,0,1f));cameraBody.add(bottom,top=6)
+        }else { screenBody.add(header);screenBody.addView(scene,LinearLayout.LayoutParams(-1,-2));screenBody.add(lower,top=12) }
+        scroll.visibility=if(value)View.GONE else View.VISIBLE;cameraBody.visibility=if(value)View.VISIBLE else View.GONE
+        scene.useImmersive(value)
+    }
+    private fun cameraOptions() {
+        val options=mutableListOf(t("Continue on screen","स्क्रीन पर जारी रखें"),t("Use text actions","लिखित क्रियाएँ उपयोग करें"),t("Reposition the scene","दृश्य की जगह बदलें"),t("Camera permission settings","कैमरा अनुमति सेटिंग"),if(centreAim)t("Use direct target touch","लक्ष्य सीधे छूकर चुनें")else t("Use centre aiming","बीच का निशाना उपयोग करें"),t("Save & return","सहेजें और लौटें"))
+        if(!session.feedback && ProcedureSpatial.supported(session.step.id))options.add(if(spatial)t("Use button actions instead","बटन वाली क्रियाएँ उपयोग करें")else t("Use spatial target practice","स्थानिक लक्ष्य अभ्यास उपयोग करें"))
+        android.app.AlertDialog.Builder(this).setTitle(t("AR practice options","AR अभ्यास विकल्प")).setItems(options.toTypedArray()) { _,which ->
+            if(!active)return@setItems
+            when(which) {
+                0->{camera=false;descriptions=false;render()}
+                1->{camera=false;descriptions=true;render()}
+                2->scene.placeAtCameraCentre()
+                3->startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName")))
+                4->{centreAim=!centreAim;scene.useCentreAim(centreAim)}
+                5->finish()
+                6->{spatial=!spatial;render()}
+            }
+        }.setNegativeButton(t("Close","बंद करें"),null).show()
+    }
+    /** Camera training occupies the remaining window; options and feedback no longer push it below a long lesson. */
+    private fun renderCamera(currentRevision:Int) {
+        val step=session.step
+        val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
+        row.addView(label(t("CAMERA AR · ${session.index+1}/${ProcedureCatalog.modules.getValue(session.module).steps.size}","कैमरा AR · ${session.index+1}/${ProcedureCatalog.modules.getValue(session.module).steps.size}"),15f,Palette.blue,true),LinearLayout.LayoutParams(0,-2,1f))
+        row.addView(action(t("Options","विकल्प"),false,role=ActionRole.NEUTRAL) { cameraOptions() },LinearLayout.LayoutParams(-2,-2))
+        header.add(row,bottom=6);header.add(label(step.text(hi),18f,Palette.ink,true).asHeading(),bottom=6)
+        status=label(t("Find a clear training surface, then place the scene.","खाली प्रशिक्षण सतह खोजें, फिर दृश्य रखें।"),13f,Palette.muted)
+        if(!session.feedback)header.add(status!!,bottom=6)
+        if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED)lower.add(action(t("Enable camera","कैमरा चालू करें"),false,role=ActionRole.CAMERA) { requestCameraPermission() },bottom=8)
+        val completed=session.data.getJSONObject("flags").keys().asSequence().filter { session.data.getJSONObject("flags").optBoolean(it) }.toSet()
+        val choices=step.actions.shuffled(java.util.Random(session.data.getString("id").hashCode().toLong() xor session.index.toLong()))
+        val useSpatial=spatial && ProcedureSpatial.supported(step.id) && !session.feedback
+        scene.pause();scene.visibility=View.VISIBLE
+        scene.configure(ProcedureSceneView.Scene(session.module,step.id,if(session.feedback)emptyList()else choices.map { ProcedureSceneView.Target(it.id,it.text(hi),it.point) },completed,enabled=!session.feedback,spatial=useSpatial),hi) { id,presentation,proof ->
+            if(active && revision==currentRevision && !session.feedback && !session.done && session.step.id==step.id)change { it.choose(id,presentation,System.currentTimeMillis(),proof) }
+        }
+        scene.useCentreAim(centreAim);scene.useCamera(true);if(active)scene.resume()
+        if(session.feedback) {
+            lower.add(label(if(session.guided)if(session.data.optBoolean("lastCorrect"))t("Action completed","क्रिया पूरी हुई")else t("Review and retry","समझें और फिर कोशिश करें")else t("Action saved","क्रिया सहेजी गई"),18f,Palette.ink,true).asHeading(),bottom=6)
+            if(session.guided)lower.add(label(step.explain(hi),15f),bottom=6)
+        }else if(useSpatial) {
+            lower.add(label(t("Hold a target for 0.65 s · virtual targeting only","लक्ष्य 0.65 सेकंड दबाएँ · केवल काल्पनिक निशाना"),13f,Palette.muted),bottom=4)
+            choices.forEachIndexed { index,target -> lower.add(label("${index+1} · ${target.text(hi)}",14f,Palette.ink),bottom=4) }
+        }
+    }
     private fun render() {
         revision++;val currentRevision=revision
         header.removeAllViews();lower.removeAllViews();status=null
+        arrangeCamera(camera && safeArea && !session.done && !descriptions)
+        if(immersive) { renderCamera(currentRevision);return }
         header.add(label(ProcedureCatalog.modules.getValue(session.module).text(hi),25f,Palette.ink,true).asHeading(),bottom=8)
         header.add(label(if(session.guided)t("GUIDED PROCEDURE · DRAFT SIMULATION","निर्देशित प्रक्रिया · प्रारूप सिमुलेशन")else t("INDEPENDENT PROCEDURE · NO HINTS","स्वतंत्र प्रक्रिया · कोई संकेत नहीं"),13f,Palette.blue,true),bottom=8)
         header.add(label(t("Learner: ${identity.name.ifBlank { "Unnamed learner" }} · Practical competence is not assessed.","शिक्षार्थी: ${identity.name.ifBlank { "बिना नाम" }} · व्यावहारिक योग्यता का मूल्यांकन नहीं है।"),14f,Palette.muted),bottom=12)
@@ -85,7 +161,7 @@ class ProcedureActivity: Activity() {
         if(!safeArea && !session.done) {
             header.add(label(t("Prepare a safe training space","सुरक्षित प्रशिक्षण जगह तैयार करें"),22f,Palette.ink,true).asHeading(),bottom=12)
             header.add(label(t("Stay away from operating machinery and real hazards. Use a cleared tabletop or a stationary screen exercise. All flames, readings, routes and actions are simulated; they never assess the real surroundings.","चलती मशीनों और असली खतरों से दूर रहें। खाली मेज़ या स्थिर स्क्रीन अभ्यास उपयोग करें। आग, रीडिंग, रास्ते और क्रियाएँ काल्पनिक हैं; ये असली आसपास का आकलन नहीं करते।")),bottom=16)
-            lower.add(action(t("I am in a safe training area","मैं सुरक्षित प्रशिक्षण जगह पर हूँ")) { safeArea=true;render() })
+            lower.add(action(t("I am in a safe training area","मैं सुरक्षित प्रशिक्षण जगह पर हूँ")) { safeArea=true;render();if(camera)requestCameraPermission() })
         } else if(session.done) {
             header.accessibilityPaneTitle=t("Procedure result","प्रक्रिया परिणाम")
             val stopped=session.data.optJSONObject("result")?.optBoolean("stopped")==true

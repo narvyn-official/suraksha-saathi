@@ -46,8 +46,11 @@ fun Button.actionRole(role: ActionRole)=apply {
         addState(intArrayOf(android.R.attr.state_focused),context.shape(fill,14,ink))
         addState(intArrayOf(),context.shape(fill,14))
     }
+    states.state=drawableState
     backgroundTintList=null
     background=RippleDrawable(ColorStateList.valueOf(if(role==ActionRole.PRIMARY)0x40ffffff else 0x200e3551),states,context.shape(Color.WHITE,14))
+    background.state=drawableState
+    refreshDrawableState()
 }
 fun Context.action(text: String,primary: Boolean=true,role: ActionRole=if(primary)ActionRole.PRIMARY else ActionRole.LEARN,onClick: ()->Unit)=Button(this).apply {
     stateListAnimator=null;elevation=0f;this.text=text;isAllCaps=false;textSize=16f;typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL)

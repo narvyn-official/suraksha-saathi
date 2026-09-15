@@ -43,8 +43,9 @@ object ProcedureSpatial {
         }.minByOrNull { it.first }?.second
     }
     data class Sample(val elapsed: Long, val error: Float)
-    data class Proof(val action: String, val samples: List<Sample>) {
+    data class Proof(val action: String, val samples: List<Sample>, val input: String?=null) {
         fun json()=JSONObject().put("version",VERSION).put("kind","target-hold").put("action",action)
+            .apply { if(input!=null)put("input",input) }
             .put("samples",JSONArray().apply { samples.forEach { put(JSONObject().put("elapsedMs",it.elapsed).put("normalisedError",it.error.toDouble())) } })
     }
     fun proof(json: JSONObject, step: String, action: String, presentation: String): Proof {
@@ -54,7 +55,9 @@ object ProcedureSpatial {
         val samples=(0 until raw.length()).map { raw.getJSONObject(it).let { s -> Sample(s.getLong("elapsedMs"),s.getDouble("normalisedError").toFloat()) } }
         require(samples.first().elapsed==0L && samples.last().elapsed in HOLD_MS..(HOLD_MS+MAX_GAP_MS))
         samples.forEachIndexed { i,s -> require(s.error.isFinite() && s.error in 0f..1f);if(i>0)require(s.elapsed-samples[i-1].elapsed in 1..MAX_GAP_MS) }
-        return Proof(action,samples)
+        val input=if(json.has("input"))json.getString("input")else null
+        require(input==null || input=="touch" || (input=="centre-aim" && presentation=="camera"))
+        return Proof(action,samples,input)
     }
 }
 
@@ -65,8 +68,8 @@ class ProcedureSpatialHold {
     private var last=0L
     private var samples=mutableListOf<ProcedureSpatial.Sample>()
     @Synchronized fun reset() { id=null;samples.clear();started=0;last=0 }
-    @Synchronized fun sample(hit: ProcedureSpatial.Hit?, now: Long): ProcedureSpatial.Proof? {
-        if(hit==null || now<0 || !hit.error.isFinite() || hit.error !in 0f..1f) { reset();return null }
+    @Synchronized fun sample(hit: ProcedureSpatial.Hit?, now: Long, gestureStartedAt: Long = 0): ProcedureSpatial.Proof? {
+        if(hit==null || now<0 || now<gestureStartedAt || !hit.error.isFinite() || hit.error !in 0f..1f) { reset();return null }
         if(id!=hit.id || now<last || now-last>ProcedureSpatial.MAX_GAP_MS) { reset();id=hit.id;started=now;last=now;samples.add(ProcedureSpatial.Sample(0,hit.error));return null }
         if(now==last)return null // repeated camera images cannot grow the journal
         last=now

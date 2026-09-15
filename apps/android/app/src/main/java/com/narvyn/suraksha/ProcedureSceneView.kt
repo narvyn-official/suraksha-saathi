@@ -33,10 +33,21 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     private data class Snapshot(val revision: Int, val scene: Scene, val camera: Boolean,
                                 val heights: List<Float>, val columns: Int, val width: Int, val height: Int)
     private data class Action(val revision: Int, val stepId: String, val id: String, val camera: Boolean, val proof: ProcedureSpatial.Proof? = null, val gesture: Long = -1)
-    private data class Pointer(val revision: Int, val serial: Long, val x: Float, val y: Float)
+    private data class Pointer(val revision: Int, val serial: Long, val x: Float, val y: Float, val centred: Boolean, val startedAt: Long)
     private data class Preview(val revision: Int, val camera: Boolean, val points: List<ComponentProjection.Point?>,
                                val boxes: List<ArChoiceLayout.Box>?, val message: String, val progress: Float = 0f, val cursor: ComponentProjection.Point? = null, val radii: List<Float> = emptyList(), val inverse: FloatArray? = null)
 
+    private val body = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+    private val controlRow = LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL }
+    private val controlScroll = object:android.widget.ScrollView(activity) {
+        override fun onMeasure(w:Int,h:Int) {
+            val cap=CameraWorkspaceLayout.controls(MeasureSpec.getSize(h),resources.displayMetrics.density)
+            super.onMeasure(w,MeasureSpec.makeMeasureSpec(cap,MeasureSpec.AT_MOST))
+        }
+    }
+    private var immersive = false
+    private var centreAim = false
+    @Volatile private var placementMade = false
     private val viewport = FrameLayout(activity)
     private val surface = GLSurfaceView(activity)
     private val overlay = ProcedureOverlay()
@@ -86,7 +97,6 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     private fun t(en: String, hindi: String) = if (hi) hindi else en
 
     init {
-        val body = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
         addView(body, LayoutParams(-1, -2))
         body.addView(viewport, LinearLayout.LayoutParams(-1, activity.dp(340)))
         body.addView(placement, LinearLayout.LayoutParams(-1, -2).apply { topMargin = activity.dp(8) })
@@ -94,7 +104,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         aim.tag = "procedure-hold-aim"
         aim.setOnTouchListener { control, event ->
             when(event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> { control.isPressed=true;beginPointer(surface.width/2f,surface.height/2f);true }
+                MotionEvent.ACTION_DOWN -> { control.isPressed=true;beginPointer(surface.width/2f,surface.height/2f,true);true }
                 MotionEvent.ACTION_MOVE -> { if(event.x !in 0f..control.width.toFloat() || event.y !in 0f..control.height.toFloat()) { control.isPressed=false;releasePointer() };true }
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN -> { control.isPressed=false;releasePointer();true }
                 else -> true
@@ -131,6 +141,27 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         rebind()
     }
 
+    fun useImmersive(value: Boolean) {
+        if(immersive==value)return
+        immersive=value
+        for(control in listOf(placement,aim))(control.parent as? android.view.ViewGroup)?.removeView(control)
+        body.removeView(controlScroll);controlScroll.removeAllViews();controlRow.removeAllViews()
+        if(value) {
+            controlRow.addView(placement,LinearLayout.LayoutParams(0,-2,1f))
+            controlRow.addView(aim,LinearLayout.LayoutParams(0,-2,1f).apply { leftMargin=activity.dp(6) })
+            controlScroll.addView(controlRow,FrameLayout.LayoutParams(-1,-2))
+            body.addView(controlScroll,LinearLayout.LayoutParams(-1,-2))
+        }else {
+            body.addView(placement,LinearLayout.LayoutParams(-1,-2).apply { topMargin=activity.dp(8) })
+            body.addView(aim,LinearLayout.LayoutParams(-1,-2).apply { topMargin=activity.dp(8) })
+        }
+        body.layoutParams=LayoutParams(-1,if(value)-1 else -2)
+        viewport.layoutParams=LinearLayout.LayoutParams(-1,if(value)0 else activity.dp(340),if(value)1f else 0f)
+        rebind()
+    }
+    fun useCentreAim(value:Boolean) { centreAim=value;rebind() }
+    fun placeAtCameraCentre() = requestPlacement(surface.width/2f,surface.height/2f)
+
     fun useCamera(value: Boolean) {
         stopRenderer()
         cameraMode = value
@@ -152,7 +183,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
 
     fun close() {
         pause()
-        anchor?.detach(); anchor = null
+        anchor?.detach(); anchor = null;placementMade=false
         ar?.close(); ar = null
     }
 
@@ -164,11 +195,11 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         val revision = gate.configure()
         val heights = overlay.bind(if(scene.spatial)emptyList()else scene.targets, cardWidth, revision)
         snapshot = Snapshot(revision, scene, cameraMode, heights, columns, viewport.width, viewport.height)
-        placement.text = t("Place at camera centre", "कैमरा दृश्य के बीच में रखें")
+        placement.text = if(immersive)t("Place scene", "दृश्य रखें")else t("Place at camera centre", "कैमरा दृश्य के बीच में रखें")
         placement.contentDescription = t("Place simulated procedure at camera centre", "काल्पनिक प्रक्रिया कैमरा दृश्य के बीच में रखें")
-        placement.visibility = if (cameraMode) VISIBLE else GONE
-        aim.visibility = if(cameraMode && scene.spatial) VISIBLE else GONE
-        aim.text = t("Hold to aim at a target", "लक्ष्य पर निशाने के लिए दबाए रखें")
+        placement.visibility = if (cameraMode && (!immersive || !placementMade)) VISIBLE else GONE
+        aim.visibility = if(cameraMode && scene.spatial && (!immersive || centreAim)) VISIBLE else GONE
+        aim.text = if(immersive)t("Hold to aim", "निशाने के लिए दबाएँ")else t("Hold to aim at a target", "लक्ष्य पर निशाने के लिए दबाए रखें")
         aim.contentDescription = t("Hold while aiming. For accessible actions, use text actions above.", "निशाना रखते हुए दबाए रखें। सुलभ क्रियाओं के लिए ऊपर लिखित क्रियाएँ उपयोग करें।")
         placement.isEnabled = foreground && scene.enabled && scene.targets.isNotEmpty()
         overlay.clear()
@@ -239,11 +270,11 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         placements.offer(ArPlacementRequest.createAt(snapshot.revision, x, y, viewport.width, viewport.height, SystemClock.elapsedRealtime()))
     }
 
-    private fun beginPointer(x:Float,y:Float) {
+    private fun beginPointer(x:Float,y:Float,centred:Boolean=false) {
         val current=snapshot
         if(!current.scene.spatial || !ready(current))return
         hold.reset()
-        val input=Pointer(current.revision,++pointerSerial,x,y);pointer.set(input)
+        val input=Pointer(current.revision,++pointerSerial,x,y,centred,SystemClock.elapsedRealtime());pointer.set(input)
         if(!current.camera)sampleScreen(input.serial)
     }
     /** Screen practice samples the last displayed static geometry; it never receives camera attribution. */
@@ -252,9 +283,9 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         val current=snapshot
         if(input.serial!=serial || input.revision!=current.revision || current.camera || !ready(current)) { releasePointer();return }
         val hit=overlay.screenHit(input.x,input.y,current)
-        val proof=hold.sample(hit,SystemClock.elapsedRealtime())
+        val proof=hold.sample(hit,SystemClock.elapsedRealtime(),input.startedAt)
         overlay.showHold(hold.progress(),ComponentProjection.Point(input.x,input.y))
-        if(proof!=null)deliver(Action(current.revision,current.scene.stepId,proof.action,false,proof,input.serial))
+        if(proof!=null)deliver(Action(current.revision,current.scene.stepId,proof.action,false,proof.copy(input="touch"),input.serial))
         else postDelayed({sampleScreen(serial)},50)
     }
     private fun releasePointer() { pointer.set(null);hold.reset();aim.isPressed=false }
@@ -322,7 +353,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
                 val frame = session.update(); drawCamera(frame)
                 val receipt = freshness.observedAt(frame.timestamp, SystemClock.elapsedRealtime())
                 if (receipt == null || frame.camera.trackingState != TrackingState.TRACKING) {
-                    unavailable(current, t("Tracking paused. Wait or continue on screen.", "ट्रैकिंग रुकी है। प्रतीक्षा करें या स्क्रीन पर जारी रखें।")); return
+                    unavailable(current, trackingHelp(frame.camera.trackingFailureReason)); return
                 }
                 observedAt = receipt
                 val request = placements.consumeFor(current.revision)
@@ -332,13 +363,21 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
                         plane != null && plane.type == Plane.Type.HORIZONTAL_UPWARD_FACING && plane.trackingState == TrackingState.TRACKING && plane.isPoseInPolygon(it.hitPose)
                     }
                     if (hit != null) {
-                        val next = hit.createAnchor(); anchor?.detach(); anchor = next; missedPlacement = null
-                        facing = Math.toDegrees(kotlin.math.atan2((frame.camera.pose.tx() - next.pose.tx()).toDouble(), (frame.camera.pose.tz() - next.pose.tz()).toDouble())).toFloat()
+                        val next = hit.createAnchor()
+                        // hitTest/createAnchor may span a UI revision or pause. Keep the old anchor on invalidation.
+                        var committed=false
+                        gate.withCurrentRevision(current.revision) {
+                            if(request.eligible(snapshot.revision,widthPx,heightPx,SystemClock.elapsedRealtime(),foreground && cameraRunning,true,SystemClock.elapsedRealtime()-receipt in 0..500) && current.revision==snapshot.revision) {
+                                anchor?.detach();anchor=next;placementMade=true;missedPlacement=null;committed=true
+                                facing=Math.toDegrees(kotlin.math.atan2((frame.camera.pose.tx()-next.pose.tx()).toDouble(),(frame.camera.pose.tz()-next.pose.tz()).toDouble())).toFloat()
+                            }
+                        }
+                        if(!committed)next.detach()
                     } else missedPlacement = current.revision
                 }
                 val placed = anchor
                 if (placed == null || placed.trackingState != TrackingState.TRACKING) {
-                    if (placed?.trackingState == TrackingState.STOPPED) { placed.detach(); anchor = null }
+                    if (placed?.trackingState == TrackingState.STOPPED) { placed.detach(); anchor = null; placementMade=false }
                     unavailable(current, if (missedPlacement == current.revision) t("No tracked surface here. Aim at a clear tabletop and try again.", "यहाँ ट्रैक की गई सतह नहीं मिली। खाली मेज़ पर निशाना रखकर फिर कोशिश करें।") else t("Aim at a clear tabletop, then select Place at camera centre.", "खाली मेज़ पर निशाना रखें, फिर कैमरा दृश्य के बीच में रखें चुनें।")); return
                 }
                 frame.camera.getProjectionMatrix(projection, 0, .05f, 20f); frame.camera.getViewMatrix(view, 0)
@@ -398,21 +437,30 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         var cursor:ComponentProjection.Point?=null
         if(current.camera && visible && input!=null && input.revision==current.revision && gate.allows(current.revision,SystemClock.elapsedRealtime())) {
             if(sampledSerial!=input.serial) { hold.reset();sampledSerial=input.serial }
-            val x=if(current.camera)widthPx/2f else input.x;val y=if(current.camera)heightPx/2f else input.y
+            val x=if(input.centred)widthPx/2f else input.x;val y=if(input.centred)heightPx/2f else input.y
             cursor=ComponentProjection.Point(x,y)
             val hit=ProcedureSpatial.hit(x,y,widthPx,heightPx,inverseMvp,ordered)
-            val proof=hold.sample(hit,observedAt)
+            val proof=hold.sample(hit,observedAt,input.startedAt)
             if(proof!=null) {
-                val action=Action(current.revision,current.scene.stepId,proof.action,current.camera,proof,input.serial)
+                val action=Action(current.revision,current.scene.stepId,proof.action,current.camera,proof.copy(input=if(input.centred)"centre-aim"else"touch"),input.serial)
                 if(pendingAction.compareAndSet(null,action))post {
                     if(pendingAction.compareAndSet(action,null))deliver(action)
                 }
             }
         }else if(current.camera)hold.reset()
         val message=if(!visible)t("Keep both target zones in view, or use text actions.","दोनों लक्ष्य दृश्य में रखें या लिखित क्रियाएँ उपयोग करें।")
-            else if(current.camera)t("Aim the centre cross, then hold the aim control steadily. Targets are simulated.","बीच का निशाना रखें, फिर निशाने का नियंत्रण स्थिर दबाएँ। लक्ष्य काल्पनिक हैं।")
+            else if(current.camera)t("Touch and hold a target, or aim the cross and hold the aim control.","लक्ष्य छूकर दबाए रखें, या बीच का निशाना रखकर निशाने का नियंत्रण दबाएँ।")
             else t("Touch and hold a target ring. Slide to adjust; lifting resets the hold.","लक्ष्य का घेरा छूकर दबाए रखें। खिसकाकर ठीक करें; उठाने से पकड़ रीसेट होगी।")
         publish(Preview(current.revision,current.camera,points,if(visible)emptyList()else null,message,hold.progress(),cursor,radii,if(visible)inverseMvp.copyOf()else null))
+    }
+
+    private fun trackingHelp(reason:TrackingFailureReason):String = when(reason) {
+        TrackingFailureReason.INSUFFICIENT_LIGHT -> t("More light is needed. Check that camera access is on, or continue on screen.","अधिक रोशनी चाहिए। कैमरा पहुँच चालू जाँचें, या स्क्रीन पर जारी रखें।")
+        TrackingFailureReason.EXCESSIVE_MOTION -> t("Move the phone more slowly and keep the training surface in view.","फ़ोन धीरे हिलाएँ और प्रशिक्षण सतह दृश्य में रखें।")
+        TrackingFailureReason.INSUFFICIENT_FEATURES -> t("Aim at a surface with visible detail. Avoid a blank wall or plain surface.","दिखने वाले विवरण वाली सतह पर निशाना रखें। खाली दीवार या सादी सतह से बचें।")
+        TrackingFailureReason.CAMERA_UNAVAILABLE -> t("Another app is using the camera. Return here when it is available.","दूसरा ऐप कैमरा उपयोग कर रहा है। उपलब्ध होने पर यहाँ लौटें।")
+        TrackingFailureReason.BAD_STATE -> t("Tracking was interrupted. Retry camera AR or continue on screen.","ट्रैकिंग बाधित हुई। कैमरा AR फिर चलाएँ या स्क्रीन पर जारी रखें।")
+        else -> t("Scanning the training surface. Move the phone slowly to help placement.","प्रशिक्षण सतह की जाँच हो रही है। रखने में मदद के लिए फ़ोन धीरे हिलाएँ।")
     }
 
     private fun unavailable(current: Snapshot, message: String) {
@@ -431,6 +479,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
             val current = snapshot
             if (foreground && latest != null && latest.revision == current.revision && latest.camera == cameraMode) {
                 if (latest.boxes != null && (!latest.camera || gate.allows(current.revision, SystemClock.elapsedRealtime()))) overlay.position(current, latest.points, latest.boxes, latest.progress, latest.cursor, latest.radii, latest.inverse) else overlay.clear()
+                placement.visibility=if(cameraMode && (!immersive || !placementMade))VISIBLE else GONE
                 status(latest.message)
                 reportShown()
             }
@@ -546,13 +595,13 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
             paint.textAlign = Paint.Align.LEFT; paint.isFakeBoldText = false
         }
         override fun onTouchEvent(event: MotionEvent): Boolean {
-            if(snapshot.scene.spatial && !cameraMode) {
+            if(snapshot.scene.spatial) {
                 when(event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> { parent.requestDisallowInterceptTouchEvent(true);beginPointer(event.x,event.y) }
                     MotionEvent.ACTION_MOVE -> pointer.get()?.let { pointer.set(it.copy(x=event.x,y=event.y)) }
                     MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL,MotionEvent.ACTION_POINTER_DOWN -> { releasePointer();parent.requestDisallowInterceptTouchEvent(false);if(event.actionMasked==MotionEvent.ACTION_UP)performClick() }
                 }
-            } else if(event.actionMasked==MotionEvent.ACTION_UP) { if(cameraMode)requestPlacement(event.x,event.y);performClick() }
+            } else if(event.actionMasked==MotionEvent.ACTION_UP) { performClick() } // Placement is an explicit native action; scene touches never move the anchor.
             return true
         }
         override fun performClick(): Boolean { super.performClick(); return true }
