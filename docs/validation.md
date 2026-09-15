@@ -1,5 +1,17 @@
 # Pilot validation — 15 September 2026
 
+## v0.4.4 verification
+
+- **51 JVM tests** passed. Nine new cases cover centre/direct placement equivalence, invalid coordinates, expiry, dimension/revision/lifecycle changes, one-time concurrent consumption and older-frame queue rejection. Read-only integration review caught and verified fixes for an older frame discarding a newer request and pause eligibility remaining active during GL shutdown.
+- **Two new Android placement tests** passed at both **100% (19.578 seconds)** and **200% (20.440 seconds)** system font on the API 36 ARM64 emulator, native 1080 × 2400 / 420 dpi. Each run covers English/Hindi, camera-off placement actions, recreation, hidden answer controls and unchanged stored records. Decision cases cover guided and scored sessions; component cases complete text alternatives without camera credit. Native accessibility show/scroll/focus/click actions and measured button text/target checks are used.
+- At 200% font, the existing saved-camera-feedback accessibility test passed (9.426 seconds). After restoring 100%, **eight existing native tests** passed (91.413 seconds): four AR recovery tests, camera denial/fallback, all five component recognition models and changed views, Hindi description assistance, and database migration. This is **11 distinct Android tests**, with the two placement tests exercised at both font settings.
+- Fresh English/Hindi normal and enlarged placement/fallback screens were visually inspected. Controls retain the light UI and readable text; scrollable content may extend beyond the current viewport. These camera-off captures do not demonstrate the reticle over a live image, tracked hits or physical placement quality.
+- A separate recorded placement walkthrough passed both placement tests again (27.924 seconds, including demonstration pauses). The supplied MP4 has a **47.782-second container duration**, includes the walkthrough and surrounding emulator idle time, and is not a positive-camera AR or TalkBack audio demonstration.
+- Final APK SHA-256: `9ee9d23f6c146e1d44b4a72134a91788fe57498ec4df90c69e8f740d11e29726`. Demo SHA-256: `823b293cdf041bc9baff4d7f67fe28d5acb7b318850ad1d33813ccecfb50ba48`.
+- Curriculum 0.4.0, archives, equipment meshes/shaders, database schema, assessment/credential semantics and dashboard source remain unchanged. No new web checks were needed for this Android increment. Emulator font and camera permission were restored to their prior settings.
+
+See [native placement](ar-placement.md) for the request/plane rules and primary references. Physical ARCore hit quality, camera interruptions, scale/presence, font/landscape callout usability and actual assistive-service speech remain external gates. Next software work targets equipment contact-shadow cues, with no new physical-fidelity or learning-effectiveness claim.
+
 ## v0.4.3 verification
 
 - The baseline 200% system-font check passed in portrait, then **failed in landscape with a 0-pixel equipment viewport**. The saved baseline image also shows clipped lower controls. The new scrollable layout keeps a 320 dp viewport and exposes the lower actions through native scrolling.

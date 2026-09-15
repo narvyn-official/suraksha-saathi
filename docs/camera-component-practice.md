@@ -1,10 +1,10 @@
-# Fire component practice in camera AR — updated for app 0.4.3
+# Fire component practice in camera AR — updated for app 0.4.4
 
 This pilot extends the existing component-recognition session into an optional ARCore camera view for the **fire model only**. The same three generic parts, two model orientations, examples, hints, feedback and local review schedule are used. The catalogue remains version 1 and scored curriculum remains 0.4.0. Other models retain screen practice. This implementation has software tests, but no physical-camera validation yet.
 
 ## Worker flow
 
-Lesson → Explore in 3D → Practice finding parts → **Use camera AR · fire**. Camera permission and Google Play Services for AR are required. When permission is denied, **Camera permission settings** opens this app’s Android settings; the worker can enable it there or keep using screen practice. From a clear training position, tap a tracked horizontal tabletop to place the illustrative extinguisher. It faces the camera at placement and turns between the two recognition stages; walking around is not required.
+Lesson → Explore in 3D → Practice finding parts → **Use camera AR · fire**. Camera permission and Google Play Services for AR are required. When permission is denied, **Camera permission settings** opens this app’s Android settings; the worker can enable it there or keep using screen practice. From a clear training position, aim the camera centre at a tracked horizontal tabletop and select **Place at camera centre**, or tap the camera view directly, to place the illustrative extinguisher. It faces the camera at placement and turns between the two recognition stages; walking around is not required.
 
 Three native 48dp letter buttons connect by leader lines to model-space parts. Labels are shown for examples, help and feedback, and removed for independent recognition. These are projected recognition targets, not direct mesh manipulation, object detection, instrument readings or physical operation. The app does not measure occlusion by real objects.
 
@@ -20,6 +20,8 @@ Three native 48dp letter buttons connect by leader lines to model-space parts. L
 - The camera rendering surface is paused when not in use, and the session is explicitly closed when the activity is destroyed. This does not yet establish measured thermal or battery performance.
 
 These constraints prioritize readable recognition from a stationary position. They do not establish dimensional accuracy, robust real-world tracking or practical competence.
+
+From app 0.4.4, native placement and direct taps share expiring, viewport-bound requests. A miss preserves an existing anchor; the separate reset still clears it. The running camera remains visible before placement. See [native placement](ar-placement.md) for implementation and validation limits.
 
 ## Attributable learning
 

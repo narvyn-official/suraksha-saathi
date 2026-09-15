@@ -1,6 +1,6 @@
 # Equipment and review accessibility
 
-App 0.4.3 improves a bounded set of Android views: equipment inspection, component practice and delayed decision review. This is not a whole-app accessibility certification or a report of worker usability testing.
+Apps 0.4.3–0.4.4 improve a bounded set of Android views: equipment inspection, component practice and delayed decision review. This is not a whole-app accessibility certification or a report of worker usability testing.
 
 ## Reproduced problem and changes
 
@@ -19,7 +19,7 @@ These tests exercise the API that accessibility services use. They do **not** ru
 ## Remaining acceptance checks
 
 - Observe TalkBack speech, focus order, heading navigation, interruptions and Hindi pronunciation with suitable installed voices. Check Switch Access/Voice Access separately, with representative workers where feasible.
-- Add a native action for attempting camera placement. Current coordinate-tap placement remains a barrier; accessible screen/text alternatives are available. Never bypass tracked-plane or fresh-image checks merely to expose that action.
+- Native camera-placement actions are implemented in 0.4.4 and camera-off controls are checked at normal/200% text. Test their positive physical-camera and assistive-service usability, including viewport clipping and landscape. [Placement details](ar-placement.md).
 - Extend the audit to scored assessments, credentials, onboarding and admin workflows; test additional display sizes, Android 10 devices and landscape combinations.
 - Test real device gestures, model presence, rendering/performance, and actual camera tracking. Font and accessibility API checks do not validate physical AR.
 

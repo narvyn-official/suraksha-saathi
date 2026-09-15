@@ -25,24 +25,25 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private data class Option(val id: String, val text: String)
     private data class Scene(val revision: Int, val questionId: String, val module: String, val options: List<Option>, val heights: List<Float>, val columns: Int, val width: Int, val height: Int, val canAnswer: Boolean)
     private data class Choice(val revision: Int, val questionId: String, val optionId: String)
-    private data class Placement(val revision: Int, val x: Float, val y: Float, val at: Long)
     private data class Preview(val revision: Int, val points: List<ComponentProjection.Point?>, val boxes: List<ArChoiceLayout.Box>?, val message: String)
     private lateinit var store: Store
     private lateinit var flow: ArDecisionFlow
     private lateinit var surface: GLSurfaceView
     private lateinit var overlay: AnswerOverlay
     private lateinit var viewport: FrameLayout
-    private lateinit var feedback: ScrollView
+    private lateinit var feedback: LinearLayout
+    private lateinit var scroll: ScrollView
     private lateinit var feedbackBody: LinearLayout
     private lateinit var controls: LinearLayout
     private lateinit var question: TextView
     private lateinit var status: TextView
     private lateinit var mode: TextView
     private var hi=false
-    private var active=false
+    @Volatile private var active=false
     @Volatile private var running=false
     @Volatile private var ar: Session?=null
     @Volatile private var scene=Scene(0,"","fire",emptyList(),emptyList(),1,0,0,false)
+    private var missedPlacement: Int?=null
     private var anchor: Anchor?=null // Only accessed on GL thread while running; stopped before UI cleanup.
     private var installRequested=false
     private var widthPx=1;private var heightPx=1
@@ -52,8 +53,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private val lightCorrection=floatArrayOf(1f,1f,1f,1f);private val estimatedLight=FloatArray(4)
     private val projection=FloatArray(16);private val view=FloatArray(16);private val model=FloatArray(16);private val vp=FloatArray(16);private val mvp=FloatArray(16)
     private val pendingChoice=AtomicReference<Choice?>(null)
-    private val pendingPlacement=AtomicReference<Placement?>(null)
-    private val resetPlacement=AtomicBoolean(false)
+    private val pendingPlacement=ArPlacementQueue()
     private val pendingPreview=AtomicReference<Preview?>(null)
     private val previewPosted=AtomicBoolean(false)
     private val vertices=floats(floatArrayOf(-1f,-1f,1f,-1f,-1f,1f,1f,1f))
@@ -75,10 +75,12 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
             else v.setPadding(dp(16)+i.systemWindowInsetLeft,dp(12)+i.systemWindowInsetTop,dp(16)+i.systemWindowInsetRight,dp(12)+i.systemWindowInsetBottom)
             i
         }
-        mode=label("",13f,Palette.blue,true);root.add(mode,bottom=8)
-        question=label("",20f,Palette.ink,true);root.add(question,bottom=8)
-        status=label("",14f,Palette.muted);root.add(status,bottom=12)
-        val middle=FrameLayout(this)
+        val body=column()
+        scroll=ScrollView(this).apply { isFillViewport=true;addView(body) }
+        root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+        mode=label("",13f,Palette.blue,true);body.add(mode,bottom=8)
+        question=label("",20f,Palette.ink,true).asHeading();body.add(question,bottom=8)
+        status=label("",14f,Palette.muted);body.add(status,bottom=12)
         viewport=FrameLayout(this)
         surface=GLSurfaceView(this).apply {
             setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);preserveEGLContextOnPause=true
@@ -87,12 +89,11 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         }
         viewport.addView(surface,FrameLayout.LayoutParams(-1,-1))
         overlay=AnswerOverlay();viewport.addView(overlay,FrameLayout.LayoutParams(-1,-1))
-        middle.addView(viewport,FrameLayout.LayoutParams(-1,-1))
+        body.addView(viewport,LinearLayout.LayoutParams(-1,dp(320)))
         feedbackBody=column(12)
-        feedback=ScrollView(this).apply { isFillViewport=true;addView(feedbackBody) }
-        middle.addView(feedback,FrameLayout.LayoutParams(-1,-1))
-        root.addView(middle,LinearLayout.LayoutParams(-1,0,1f))
-        controls=column();root.add(controls,top=12)
+        feedback=feedbackBody
+        body.add(feedback)
+        controls=column();body.add(controls,top=12)
         root.add(action(t("Continue on screen","स्क्रीन पर जारी रखें"),false) { setResult(RESULT_OK);finish() },top=10)
         viewport.addOnLayoutChangeListener { _,l,top,r,b,ol,ot,or,ob ->
             if((r-l!=or-ol || b-top!=ob-ot) && ::flow.isInitialized && !flow.finished && !flow.training.data.optBoolean("awaitingContinue")) {
@@ -125,16 +126,16 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         } else {
             status.text=t("Place the simulated stations on a clear training surface.","काल्पनिक विकल्प खाली प्रशिक्षण सतह पर रखें।")
             val row=LinearLayout(this)
-            row.addView(action(t("Place again","फिर रखें"),false) { flow.invalidate();pendingPlacement.set(null);pendingChoice.set(null);resetPlacement.set(true);refreshScene() },LinearLayout.LayoutParams(0,dp(48),1f).apply { marginEnd=dp(8) })
-            row.addView(action(if(checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)t("Retry camera","कैमरा फिर आज़माएँ")else t("Enable camera","कैमरा चालू करें"),false) { retryCamera() },LinearLayout.LayoutParams(0,dp(48),1f))
+            row.addView(action(t("Place at centre","बीच में रखें"),false) { requestPlacementAt(viewport.width/2f,viewport.height/2f) }.apply { tag="ar-place-center";contentDescription=t("Place decision stations at camera centre","निर्णय विकल्प कैमरा दृश्य के बीच में रखें") },LinearLayout.LayoutParams(0,-2,1f).apply { marginEnd=dp(8) })
+            row.addView(action(if(checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)t("Retry camera","कैमरा फिर आज़माएँ")else t("Enable camera","कैमरा चालू करें"),false) { retryCamera() },LinearLayout.LayoutParams(0,-2,1f))
             controls.add(row)
             if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) controls.add(action(t("Camera permission settings","कैमरा अनुमति सेटिंग"),false) { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName"))) },top=8)
         }
-        refreshScene()
+        refreshScene();scroll.post { scroll.scrollTo(0,0) }
     }
     private fun refreshScene() {
         if(!::overlay.isInitialized || flow.finished) return
-        pendingChoice.set(null);pendingPlacement.set(null)
+        pendingChoice.set(null);pendingPlacement.clear()
         val training=flow.training
         val options=training.options().map { Option(it.getString("id"),it.local("text",hi)) }
         val columns=if(options.size==2 && viewport.width>=dp(280))2 else 1
@@ -173,10 +174,11 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         } catch(_: Exception) { status.text=t("Camera AR is unavailable. Retry, or continue on screen.","कैमरा AR उपलब्ध नहीं है। फिर कोशिश करें, या स्क्रीन पर जारी रखें।");overlay.clear() }
     }
     private fun stopCamera() {
-        pendingChoice.set(null);pendingPlacement.set(null);pendingPreview.set(null)
+        val wasRunning=running;running=false
+        pendingChoice.set(null);pendingPlacement.clear();pendingPreview.set(null)
         if(::overlay.isInitialized) { overlay.clear();overlay.cameraVisible(false) }
         if(::surface.isInitialized)surface.onPause()
-        if(running) { try { ar?.pause() } catch(_: Exception) {} };running=false
+        if(wasRunning) { try { ar?.pause() } catch(_: Exception) {} };running=false
     }
     private fun retryCamera() {
         stopCamera();anchor?.detach();anchor=null;ar?.close();ar=null;freshness.clear();installRequested=false
@@ -186,6 +188,17 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         flow.invalidate();stopCamera();renderState()
         status.text=t("Could not save. Your previously saved progress is preserved.","सहेजा नहीं जा सका। पहले सहेजी गई प्रगति सुरक्षित है।")
         notice(t("Could not save","सहेजा नहीं जा सका"),t("Check available storage, then retry from your saved progress.","उपलब्ध स्टोरेज जाँचें, फिर सहेजी गई प्रगति से कोशिश करें।"))
+    }
+    private fun requestPlacementAt(x: Float,y: Float) {
+        if(!active || !running || !scene.canAnswer) {
+            status.text=t("Camera is not running. Enable it, or continue on screen.","कैमरा चालू नहीं है। चालू करें, या स्क्रीन पर जारी रखें।");return
+        }
+        val visible=Rect()
+        if(!viewport.getLocalVisibleRect(visible) || !visible.contains(x.toInt(),y.toInt())) {
+            status.text=t("Show the camera centre before placing, or continue on screen.","रखने से पहले कैमरा दृश्य का बीच दिखाएँ, या स्क्रीन पर जारी रखें।");return
+        }
+        flow.invalidate();refreshScene()
+        pendingPlacement.offer(ArPlacementRequest.createAt(flow.revision,x,y,viewport.width,viewport.height,SystemClock.elapsedRealtime()))
     }
     private fun queueChoice(optionId: String, revision: Int, questionId: String) {
         if(active && flow.revision==revision && flow.ready(SystemClock.elapsedRealtime()) && overlay.targetsVisible()) pendingChoice.compareAndSet(null,Choice(revision,questionId,optionId))
@@ -205,17 +218,17 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         if(!running)return
         val current=scene;val session=ar ?: return
         try {
-            if(resetPlacement.getAndSet(false)) { anchor?.detach();anchor=null }
             session.setCameraTextureName(texture);session.setDisplayGeometry(windowManager.defaultDisplay.rotation,widthPx,heightPx)
             val frame=session.update();drawCamera(frame)
             val observedAt=freshness.observedAt(frame.timestamp,SystemClock.elapsedRealtime())
             if(observedAt==null || frame.camera.trackingState!=TrackingState.TRACKING) { unavailable(current,t("Tracking paused. Wait for a fresh, tracked camera image.","ट्रैकिंग रुकी है। नए, ट्रैक किए गए कैमरा दृश्य की प्रतीक्षा करें।"));return }
-            val tap=pendingPlacement.getAndSet(null)
-            if(anchor==null && tap!=null && tap.revision==current.revision && SystemClock.elapsedRealtime()-tap.at in 0L..500L) {
-                frame.hitTest(tap.x,tap.y).firstOrNull { val plane=it.trackable as? Plane;plane!=null && plane.type==Plane.Type.HORIZONTAL_UPWARD_FACING && plane.trackingState==TrackingState.TRACKING && plane.isPoseInPolygon(it.hitPose) }?.let { anchor=it.createAnchor() }
+            val tap=pendingPlacement.consumeFor(current.revision)
+            if(tap?.eligible(flow.revision,widthPx,heightPx,SystemClock.elapsedRealtime(),active && running && current.canAnswer,frame.camera.trackingState==TrackingState.TRACKING,observedAt!=null)==true && current.revision==flow.revision) {
+                val hit=frame.hitTest(tap.x,tap.y).firstOrNull { val plane=it.trackable as? Plane;plane!=null && plane.type==Plane.Type.HORIZONTAL_UPWARD_FACING && plane.trackingState==TrackingState.TRACKING && plane.isPoseInPolygon(it.hitPose) }
+                if(hit!=null) { val replacement=hit.createAnchor();anchor?.detach();anchor=replacement;missedPlacement=null } else missedPlacement=current.revision
             }
             val a=anchor
-            if(a==null) { unavailable(current,t("Tap the camera view to place stations on a clear surface.","खाली सतह पर विकल्प रखने के लिए कैमरा दृश्य पर टैप करें।"));return }
+            if(a==null) { unavailable(current,if(missedPlacement==current.revision)placementMissMessage()else t("Aim the camera centre at a clear surface, then select Place at centre.","खाली सतह पर कैमरा दृश्य का बीच रखें, फिर बीच में रखें चुनें।"));return }
             if(a.trackingState!=TrackingState.TRACKING) {
                 if(a.trackingState==TrackingState.STOPPED) { a.detach();anchor=null }
                 unavailable(current,t("Placement tracking stopped. Wait or place again.","रखी जगह की ट्रैकिंग रुकी है। प्रतीक्षा करें या फिर रखें।"));return
@@ -235,7 +248,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
                     }
                 }
             }
-            publish(Preview(current.revision,points,boxes,if(boxes==null)t("Keep every station in view. If choices do not fit, continue on screen.","सभी विकल्प दृश्य में रखें। विकल्प न समाएँ तो स्क्रीन पर जारी रखें।")else t("Stations placed · choose one response.","विकल्प रखे गए · एक उत्तर चुनें।")))
+            publish(Preview(current.revision,points,boxes,if(missedPlacement==current.revision)placementMissMessage()else if(boxes==null)t("Keep every station in view. If choices do not fit, continue on screen.","सभी विकल्प दृश्य में रखें। विकल्प न समाएँ तो स्क्रीन पर जारी रखें।")else t("Stations placed · choose one response.","विकल्प रखे गए · एक उत्तर चुनें।")))
         } catch(_: Exception) { unavailable(current,t("Camera interrupted. Retry, or continue on screen.","कैमरा बाधित है। फिर कोशिश करें, या स्क्रीन पर जारी रखें।")) }
     }
     private fun drawCamera(frame: Frame) {
@@ -246,8 +259,10 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         GLES20.glEnableVertexAttribArray(p);GLES20.glEnableVertexAttribArray(u);GLES20.glVertexAttribPointer(p,2,GLES20.GL_FLOAT,false,0,vertices);GLES20.glVertexAttribPointer(u,2,GLES20.GL_FLOAT,false,0,uv)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP,0,4);GLES20.glDisableVertexAttribArray(p);GLES20.glDisableVertexAttribArray(u)
     }
+    private fun placementMissMessage()=t("No tracked surface at this point. Aim at a clear surface and try again.","इस बिंदु पर ट्रैक की गई सतह नहीं मिली। खाली सतह पर निशाना रखकर फिर कोशिश करें।")
     private fun unavailable(current: Scene, message: String) {
-        flow.frame(current.revision,false,SystemClock.elapsedRealtime());pendingChoice.set(null);pendingPlacement.set(null)
+        flow.frame(current.revision,false,SystemClock.elapsedRealtime());pendingChoice.set(null)
+        pendingPlacement.discardFor(current.revision)
         publish(Preview(current.revision,emptyList(),null,message))
     }
     private fun publish(value: Preview) {
@@ -263,9 +278,10 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private inner class AnswerOverlay: FrameLayout(this@ArActivity) {
         private val buttons=mutableListOf<Button>();private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
         private var lines=emptyList<FloatArray>()
+        private var cameraIsVisible=false
         private val placeholder=label(t("Camera view paused\nYou can continue on screen.","कैमरा दृश्य रुका है\nआप स्क्रीन पर जारी रख सकते हैं।"),17f,Palette.muted,true).apply { gravity=Gravity.CENTER;setPadding(dp(16),dp(16),dp(16),dp(16));background=shape(Palette.surface,16,Palette.line) }
         init { setWillNotDraw(false);cameraVisible(false);addView(placeholder,LayoutParams(-1,-2,Gravity.CENTER).apply { setMargins(dp(8),0,dp(8),0) }) }
-        fun cameraVisible(visible: Boolean) { setBackgroundColor(if(visible)Color.TRANSPARENT else Palette.canvas) }
+        fun cameraVisible(visible: Boolean) { cameraIsVisible=visible;setBackgroundColor(if(visible)Color.TRANSPARENT else Palette.canvas);placeholder.visibility=if(visible)GONE else VISIBLE;invalidate() }
         fun bind(options: List<Option>, width: Int, revision: Int, questionId: String): List<Float> {
             buttons.forEach { removeView(it) };buttons.clear();clear()
             return options.map { option ->
@@ -274,7 +290,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
                 val h=button.measuredHeight.coerceAtLeast(dp(48));buttons.add(button);addView(button,LayoutParams(width,h));h.toFloat()
             }
         }
-        fun clear() { buttons.forEach { it.visibility=INVISIBLE;it.isEnabled=false };lines=emptyList();placeholder.visibility=VISIBLE;invalidate() }
+        fun clear() { buttons.forEach { it.visibility=INVISIBLE;it.isEnabled=false };lines=emptyList();placeholder.visibility=if(cameraIsVisible)GONE else VISIBLE;invalidate() }
         fun targetsVisible(): Boolean {
             val visible=Rect()
             return isShown && buttons.isNotEmpty() && getLocalVisibleRect(visible) && buttons.all { b -> b.visibility==VISIBLE && b.isEnabled && visible.contains(kotlin.math.floor(b.x).toInt(),kotlin.math.floor(b.y).toInt(),kotlin.math.ceil(b.x+b.width).toInt(),kotlin.math.ceil(b.y+b.height).toInt()) }
@@ -285,8 +301,8 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
             buttons.forEachIndexed { i,b -> val box=boxes[i];b.x=box.left;b.y=box.top;b.visibility=VISIBLE;b.isEnabled=true }
             lines=points.mapIndexedNotNull { i,p -> p?.let { floatArrayOf(it.x,it.y,boxes[i].left+boxes[i].width/2,boxes[i].top+boxes[i].height/2) } };invalidate()
         }
-        override fun onDraw(canvas: Canvas) { super.onDraw(canvas);lines.forEach { p -> paint.color=Color.WHITE;paint.strokeWidth=dp(5).toFloat();canvas.drawLine(p[0],p[1],p[2],p[3],paint);paint.color=Palette.blue;paint.strokeWidth=dp(2).toFloat();canvas.drawLine(p[0],p[1],p[2],p[3],paint) } }
-        override fun onTouchEvent(event: MotionEvent): Boolean { if(event.action==MotionEvent.ACTION_UP) { if(active && scene.canAnswer)pendingPlacement.set(Placement(scene.revision,event.x,event.y,SystemClock.elapsedRealtime()));performClick() };return true }
+        override fun onDraw(canvas: Canvas) { super.onDraw(canvas);if(cameraIsVisible)PlacementAim.draw(canvas,paint,this@ArActivity,width,height);lines.forEach { p -> paint.color=Color.WHITE;paint.strokeWidth=dp(5).toFloat();canvas.drawLine(p[0],p[1],p[2],p[3],paint);paint.color=Palette.blue;paint.strokeWidth=dp(2).toFloat();canvas.drawLine(p[0],p[1],p[2],p[3],paint) } }
+        override fun onTouchEvent(event: MotionEvent): Boolean { if(event.action==MotionEvent.ACTION_UP) { requestPlacementAt(event.x,event.y);performClick() };return true }
         override fun performClick(): Boolean { super.performClick();return true }
     }
     companion object {

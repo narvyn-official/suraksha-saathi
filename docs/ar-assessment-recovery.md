@@ -26,6 +26,8 @@ These are adaptive screen-space callouts connected to world-anchored stations, n
 
 Answer and Continue operations clone the current training state, persist the candidate, and replace the live state only after the save returns successfully. A thrown persistence failure leaves the controller's live state intact and surfaces a retry notice. This is tested with injected save failures; it is not a device-storage exhaustion or crash-atomicity test of every SQLite failure mode. Archived attempts resolve their own bundled curriculum version when resumed.
 
+App 0.4.4 adds a native centre-placement action and a scrollable page with a 320 dp camera viewport, growing controls and persistent screen fallback. Camera-off English/Hindi actions are tested at normal and 200% text; positive camera callout readability and actual TalkBack remain separate gates. See [native placement](ar-placement.md).
+
 ## Evidence and remaining checks
 
 See [validation](validation.md) for exact test counts, inspected screens, APK checksum and the emulator walkthrough. JVM tests cover stale/question/lifecycle callbacks, duplicate actions, feedback restoration, final acknowledgement, critical stops, invalid options and persistence exceptions. Native tests seed saved AR records and verify recovery, English/Hindi feedback, camera-off hidden targets and return to screen mode. They do not simulate positive physical camera tracking.
