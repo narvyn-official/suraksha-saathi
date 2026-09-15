@@ -43,6 +43,7 @@ class ProcedureFlowTest {
             }
             instrumentation.waitForIdleSync();if(clicked) { Thread.sleep(150);return };Thread.sleep(100)
         }
+        screenshot("unreachable")
         fail("Action not reachable: ${tag?:text}")
     }
     private fun screenshot(name:String) {
@@ -70,6 +71,7 @@ class ProcedureFlowTest {
                     val current=records(module,true)
                     if(InstrumentationRegistry.getArguments().getString("walkthrough")=="true")Thread.sleep(900)
                     if(current.feedback)click(s,"Continue procedure") else {
+                        if(current.step.id=="fire-aim" || current.step.id=="gas-attendant")click(s,"Use button actions instead")
                         if(current.index in listOf(0,4,6,9)) { pixels(s);screenshot("$module-step-${current.index+1}") }
                         click(s,tag="procedure-target-${current.step.actions.first { it.correct }.id}")
                         assertTrue(records(module,true).feedback)

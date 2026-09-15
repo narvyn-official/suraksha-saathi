@@ -1,5 +1,18 @@
 # Pilot validation — 15 September 2026
 
+## v0.5.1 spatial procedure verification
+
+- **71 JVM tests passed** (63 existing plus eight spatial geometry/evidence cases). Coverage includes transformed rays, nearest-target picking, misses, repeated/stale frames, interrupted holds, invalid sample data, action/mode mismatches, unsafe independent gas choice, replay and compatibility with older button journals.
+- **Five new native test methods passed**, covering all five spatial steps with actual touch delivery, saved-record recreation, partial-hold cancellation, unsafe gas-position stopping, Hindi text alternatives and camera-unavailable rejection with successful screen recovery. The test driver reads rendered marker positions and dispatches touch events; it does not invoke learning callbacks to fabricate completion.
+- **Three existing full-procedure tests passed**, including both complete sequences using the explicit button alternative, Hindi unsafe stop/retry and denied-camera fallback. **Three learner-lifecycle methods passed** in the focused regression run. The combined procedure/spatial run before the additional camera-unavailable method passed seven tests in 78.77 seconds; the additional method passed in 11.634 seconds.
+- **Hindi at 200% system font passed** the spatial-view/text-alternative test in 6.175 seconds. Fresh fire/gas and large-Hindi screenshots were inspected. This scoped check does not establish full TalkBack or whole-app accessibility. Emulator font was restored to 1.0.
+- Initial native testing failed two fire hold cases when continuous equipment rendering was coupled to sample timing. Static screen practice now samples its displayed inverse projection without continuous redraw; camera practice still requires fresh tracked images. All four initial spatial methods then passed in 38.836 seconds.
+- Regression testing then found action buttons partly below the scroll viewport: translation-only positioning did not give native scrolling their true layout position. Real button margins fixed the reproducible failure; the full sequence test passed in the combined rerun.
+- App remains debug-signed. Database/curriculum versions, earlier content archives, issuer keys and dashboard code are unchanged. Spatial sample journals remain local and non-certifying. No web checks were rerun for this Android-only increment.
+- **Physical device:** a Samsung SM-S921B on Android 16/API 36 connected successfully, with installed Google Play Services for AR 1.56.262080393. Updating from app 0.5.0 to the 0.5.1 preview succeeded without uninstalling/clearing data. This verifies installation only. Positive camera placement, anchor stability, camera target holds and device performance remain pending; the device serial and personal surroundings are not published.
+- The 0.5.1 video is a 56.5-second staged emulator walkthrough of five spatial interactions. Its final capture run passed in 56.397 seconds; frames including the final gas feedback were visually inspected. Earlier procedure steps are fixture setup for each excerpt, not footage of two complete real-camera procedures.
+
+
 ## v0.5.0 verification
 
 - **63 JVM tests** passed: the previous 51 plus eight procedure replay/sequence tests and four validity-date tests. Android app and test APKs built successfully. Curriculum and issuer trust consistency checks passed.
@@ -112,3 +125,10 @@ Earlier validation found dialog-focus selectors, status-bar overlap and excessiv
 - Sites registration returned a transport failure. Discovery found no corresponding site. No hosted URL, automatic sync or public revocation endpoint is claimed.
 - No delayed retention or practical-transfer study. Spaced-review intervals are pilot heuristics; no retention improvement or accident reduction has been measured.
 - No adversarial security review, production organisation roles or production signing/distribution audit.
+
+0.5.1 release artifact SHA-256:
+
+```text
+7b64c61ac0a7110f102873af7a0b39f468b26b8210c4a34de14923d5bf7ccf4a  suraksha-saathi-0.5.1-debug.apk
+895d631db7fda79cf8daf837189130af5d17edd0b56ab2e8fb4a7d72ba0cdf84  suraksha-saathi-0.5.1-demo.mp4
+```

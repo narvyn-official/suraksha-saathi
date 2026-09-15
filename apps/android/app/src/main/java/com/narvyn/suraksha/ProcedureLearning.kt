@@ -113,11 +113,12 @@ class ProcedureSession private constructor(val data: JSONObject) {
     private fun mayChange(now: Long) = !done && events.length() < MAX_EVENTS && now >= data.getLong("updatedAt")
 
     /** True means a valid action was accepted, including an unsafe action; inspect lastCorrect only in practice feedback. */
-    fun choose(actionId: String, presentation: String, now: Long): Boolean {
+    fun choose(actionId: String, presentation: String, now: Long, spatial: JSONObject? = null): Boolean {
         if (!mayChange(now) || feedback || presentation !in setOf("screen","camera","description")) return false
         val action = step.actions.firstOrNull { it.id == actionId } ?: return false
+        val proof = spatial?.let { ProcedureSpatial.proof(it,step.id,actionId,presentation) }
         events.put(JSONObject().put("type","action").put("sequence",events.length()+1).put("step",step.id)
-            .put("action",action.id).put("presentation",presentation).put("correct",action.correct).put("time",now))
+            .put("action",action.id).put("presentation",presentation).put("correct",action.correct).put("time",now).apply { if(proof!=null)put("spatial",proof.json()) })
         data.put("updatedAt",now).put("lastCorrect",action.correct).put("feedback",true)
         if (action.correct) data.getJSONObject("flags").put(action.id,true)
         else {
@@ -166,7 +167,7 @@ class ProcedureSession private constructor(val data: JSONObject) {
                 val event = savedEvents.getJSONObject(i)
                 require(event.getInt("sequence") == i+1 && event.getString("step") == session.step.id) { "Invalid procedure event order." }
                 val accepted = when (event.getString("type")) {
-                    "action" -> session.choose(event.getString("action"),event.getString("presentation"),event.getLong("time"))
+                    "action" -> session.choose(event.getString("action"),event.getString("presentation"),event.getLong("time"),if(event.has("spatial"))event.getJSONObject("spatial")else null)
                     "advance" -> session.advanceAt(event.getLong("time"))
                     else -> false
                 }

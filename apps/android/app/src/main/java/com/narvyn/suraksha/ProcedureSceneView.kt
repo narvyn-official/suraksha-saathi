@@ -29,16 +29,23 @@ import javax.microedition.khronos.opengles.GL10
 /** Local simulated procedure scene. Projected callouts are not mesh manipulation or equipment detection. */
 class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity), GLSurfaceView.Renderer {
     data class Target(val id: String, val label: String, val point: FloatArray)
-    data class Scene(val module: String, val stepId: String, val targets: List<Target>, val completedActions: Set<String>, val enabled: Boolean = true)
+    data class Scene(val module: String, val stepId: String, val targets: List<Target>, val completedActions: Set<String>, val enabled: Boolean = true, val spatial: Boolean = false)
     private data class Snapshot(val revision: Int, val scene: Scene, val camera: Boolean,
                                 val heights: List<Float>, val columns: Int, val width: Int, val height: Int)
-    private data class Action(val revision: Int, val stepId: String, val id: String, val camera: Boolean)
+    private data class Action(val revision: Int, val stepId: String, val id: String, val camera: Boolean, val proof: ProcedureSpatial.Proof? = null, val gesture: Long = -1)
+    private data class Pointer(val revision: Int, val serial: Long, val x: Float, val y: Float)
     private data class Preview(val revision: Int, val camera: Boolean, val points: List<ComponentProjection.Point?>,
-                               val boxes: List<ArChoiceLayout.Box>?, val message: String)
+                               val boxes: List<ArChoiceLayout.Box>?, val message: String, val progress: Float = 0f, val cursor: ComponentProjection.Point? = null, val radii: List<Float> = emptyList(), val inverse: FloatArray? = null)
 
     private val viewport = FrameLayout(activity)
     private val surface = GLSurfaceView(activity)
     private val overlay = ProcedureOverlay()
+    private val aim = activity.action("", false, role=ActionRole.CAMERA) { }
+    private val hold = ProcedureSpatialHold()
+    private val pointer = AtomicReference<Pointer?>(null)
+    private var pointerSerial = 0L // UI thread only
+    private var sampledSerial = -1L // renderer only
+    private val inverseMvp = FloatArray(16)
     private val placement = activity.action("", false) { requestPlacement(surface.width / 2f, surface.height / 2f) }
     private val gate = ComponentCameraGate()
     private val freshness = ComponentCameraFreshness()
@@ -58,7 +65,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     private var anchor: Anchor? = null // GL owned until renderer is paused.
     private var facing = 0f
     private var missedPlacement: Int? = null
-    private var onAction: (String, String) -> Unit = { _, _ -> }
+    private var onAction: (String, String, org.json.JSONObject?) -> Unit = { _, _, _ -> }
     var onStatus: ((String) -> Unit)? = null
     var onShown: ((String) -> Unit)? = null
     val cameraSelected get() = cameraMode
@@ -83,6 +90,18 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         addView(body, LayoutParams(-1, -2))
         body.addView(viewport, LinearLayout.LayoutParams(-1, activity.dp(340)))
         body.addView(placement, LinearLayout.LayoutParams(-1, -2).apply { topMargin = activity.dp(8) })
+        body.addView(aim, LinearLayout.LayoutParams(-1, -2).apply { topMargin = activity.dp(8) })
+        aim.tag = "procedure-hold-aim"
+        aim.setOnTouchListener { control, event ->
+            when(event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> { control.isPressed=true;beginPointer(surface.width/2f,surface.height/2f);true }
+                MotionEvent.ACTION_MOVE -> { if(event.x !in 0f..control.width.toFloat() || event.y !in 0f..control.height.toFloat()) { control.isPressed=false;releasePointer() };true }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN -> { control.isPressed=false;releasePointer();true }
+                else -> true
+            }
+        }
+        // A click (including accessibility activation) cannot fabricate a continuous spatial hold.
+        aim.contentDescription = ""
         placement.tag = "procedure-place-center"
         placement.visibility = GONE
         surface.setEGLContextClientVersion(2)
@@ -99,10 +118,10 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
             if (r - l != oldR - oldL || bottom - top != oldBottom - oldTop) rebind()
         }
         // Static screen scenes also need visibility re-evaluation when an ancestor scrolls.
-        viewTreeObserver.addOnScrollChangedListener { reportShown() }
+        viewTreeObserver.addOnScrollChangedListener { if(!overlay.fullyVisible(snapshot.revision))releasePointer();reportShown() }
     }
 
-    fun configure(scene: Scene, hi: Boolean, onAction: (String, String) -> Unit) {
+    fun configure(scene: Scene, hi: Boolean, onAction: (String, String, org.json.JSONObject?) -> Unit) {
         this.hi = hi
         this.onAction = onAction
         equipment.prepareProcedure(scene.module)
@@ -138,16 +157,19 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     }
 
     private fun rebind() {
-        pendingAction.set(null); placements.clear()
+        pendingAction.set(null); placements.clear();releasePointer()
         val scene = snapshot.scene
         val columns = if (scene.targets.size > 1 && viewport.width >= activity.dp(300)) 2 else 1
         val cardWidth = ((viewport.width - activity.dp(10) * (columns + 1)) / columns).coerceAtLeast(1)
         val revision = gate.configure()
-        val heights = overlay.bind(scene.targets, cardWidth, revision)
+        val heights = overlay.bind(if(scene.spatial)emptyList()else scene.targets, cardWidth, revision)
         snapshot = Snapshot(revision, scene, cameraMode, heights, columns, viewport.width, viewport.height)
         placement.text = t("Place at camera centre", "कैमरा दृश्य के बीच में रखें")
         placement.contentDescription = t("Place simulated procedure at camera centre", "काल्पनिक प्रक्रिया कैमरा दृश्य के बीच में रखें")
         placement.visibility = if (cameraMode) VISIBLE else GONE
+        aim.visibility = if(cameraMode && scene.spatial) VISIBLE else GONE
+        aim.text = t("Hold to aim at a target", "लक्ष्य पर निशाने के लिए दबाए रखें")
+        aim.contentDescription = t("Hold while aiming. For accessible actions, use text actions above.", "निशाना रखते हुए दबाए रखें। सुलभ क्रियाओं के लिए ऊपर लिखित क्रियाएँ उपयोग करें।")
         placement.isEnabled = foreground && scene.enabled && scene.targets.isNotEmpty()
         overlay.clear()
         surface.requestRender()
@@ -194,7 +216,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         cameraRunning = false
         gate.pause()
         snapshot = snapshot.copy(revision = gate.configure())
-        pendingAction.set(null); placements.clear(); preview.set(null)
+        pendingAction.set(null); placements.clear(); preview.set(null);releasePointer()
         surface.onPause(); rendererRunning = false
         if (wasCameraRunning) try { ar?.pause() } catch (_: Exception) {}
         overlay.clear()
@@ -217,9 +239,29 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         placements.offer(ArPlacementRequest.createAt(snapshot.revision, x, y, viewport.width, viewport.height, SystemClock.elapsedRealtime()))
     }
 
+    private fun beginPointer(x:Float,y:Float) {
+        val current=snapshot
+        if(!current.scene.spatial || !ready(current))return
+        hold.reset()
+        val input=Pointer(current.revision,++pointerSerial,x,y);pointer.set(input)
+        if(!current.camera)sampleScreen(input.serial)
+    }
+    /** Screen practice samples the last displayed static geometry; it never receives camera attribution. */
+    private fun sampleScreen(serial:Long) {
+        val input=pointer.get()?:return
+        val current=snapshot
+        if(input.serial!=serial || input.revision!=current.revision || current.camera || !ready(current)) { releasePointer();return }
+        val hit=overlay.screenHit(input.x,input.y,current)
+        val proof=hold.sample(hit,SystemClock.elapsedRealtime())
+        overlay.showHold(hold.progress(),ComponentProjection.Point(input.x,input.y))
+        if(proof!=null)deliver(Action(current.revision,current.scene.stepId,proof.action,false,proof,input.serial))
+        else postDelayed({sampleScreen(serial)},50)
+    }
+    private fun releasePointer() { pointer.set(null);hold.reset();aim.isPressed=false }
+
     private fun requestAction(id: String, revision: Int) {
         val current = snapshot
-        if (revision != current.revision || !current.scene.enabled || !ready(current)) return
+        if (current.scene.spatial || revision != current.revision || !current.scene.enabled || !ready(current)) return
         val request = Action(revision, current.scene.stepId, id, current.camera)
         if (current.camera) pendingAction.compareAndSet(null, request) else deliver(request)
     }
@@ -232,13 +274,15 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         val current = snapshot
         if (request.revision != current.revision || request.stepId != current.scene.stepId || request.camera != current.camera ||
             !current.scene.enabled || current.scene.targets.none { it.id == request.id } || !ready(current)) return
+        if(current.scene.spatial != (request.proof!=null))return
+        if(request.proof!=null && pointer.get()?.let { it.serial==request.gesture && it.revision==request.revision }!=true)return
         val mode = if (request.camera) "camera" else "screen"
         onShown?.invoke(mode)
         if (snapshot.revision != current.revision || !ready(current)) return
         // Invalidate before the host callback, even if the host cannot save and does not reconfigure.
         snapshot = current.copy(revision = gate.configure())
-        pendingAction.set(null); placements.clear(); overlay.clear()
-        onAction(request.id, mode)
+        pendingAction.set(null); placements.clear(); overlay.clear();releasePointer()
+        onAction(request.id, mode, request.proof?.json())
     }
 
     private fun reportShown() {
@@ -319,6 +363,10 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
             Matrix.multiplyMM(vp, 0, projection, 0, view, 0)
             equipment.draw(vp, model, current.scene.module, eye, if (current.camera) light else floatArrayOf(1f, 1f, 1f, 1f), completedActions = current.scene.completedActions, procedureMode = true)
             Matrix.multiplyMM(mvp, 0, vp, 0, model, 0)
+            if(current.scene.spatial) {
+                drawSpatial(current,observedAt)
+                return
+            }
             val points = current.scene.targets.map { ComponentProjection.project(it.point, mvp, widthPx, heightPx) }
             val boxes = if (current.width == widthPx && current.height == heightPx) {
                 val bottomPoints = points.map { it?.let { p -> ComponentProjection.Point(p.x, heightPx - activity.dp(10).toFloat()) } }
@@ -334,8 +382,41 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         }
     }
 
+    private fun drawSpatial(current: Snapshot, observedAt: Long) {
+        val zones=ProcedureSpatial.zones(current.scene.stepId)
+        val ordered=current.scene.targets.mapNotNull { target -> zones.firstOrNull { it.id==target.id } }
+        val points=ordered.map { ComponentProjection.project(it.center,mvp,widthPx,heightPx) }
+        val radii=ordered.mapIndexed { i,zone ->
+            val edge=ComponentProjection.project(floatArrayOf(zone.center[0]+zone.radius,zone.center[1],zone.center[2]),mvp,widthPx,heightPx)
+            val point=points[i]
+            if(edge==null || point==null)0f else kotlin.math.hypot(edge.x-point.x,edge.y-point.y)
+        }
+        val visible=current.scene.enabled && current.revision==snapshot.revision && current.width==widthPx && current.height==heightPx &&
+            ordered.size==current.scene.targets.size && points.isNotEmpty() && points.all { it!=null } && radii.all { it>0f } && Matrix.invertM(inverseMvp,0,mvp,0)
+        gate.frame(current.revision,visible,observedAt)
+        val input=pointer.get()
+        var cursor:ComponentProjection.Point?=null
+        if(current.camera && visible && input!=null && input.revision==current.revision && gate.allows(current.revision,SystemClock.elapsedRealtime())) {
+            if(sampledSerial!=input.serial) { hold.reset();sampledSerial=input.serial }
+            val x=if(current.camera)widthPx/2f else input.x;val y=if(current.camera)heightPx/2f else input.y
+            cursor=ComponentProjection.Point(x,y)
+            val hit=ProcedureSpatial.hit(x,y,widthPx,heightPx,inverseMvp,ordered)
+            val proof=hold.sample(hit,observedAt)
+            if(proof!=null) {
+                val action=Action(current.revision,current.scene.stepId,proof.action,current.camera,proof,input.serial)
+                if(pendingAction.compareAndSet(null,action))post {
+                    if(pendingAction.compareAndSet(action,null))deliver(action)
+                }
+            }
+        }else if(current.camera)hold.reset()
+        val message=if(!visible)t("Keep both target zones in view, or use text actions.","दोनों लक्ष्य दृश्य में रखें या लिखित क्रियाएँ उपयोग करें।")
+            else if(current.camera)t("Aim the centre cross, then hold the aim control steadily. Targets are simulated.","बीच का निशाना रखें, फिर निशाने का नियंत्रण स्थिर दबाएँ। लक्ष्य काल्पनिक हैं।")
+            else t("Touch and hold a target ring. Slide to adjust; lifting resets the hold.","लक्ष्य का घेरा छूकर दबाए रखें। खिसकाकर ठीक करें; उठाने से पकड़ रीसेट होगी।")
+        publish(Preview(current.revision,current.camera,points,if(visible)emptyList()else null,message,hold.progress(),cursor,radii,if(visible)inverseMvp.copyOf()else null))
+    }
+
     private fun unavailable(current: Snapshot, message: String) {
-        gate.frame(current.revision, false, SystemClock.elapsedRealtime())
+        gate.frame(current.revision, false, SystemClock.elapsedRealtime());hold.reset()
         placements.discardFor(current.revision)
         val action = pendingAction.get()
         if (action?.revision == current.revision) pendingAction.compareAndSet(action, null)
@@ -349,7 +430,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
             val latest = preview.getAndSet(null)
             val current = snapshot
             if (foreground && latest != null && latest.revision == current.revision && latest.camera == cameraMode) {
-                if (latest.boxes != null && (!latest.camera || gate.allows(current.revision, SystemClock.elapsedRealtime()))) overlay.position(current, latest.points, latest.boxes) else overlay.clear()
+                if (latest.boxes != null && (!latest.camera || gate.allows(current.revision, SystemClock.elapsedRealtime()))) overlay.position(current, latest.points, latest.boxes, latest.progress, latest.cursor, latest.radii, latest.inverse) else overlay.clear()
                 status(latest.message)
                 reportShown()
             }
@@ -372,6 +453,10 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         private var shownRevision = -1
         private var points = emptyList<ComponentProjection.Point?>()
         private var boxes = emptyList<ArChoiceLayout.Box>()
+        private var progress = 0f
+        private var cursor: ComponentProjection.Point?=null
+        private var radii = emptyList<Float>()
+        private var inverse:FloatArray?=null
         init { setWillNotDraw(false); setBackgroundColor(Palette.canvas) }
         fun bind(targets: List<Target>, width: Int, revision: Int): List<Float> {
             buttons.forEach { removeView(it) }; buttons.clear()
@@ -387,18 +472,29 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
             }
         }
         fun clear() {
-            shownRevision = -1; points = emptyList(); boxes = emptyList()
+            shownRevision = -1; points = emptyList(); boxes = emptyList();progress=0f;cursor=null;radii=emptyList();inverse=null
             buttons.forEach { it.visibility = INVISIBLE; it.isEnabled = false }; invalidate()
         }
-        fun position(current: Snapshot, projected: List<ComponentProjection.Point?>, placements: List<ArChoiceLayout.Box>) {
+        fun position(current: Snapshot, projected: List<ComponentProjection.Point?>, placements: List<ArChoiceLayout.Box>, holdProgress:Float, aimPoint:ComponentProjection.Point?, zoneRadii:List<Float>, inverseMatrix:FloatArray?) {
             if (placements.size != buttons.size) { clear(); return }
-            shownRevision = current.revision; points = projected; boxes = placements
+            shownRevision = current.revision; points = projected; boxes = placements;progress=holdProgress;cursor=aimPoint;radii=zoneRadii;inverse=inverseMatrix
             buttons.forEachIndexed { i, button ->
-                button.x = placements[i].left; button.y = placements[i].top
+                // Real layout positions let native scrolling/focus reveal the entire action.
+                // Translation-only placement left requestRectangleOnScreen targeting the old origin.
+                val params=button.layoutParams as LayoutParams
+                val left=placements[i].left.toInt();val top=placements[i].top.toInt()
+                if(params.leftMargin!=left || params.topMargin!=top) {
+                    params.leftMargin=left;params.topMargin=top;button.layoutParams=params
+                }
                 button.visibility = VISIBLE; button.isEnabled = current.scene.enabled
             }
             invalidate()
         }
+        fun screenHit(x:Float,y:Float,current:Snapshot):ProcedureSpatial.Hit? {
+            if(current.camera || current.revision!=shownRevision)return null
+            return inverse?.let { ProcedureSpatial.hit(x,y,width,height,it,ProcedureSpatial.zones(current.scene.stepId)) }
+        }
+        fun showHold(value:Float,point:ComponentProjection.Point) { progress=value;cursor=point;invalidate() }
         fun fullyVisible(revision: Int): Boolean {
             val rect = Rect()
             return shownRevision == revision && isShown && points.isNotEmpty() && getLocalVisibleRect(rect) &&
@@ -408,6 +504,19 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         }
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            if(snapshot.scene.spatial) {
+                points.forEachIndexed { index,p -> if(p!=null && index<radii.size) {
+                    paint.style=Paint.Style.STROKE;paint.strokeWidth=activity.dp(3).toFloat();paint.color=Color.WHITE
+                    canvas.drawCircle(p.x,p.y,radii[index],paint)
+                    paint.strokeWidth=activity.dp(1).toFloat();paint.color=Palette.blue
+                    canvas.drawCircle(p.x,p.y,radii[index],paint)
+                    drawMarker(canvas,p,index+1)
+                } }
+                cursor?.let { p ->
+                    val r=activity.dp(22).toFloat();paint.style=Paint.Style.STROKE;paint.strokeWidth=activity.dp(4).toFloat();paint.color=Palette.blue
+                    canvas.drawArc(p.x-r,p.y-r,p.x+r,p.y+r,-90f,360*progress,false,paint)
+                }
+            }
             if (this@ProcedureSceneView.foreground && cameraMode && cameraRunning) PlacementAim.draw(canvas, paint, activity, width, height)
             // Draw every connector before the markers so crossings cannot obscure numbers.
             points.forEachIndexed { i, point ->
@@ -437,7 +546,13 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
             paint.textAlign = Paint.Align.LEFT; paint.isFakeBoldText = false
         }
         override fun onTouchEvent(event: MotionEvent): Boolean {
-            if (event.action == MotionEvent.ACTION_UP) { if (cameraMode) requestPlacement(event.x, event.y); performClick() }
+            if(snapshot.scene.spatial && !cameraMode) {
+                when(event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> { parent.requestDisallowInterceptTouchEvent(true);beginPointer(event.x,event.y) }
+                    MotionEvent.ACTION_MOVE -> pointer.get()?.let { pointer.set(it.copy(x=event.x,y=event.y)) }
+                    MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL,MotionEvent.ACTION_POINTER_DOWN -> { releasePointer();parent.requestDisallowInterceptTouchEvent(false);if(event.actionMasked==MotionEvent.ACTION_UP)performClick() }
+                }
+            } else if(event.actionMasked==MotionEvent.ACTION_UP) { if(cameraMode)requestPlacement(event.x,event.y);performClick() }
             return true
         }
         override fun performClick(): Boolean { super.performClick(); return true }

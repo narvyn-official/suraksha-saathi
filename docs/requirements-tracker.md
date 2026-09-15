@@ -5,7 +5,7 @@ This is the implementation contract for continued work, not a declaration that t
 | Requirement / concern | Current state | Remaining acceptance evidence |
 | --- | --- | --- |
 | Android APK, Android 10+ | Native app with minimum API 29; debug APK built and installed on an API 36 emulator | Android 10 and mid-range physical phone matrix; production signing/update distribution |
-| Two complete AR modules | Fire/gas ordered procedure prototypes, persistent state variants and ARCore placement path | Real equipment manipulation/spatial evaluation, varied scenarios, physical camera validation and safety approval |
+| Two complete AR modules | Fire/gas ordered procedure prototypes, persistent state variants, ARCore placement and five optional spatial target-hold steps | Continuous task manipulation/trajectory evaluation, varied scenarios, physical camera validation and safety approval |
 | Five safety domains | Five bundled lesson/practice/assessment flows, 40 decisions | Confirm full official brief (provided text ends at Machinery); sector/site variants and competent content review |
 | Assessment engine | Critical-stop grading, versioned content, persistent answer events, server replay of imported assessments | Authenticated learner/assessor identities, formal policy and practical observation; procedure journals currently remain separate |
 | QR generation and verification | ES256 pilot tokens, Android offline signature verification, wallet, dashboard revocation and signed expiry | Physical QR camera trials, trusted clock policy, revocation freshness, key rotation and issuer governance |

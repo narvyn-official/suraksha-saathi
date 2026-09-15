@@ -24,6 +24,7 @@ class ProcedureActivity: Activity() {
     private var camera=false
     private var safeArea=false
     private var descriptions=false
+    private var spatial=true
     private var revision=0
     private val hi get()=identity.hi
     private fun t(en:String,hindi:String)=if(hi)hindi else en
@@ -37,6 +38,7 @@ class ProcedureActivity: Activity() {
         } catch(_:Exception) { notice(t("Saved procedure unavailable","सहेजी प्रक्रिया उपलब्ध नहीं"),t("This record could not be resumed. It has been preserved.","यह रिकॉर्ड जारी नहीं हो सका। इसे सुरक्षित रखा गया है।"));finish();return }
         val sameLearner=state?.getString("workerId")==identity.workerId
         safeArea=sameLearner && state?.getBoolean("safeArea")==true;camera=sameLearner && state?.getBoolean("camera")==true;descriptions=sameLearner && state?.getBoolean("descriptions")==true
+        spatial=if(sameLearner)state?.getBoolean("spatial",true)!=false else true
         val root=column(16).apply { setBackgroundColor(Palette.canvas) }
         root.setOnApplyWindowInsetsListener { v,i ->
             if(android.os.Build.VERSION.SDK_INT>=30) { val b=i.getInsets(WindowInsets.Type.systemBars());v.setPadding(dp(16)+b.left,dp(12)+b.top,dp(16)+b.right,dp(12)+b.bottom) }
@@ -59,7 +61,7 @@ class ProcedureActivity: Activity() {
     }
     override fun onPause() { active=false;revision++;if(::scene.isInitialized)scene.pause();super.onPause() }
     override fun onDestroy() { if(::scene.isInitialized)scene.close();if(::evidence.isInitialized)evidence.close();if(::identity.isInitialized)identity.close();super.onDestroy() }
-    override fun onSaveInstanceState(out: Bundle) { out.putString("workerId",identity.workerId);out.putBoolean("safeArea",safeArea);out.putBoolean("camera",camera);out.putBoolean("descriptions",descriptions);super.onSaveInstanceState(out) }
+    override fun onSaveInstanceState(out: Bundle) { out.putString("workerId",identity.workerId);out.putBoolean("safeArea",safeArea);out.putBoolean("camera",camera);out.putBoolean("descriptions",descriptions);out.putBoolean("spatial",spatial);super.onSaveInstanceState(out) }
     override fun onRequestPermissionsResult(code:Int, permissions:Array<out String>,results:IntArray) {
         super.onRequestPermissionsResult(code,permissions,results)
         if(code==61 && active && camera) { scene.useCamera(true);render();if(safeArea && !descriptions && !session.done && !session.feedback)scene.resume() }
@@ -94,6 +96,8 @@ class ProcedureActivity: Activity() {
             val events=session.data.getJSONArray("events").objects().filter { it.optString("type")=="action" }
             val cameraEvents=events.count { it.optString("presentation")=="camera" };val descriptionEvents=events.count { it.optString("presentation")=="description" }
             card.add(label(t("Recorded actions: ${events.size} · camera: $cameraEvents · screen: ${events.size-cameraEvents-descriptionEvents} · text: $descriptionEvents","दर्ज क्रियाएँ: ${events.size} · कैमरा: $cameraEvents · स्क्रीन: ${events.size-cameraEvents-descriptionEvents} · लिखित: $descriptionEvents"),14f,Palette.muted))
+            val spatialEvents=events.filter { it.has("spatial") }
+            card.add(label(t("Spatial target holds: ${spatialEvents.size} · camera: ${spatialEvents.count { it.optString("presentation")=="camera" }}. These measure virtual targeting, not real equipment handling.","स्थानिक लक्ष्य पर पकड़: ${spatialEvents.size} · कैमरा: ${spatialEvents.count { it.optString("presentation")=="camera" }}। यह काल्पनिक लक्ष्य मापता है, असली उपकरण चलाना नहीं।"),14f,Palette.muted),top=10)
             lower.add(card,bottom=16)
             lower.add(action(t("Start a new attempt","नया प्रयास शुरू करें")) {
                 try { val next=ProcedureSession.create(session.module,identity.workerId,session.guided);evidence.save(next.data);session=next;safeArea=false;render() }
@@ -120,13 +124,22 @@ class ProcedureActivity: Activity() {
                 },bottom=10)
                 if(camera)header.add(action(t("Camera permission settings","कैमरा अनुमति सेटिंग"),false,role=ActionRole.NEUTRAL) { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName"))) },bottom=10)
                 header.add(action(if(descriptions)t("Use the training scene","प्रशिक्षण दृश्य उपयोग करें")else t("Use text actions","लिखित क्रियाएँ उपयोग करें"),false) { descriptions=!descriptions;camera=false;scene.useCamera(false);render() },bottom=10)
+                val useSpatial=spatial && ProcedureSpatial.supported(step.id)
+                if(ProcedureSpatial.supported(step.id) && !descriptions) {
+                    header.add(action(if(spatial)t("Use button actions instead","बटन वाली क्रियाएँ उपयोग करें")else t("Use spatial target practice","स्थानिक लक्ष्य अभ्यास उपयोग करें"),false,role=ActionRole.LEARN) { spatial=!spatial;render() },bottom=10)
+                    if(useSpatial) {
+                        header.add(label(t("SPATIAL PRACTICE · hold a target for 0.65 seconds","स्थानिक अभ्यास · लक्ष्य पर 0.65 सेकंड पकड़ रखें"),13f,Palette.blue,true),bottom=8)
+                        header.add(label(if(session.module=="gas")t("Choose where the miniature attendant should stand. Target zones represent positions in this model only.","छोटा निगरानी व्यक्ति कहाँ खड़ा हो, चुनें। लक्ष्य केवल इस मॉडल की जगहें हैं।")else t("Aim at a location on the virtual fire. This measures target alignment, not a real nozzle or continuous sweep technique.","काल्पनिक आग पर जगह का निशाना चुनें। यह लक्ष्य से मिलान मापता है, असली नोज़ल या लगातार चलाने की तकनीक नहीं।"),14f,Palette.muted),bottom=10)
+                    }
+                }
                 val flags=session.data.optJSONObject("flags") ?: JSONObject()
                 val completed=flags.keys().asSequence().filter { flags.optBoolean(it) }.toSet()
                 scene.visibility=if(descriptions)View.GONE else View.VISIBLE
-                scene.configure(ProcedureSceneView.Scene(session.module,step.id,choices.map { ProcedureSceneView.Target(it.id,it.text(hi),it.point) },completed),hi) { id,presentation ->
-                    if(active && revision==currentRevision && !session.feedback && !session.done && session.step.id==step.id)change { it.choose(id,presentation,System.currentTimeMillis()) }
+                scene.configure(ProcedureSceneView.Scene(session.module,step.id,choices.map { ProcedureSceneView.Target(it.id,it.text(hi),it.point) },completed,spatial=useSpatial),hi) { id,presentation,proof ->
+                    if(active && revision==currentRevision && !session.feedback && !session.done && session.step.id==step.id)change { it.choose(id,presentation,System.currentTimeMillis(),proof) }
                 }
                 scene.useCamera(camera);if(active && !descriptions)scene.resume()
+                if(useSpatial && !descriptions) choices.forEachIndexed { index,target -> lower.add(label("${index+1} · ${target.text(hi)}",16f,Palette.ink).apply { tag="procedure-spatial-legend-${target.id}" },bottom=10) }
                 if(descriptions)choices.forEach { target -> lower.add(action(target.text(hi),false) { if(revision==currentRevision)change { it.choose(target.id,"description",System.currentTimeMillis()) } }.apply { tag="procedure-description-${target.id}" },bottom=12) }
                 lower.add(label(t("Use the scene controls to carry out the sequence. You may pause or switch to screen mode without losing your saved actions.","क्रम पूरा करने के लिए दृश्य के नियंत्रण उपयोग करें। बिना सहेजी क्रियाएँ खोए आप रुक सकते हैं या स्क्रीन तरीका चुन सकते हैं।"),14f,Palette.muted))
             }

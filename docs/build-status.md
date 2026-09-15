@@ -1,6 +1,6 @@
 # Implementation status — 15 September 2026
 
-This document describes the implemented v0.5.0 pilot (curriculum 0.4.0). Earlier architecture documents describe the target system; they are not claims that every feature is shipped.
+This document describes the implemented v0.5.1 pilot (curriculum 0.4.0). Earlier architecture documents describe the target system; they are not claims that every feature is shipped.
 
 ## Implemented
 
@@ -18,6 +18,7 @@ This document describes the implemented v0.5.0 pilot (curriculum 0.4.0). Earlier
 - Signed pilot credentials: ES256 verification on Android with a bundled trust anchor, saved credential wallet, QR and text-file import. Offline verification explicitly reports unknown revocation status.
 - React trainer dashboard, D1 persistence, owner-scoped routes, import validation and score replay, worker sectors, directory filters/history, latest-assessment analytics, CSV export, critical-decision follow-up, decision review, pilot issuance, credential QR/download, signature checking and revocation.
 
+- Five spatial target-hold steps (four fire locations and gas attendant positioning) use model-space ray targeting, hold samples, interruption resets and separately attributed camera/screen evidence. The screen interaction is tested; positive physical-camera behavior is pending. These are discrete target holds, not continuous sweep or real equipment handling. See spatial-procedure-practice.md.
 - Ordered fire (12 steps) and gas (9 steps) procedures with guided retry/independent stop, worker-scoped replayable journals, camera/screen/text attribution and equipment-state variants. See procedure-training.md. These drafts are not practical skill measurements or credential evidence.
 - Shared-phone learner profiles, schema-4 migration preserving earlier payloads, separate histories/recalls/component records and credential wallets. Old learner screens retire on profile change, saved state is owner-bound and pending exports use separate request files. No PIN, remote authentication or identity assurance is claimed.
 - Signed explicit certificate expiry, fresh validity checks, legacy no-expiry status and renewal requiring a new passed assessment. Signature authenticity and present validity are separate.
