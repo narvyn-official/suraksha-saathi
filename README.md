@@ -8,7 +8,7 @@ A working **v0.5.0 pilot** for Android safety learning and trainer review, built
 - [Watch the v0.5.0 emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-demo.mp4) · Fire/gas screen procedure walkthrough; physical-phone AR validation remains pending.
 - [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/SHA256SUMS-0.5.0.txt).
 
-**Development update:** the 0.5.2 candidate adds [room AR missions](docs/room-ar-missions.md): three separate training anchors, pin removal, continuous aiming/sweeping, worsening-fire withdrawal, and a deployed gas barrier/outside attendant. Mission actions have separate local records. Physical-phone AR validation remains pending; 0.5.1 stays a draft and the public downloads above remain 0.5.0.
+**Development update:** the 0.5.3 candidate adds [AR recovery and placement feedback](docs/ar-recovery-validation.md) to the 0.5.2 [room-mission candidate](docs/room-ar-missions.md). It includes [room AR missions](docs/room-ar-missions.md): three separate training anchors, pin removal, continuous aiming/sweeping, worsening-fire withdrawal, and a deployed gas barrier/outside attendant. Mission actions have separate local records. Physical-phone AR validation remains pending; 0.5.1 stays a draft and the public downloads above remain 0.5.0.
 
 ## What you can use now
 
@@ -37,7 +37,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/suraksha-saathi-0.5.2-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
+The debug-signed APK is copied to `artifacts/suraksha-saathi-0.5.3-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs

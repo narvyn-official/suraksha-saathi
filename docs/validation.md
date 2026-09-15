@@ -1,5 +1,9 @@
 # Pilot validation — 15 September 2026
 
+## v0.5.3 AR recovery candidate
+
+See [AR recovery validation](ar-recovery-validation.md). Physical AR is still failing/unverified: a camera feed alone was observed, with no successful plane placement. The phone disconnected after a preliminary recovery APK installed; the final 0.5.3 APK has not been tested on the physical phone. The screen fire sweep check currently fails under emulator sampling delays; do not carry forward the 0.5.2 pass as proof that the latest whole system passes.
+
 ## v0.5.2 room-mission candidate
 
 - **87 JVM tests passed**, including 13 room-mission engine tests for ordered controls, continuous alignment and five-band sweep coverage, stale/duplicate/gapped frames, intentional release, outside-only gas completion, interruption reasons, transactional copies and non-certifying snapshots. Additional guards cover pre-touch cached images, placement revisions and short-window layout budgets.

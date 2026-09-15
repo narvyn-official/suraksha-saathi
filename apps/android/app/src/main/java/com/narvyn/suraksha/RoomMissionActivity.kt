@@ -27,7 +27,7 @@ class RoomMissionActivity:Activity() {
     private lateinit var title:TextView;private lateinit var prompt:TextView;private lateinit var status:TextView
     private lateinit var control:Button;private lateinit var progress:ProgressBar
     private var hintUntil=0L
-    private var lastPhase="";private var lastPlaced=-1;private var lastTracked=false
+    private var lastPhase="";private var lastPlaced=-1;private var lastTracked=false;private var lastCanPlace=false;private var lastRetry=false
     private fun t(en:String,hi:String)=if(identity.hi)hi else en
     override fun onCreate(state:Bundle?) {
         super.onCreate(state);identity=Store(this);store=RoomMissionStore(this,identity.workerId)
@@ -50,13 +50,13 @@ class RoomMissionActivity:Activity() {
             row.addView(scene,LinearLayout.LayoutParams(0,-1,.64f))
             row.addView(ScrollView(this).apply{addView(panel,FrameLayout.LayoutParams(-1,-2))},LinearLayout.LayoutParams(0,-1,.36f))
             root.addView(row,LinearLayout.LayoutParams(-1,0,1f))
-        }else{root.addView(scene,LinearLayout.LayoutParams(-1,0,1f));root.addView(capped(panel,.24f,180),LinearLayout.LayoutParams(-1,-2))}
+        }else{root.addView(scene,LinearLayout.LayoutParams(-1,0,1f));root.addView(capped(panel,.24f,180,fixed=true),LinearLayout.LayoutParams(-1,-2))}
         control=action("",role=ActionRole.CAMERA){primary()}.apply{tag="room-mission-control"}
         root.addView(control,LinearLayout.LayoutParams(-1,-2).apply{setMargins(dp(12),dp(4),dp(12),dp(8))})
         control.setOnTouchListener{v,e->
             if(held && e.actionMasked==MotionEvent.ACTION_UP){release();return@setOnTouchListener true}
             if(e.actionMasked in listOf(MotionEvent.ACTION_CANCEL,MotionEvent.ACTION_POINTER_DOWN)){cancelGesture();return@setOnTouchListener true}
-            if(saveFailed || mission.phase!="SWEEP" || !camera || placementCount<3)return@setOnTouchListener false
+            if(saveFailed || scene.needsRetry || mission.phase!="SWEEP" || !camera || placementCount<3)return@setOnTouchListener false
             when(e.actionMasked){
                 MotionEvent.ACTION_DOWN->{if(scene.ready&&!saveFailed){held=true;heldAt=SystemClock.elapsedRealtime();v.isPressed=true;syncVisual()}}
                 MotionEvent.ACTION_MOVE->{if(e.x !in 0f..v.width.toFloat() || e.y !in 0f..v.height.toFloat())cancelGesture()}
@@ -67,7 +67,7 @@ class RoomMissionActivity:Activity() {
             placementCount=img.placement;tracking=img.tracked
             if(!img.tracked){held=false;mission.resetIncomplete();syncVisual()}
             if(status.text.toString()!=img.message && !saveFailed && (SystemClock.elapsedRealtime()>=hintUntil || !img.tracked))status.text=img.message
-            if(lastPlaced!=placementCount || lastTracked!=tracking)render()
+            if(lastPlaced!=placementCount || lastTracked!=tracking || lastCanPlace!=scene.canPlace || lastRetry!=scene.needsRetry)render()
         }
         scene.onAction={action->if(eligible())mutate{it.act(action,SystemClock.elapsedRealtime())}}
         scene.onRelease={if(!camera)release()}
@@ -81,9 +81,10 @@ class RoomMissionActivity:Activity() {
         setContentView(root);render()
         if(!safe)briefing()
     }
-    private fun capped(content:View,fraction:Float,maxDp:Int)=object:ScrollView(this){
+    // Keep feedback changes from resizing the camera viewport or cancelling an active pointer.
+    private fun capped(content:View,fraction:Float,maxDp:Int,fixed:Boolean=false)=object:ScrollView(this){
         init{addView(content,FrameLayout.LayoutParams(-1,-2));isFillViewport=false}
-        override fun onMeasure(w:Int,h:Int){super.onMeasure(w,MeasureSpec.makeMeasureSpec(minOf(dp(maxDp),(MeasureSpec.getSize(h)*fraction).toInt()),MeasureSpec.AT_MOST))}
+        override fun onMeasure(w:Int,h:Int){super.onMeasure(w,MeasureSpec.makeMeasureSpec(minOf(dp(maxDp),(MeasureSpec.getSize(h)*fraction).toInt()),if(fixed)MeasureSpec.EXACTLY else MeasureSpec.AT_MOST))}
     }
     private fun briefing(){
         AlertDialog.Builder(this).setTitle(t("Make your room a practice scene","अपने कमरे में अभ्यास दृश्य बनाएँ"))
@@ -135,13 +136,14 @@ class RoomMissionActivity:Activity() {
             mission.completed->debrief()
             !safe->briefing()
             camera&&checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED->startScene()
+            camera&&scene.needsRetry->scene.retryCamera()
             placementCount<3->scene.place()
             mission.phase=="WITHDRAW"->release()
             else->missionNotice(t("Do the action in the scene","दृश्य में क्रिया करें"),prompt.text.toString())
         }
     }
     private fun render(){
-        lastPhase=mission.phase;lastPlaced=placementCount;lastTracked=tracking
+        lastPhase=mission.phase;lastPlaced=placementCount;lastTracked=tracking;lastCanPlace=scene.canPlace;lastRetry=scene.needsRetry
         title.text=t(if(camera)"ROOM AR · " else "SCREEN MISSION · ",if(camera)"कमरा AR · " else "स्क्रीन मिशन · ")+t(if(module=="fire")"Fire response" else "Confined space",if(module=="fire")"अग्नि प्रतिक्रिया" else "बंद स्थान")
         val phase=mission.phase
         prompt.text=if(camera&&placementCount<3)t(listOf("1 / 3 · Place the equipment station","2 / 3 · Place the virtual hazard","3 / 3 · Mark a clear withdrawal point")[placementCount],listOf("1 / 3 · उपकरण स्थल रखें","2 / 3 · काल्पनिक खतरा रखें","3 / 3 · खाली वापसी बिंदु रखें")[placementCount])else when(phase){
@@ -160,11 +162,13 @@ class RoomMissionActivity:Activity() {
             saveFailed->t("Retry saving","फिर सहेजें")
             mission.completed->t("View mission debrief","मिशन समीक्षा देखें")
             camera&&checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED->t("Enable camera","कैमरा अनुमति दें")
-            placementCount<3->t("Place at centre cross","बीच के निशाने पर रखें")
+            camera&&scene.needsRetry->t("Retry camera","कैमरा फिर चलाएँ")
+            placementCount<3->if(scene.canPlace)t("Place station","स्थल रखें")else t("Scan for a surface","सतह स्कैन करें")
             phase=="SWEEP"&&camera->t("Hold to discharge","डिस्चार्ज के लिए दबाएँ")
             phase=="WITHDRAW"->t("Release discharge","डिस्चार्ज छोड़ें")
             else->t("How to do this action","यह क्रिया कैसे करें")
         }
+        control.isEnabled=saveFailed || mission.completed || !camera || scene.needsRetry || checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED || placementCount>=3 || scene.canPlace
         control.actionRole(if(phase=="WITHDRAW")ActionRole.DANGER else if(phase=="SWEEP"&&camera)ActionRole.PRIMARY else ActionRole.CAMERA)
         progress.progress=(mission.overallProgress*100).toInt();syncVisual()
     }
