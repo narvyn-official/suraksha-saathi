@@ -65,7 +65,7 @@ class RoomMissionWorkspaceTest {
             var expectedEvents=0
             s.onActivity{a->
                 val f=RoomMissionActivity::class.java.getDeclaredField("mission").apply{isAccessible=true};val m=f.get(a)as RoomMission
-                m.act("alarm",10);m.act("pin-drag",20);for(now in listOf(100L,200L,300L,400L))m.aim(0f,0f,false,now,true)
+                m.act("alarm",10);m.act("select-clear-exit",12);m.act("select-suitable-extinguisher",14);m.act("pin-drag",20);for(now in listOf(100L,200L,300L,400L))m.aim(0f,0f,false,now,true)
                 assertEquals("SWEEP",m.phase);expectedEvents=m.events.size
                 RoomMissionActivity::class.java.getDeclaredField("placementCount").apply{isAccessible=true}.setInt(a,3)
                 RoomMissionActivity::class.java.getDeclaredMethod("render").apply{isAccessible=true}.invoke(a)

@@ -19,7 +19,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
-import kotlin.math.atan2
 
 /** Fire-only stationary recognition, with real ARCore tracking and a screen alternative in its host. */
 class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurfaceView.Renderer {
@@ -37,9 +36,15 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
     private val equipment = WorldEquipment()
     @Volatile private var ar: Session? = null
     private var anchor: Anchor? = null // GL thread only while rendering
-    private var facing = 0f
+    private var facing = Pose.IDENTITY
     private var missedPlacement: Int? = null
     private var installRequested = false
+    private var wanted = false
+    private var closed = false
+    private var blocked: String? = null
+    private val release = ArSessionRelease()
+    @Volatile private var textureRegistered = false
+    private val cameraPump = ArCameraFramePump(surface) { stopWithMessage(ArCameraSupport.coolingMessage(hi)) }
     @Volatile private var running = false
     @Volatile private var hi = false
     @Volatile private var scene = Scene(0,20f,ComponentCatalog.modules.getValue("fire"),false)
@@ -88,7 +93,7 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
         surface.setOnTouchListener { _, event ->
             if(event.action == MotionEvent.ACTION_UP) { requestPlacementAt(event.x,event.y); surface.performClick() }; true
         }
-        surface.setRenderer(this); surface.renderMode=GLSurfaceView.RENDERMODE_CONTINUOUSLY; surface.onPause()
+        surface.setRenderer(this); surface.renderMode=GLSurfaceView.RENDERMODE_WHEN_DIRTY; surface.onPause()
     }
     fun configure(session: ComponentSession, hindi: Boolean, callback: (String) -> Unit) {
         hi=hindi; select=callback;
@@ -132,38 +137,54 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
     }
     /** Caller owns permission prompts. Errors leave the screen alternative available. */
     fun resumeCamera() {
-        if(running) return
+        if(running || closed) return
+        wanted=true
+        blocked?.let { onStatus(it); return }
+        if(release.failed) { onStatus(ArCameraSupport.releaseMessage(hi,true)); return }
+        if(release.busy) {
+            onStatus(ArCameraSupport.releaseMessage(hi,false))
+            release.awaitAvailable { if(!closed && wanted && blocked==null)resumeCamera() }
+            return
+        }
+        if(cameraPump.tooHot()) { stopWithMessage(ArCameraSupport.coolingMessage(hi)); return }
         try {
             if(ar==null) {
                 if(ArCoreApk.getInstance().requestInstall(host,!installRequested)==ArCoreApk.InstallStatus.INSTALL_REQUESTED) {
                     installRequested=true; onStatus(t("Finish installing AR services, or use screen practice.","AR सेवाओं की स्थापना पूरी करें, या स्क्रीन अभ्यास करें।")); return
                 }
-                ar=Session(host).apply { configure(Config(this).apply {
-                    planeFindingMode=Config.PlaneFindingMode.HORIZONTAL
-                    updateMode=Config.UpdateMode.LATEST_CAMERA_IMAGE
-                    lightEstimationMode=Config.LightEstimationMode.AMBIENT_INTENSITY
-                }) }
+                ar=Session(host)
+                ArCameraSupport.configure(ar!!)
             }
             freshness.requireNewImage(); scene=scene.copy(revision=gate.configure()); gate.activate()
-            ar!!.resume(); running=true; lines.setBackgroundColor(android.graphics.Color.TRANSPARENT);placeholder.visibility=GONE;surface.onResume()
+            textureRegistered=false; ar!!.resume(); running=true; lines.setBackgroundColor(android.graphics.Color.TRANSPARENT);placeholder.visibility=GONE;surface.onResume();cameraPump.start()
             onStatus(t("Aim the camera centre at a clear tabletop, then select Place at camera centre.","कैमरा दृश्य का बीच खाली मेज़ पर रखें, फिर बीच में रखने का बटन चुनें।"))
-        } catch(_: Exception) {
-            gate.pause(); running=false; hideMarkers()
-            onStatus(t("Camera AR is unavailable. Use screen practice, or retry the camera.","कैमरा AR उपलब्ध नहीं है। स्क्रीन अभ्यास करें, या कैमरा फिर आज़माएँ।"))
+        } catch(error: Exception) {
+            android.util.Log.e("TrainingAR", "Component camera start failed: ${error.javaClass.simpleName}")
+            stopWithMessage(ArCameraSupport.startupMessage(error,hi))
         }
     }
     fun pauseCamera() {
+        wanted=false; cameraPump.stop(); release.cancelPendingResume()
         val wasRunning=running;running=false
         gate.pause();scene=scene.copy(revision=gate.configure()); choice.set(null); tap.clear(); preview.set(null); hideMarkers()
         surface.onPause()
         if(wasRunning) { try { ar?.pause() } catch(_: Exception) {} }
-        running=false;lines.setBackgroundColor(Palette.canvas);hideMarkers()
+        textureRegistered=false;lines.setBackgroundColor(Palette.canvas);hideMarkers()
     }
-    fun prepareRetry() { pauseCamera(); installRequested=false }
-    fun close() { pauseCamera(); anchor?.detach(); anchor=null; ar?.close(); ar=null }
+    private fun retireSession() {
+        val retired=ar ?: return
+        try { retired.pause() } catch(_: Exception) {}
+        anchor?.detach();anchor=null;ar=null;freshness.clear();textureRegistered=false
+        release.retire(retired) { if(!closed && wanted) resumeCamera() }
+    }
+    private fun stopWithMessage(message:String) {
+        blocked=message;pauseCamera();retireSession();onStatus(message)
+    }
+    fun prepareRetry() { pauseCamera(); blocked=null; installRequested=false; retireSession() }
+    fun close() { pauseCamera(); closed=true; retireSession() }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        equipment.create()
+        textureRegistered=false;equipment.create()
         val ids=IntArray(1); GLES20.glGenTextures(1,ids,0); texture=ids[0]
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR)
@@ -182,10 +203,10 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
         if(!running) return
         val session=ar ?: return
         try {
-            session.setCameraTextureName(texture); session.setDisplayGeometry(host.windowManager.defaultDisplay.rotation,widthPx,heightPx)
+            if(!textureRegistered) { session.setCameraTextureName(texture);textureRegistered=true }; session.setDisplayGeometry(host.windowManager.defaultDisplay.rotation,widthPx,heightPx)
             val frame=session.update()
-            drawCamera(frame)
             val observedAt=freshness.observedAt(frame.timestamp,SystemClock.elapsedRealtime())
+            if(frame.timestamp>0L && observedAt!=null)drawCamera(frame)
             if(observedAt==null) { discardPlacement(current.revision); unavailable(current,t("Waiting for a fresh camera image. Hold still, or retry.","नए कैमरा दृश्य की प्रतीक्षा है। स्थिर रहें, या फिर कोशिश करें।")); return }
             if(reset.getAndSet(false)) { anchor?.detach(); anchor=null }
             if(frame.camera.trackingState!=TrackingState.TRACKING) {
@@ -198,9 +219,14 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
                     plane!=null && plane.type==Plane.Type.HORIZONTAL_UPWARD_FACING && plane.trackingState==TrackingState.TRACKING && plane.isPoseInPolygon(it.hitPose)
                 }
                 if(hit!=null) {
-                    val replacement=hit.createAnchor();anchor?.detach();anchor=replacement;missedPlacement=null
-                    val origin=anchor!!.pose; val eye=frame.camera.pose
-                    facing=Math.toDegrees(atan2((eye.tx()-origin.tx()).toDouble(),(eye.tz()-origin.tz()).toDouble())).toFloat()
+                    val replacement=hit.createAnchor();var committed=false
+                    gate.withCurrentRevision(current.revision) {
+                        if(placed.eligible(scene.revision,widthPx,heightPx,SystemClock.elapsedRealtime(),running,true,SystemClock.elapsedRealtime()-observedAt in 0..500)) {
+                            anchor?.detach();anchor=replacement;missedPlacement=null
+                            facing=RoomAnchorPose.facingOffset(replacement.pose,frame.camera.pose);committed=true
+                        }
+                    }
+                    if(!committed)replacement.detach()
                 } else missedPlacement=current.revision
             }
             val a=anchor
@@ -211,9 +237,8 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
             }
             frame.camera.getProjectionMatrix(projection,0,.05f,20f); frame.camera.getViewMatrix(view,0)
             Matrix.multiplyMM(vp,0,projection,0,view,0)
-            // Only translation is inherited: a horizontal training model faces the learner on placement.
-            Matrix.setIdentityM(model,0); Matrix.translateM(model,0,a.pose.tx(),a.pose.ty(),a.pose.tz())
-            Matrix.rotateM(model,0,facing+current.yaw,0f,1f,0f)
+            RoomAnchorPose.model(a.pose,facing).toMatrix(model,0)
+            Matrix.rotateM(model,0,current.yaw,0f,1f,0f)
             if(frame.lightEstimate.state==LightEstimate.State.VALID) {
                 frame.lightEstimate.getColorCorrection(estimated,0)
                 for(i in 0..3) if(estimated[i].isFinite()) light[i]=light[i]*.9f+estimated[i].coerceIn(.65f,1.35f)*.1f
@@ -221,8 +246,8 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
             equipment.draw(vp,model,"fire",frame.camera.pose.translation,light)
             Matrix.multiplyMM(mvp,0,vp,0,model,0)
             val points=current.order.map { ComponentProjection.project(it.point,mvp,widthPx,heightPx) }
-            val dx=frame.camera.pose.tx()-a.pose.tx(); val dz=frame.camera.pose.tz()-a.pose.tz()
-            val readable=ComponentCameraGeometry.readableView(dx,frame.camera.pose.ty()-a.pose.ty()-.27f,dz,facing+current.yaw)
+            val localEye=RoomAnchorPose.model(a.pose,facing).inverse().transformPoint(frame.camera.pose.translation)
+            val readable=ComponentCameraGeometry.readableView(localEye[0],localEye[1]-.27f,localEye[2],current.yaw)
             val visible=points.all { it!=null && it.x in host.dp(8).toFloat()..(widthPx-host.dp(64)).toFloat() && it.y in host.dp(12).toFloat()..(heightPx-host.dp(12)).toFloat() }
             val ready=readable && visible
             gate.frame(current.revision,ready,observedAt)
@@ -231,7 +256,11 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
                 post { if(scene.revision==current.revision && ready()) { onVisible(); select(pending.id) } }
             }
             publish(Preview(current.revision,if(ready)points else emptyList(),if(missedPlacement==current.revision)placementMissMessage()else if(ready)t("Model placed · follow the lines to identify a part.","मॉडल रखा है · पुर्ज़ा पहचानने के लिए रेखाएँ देखें।") else t("Keep the whole model in view from the front. No walking is needed.","पूरा मॉडल सामने से दृश्य में रखें। चलने की ज़रूरत नहीं है।"),ready))
-        } catch(_: Exception) { discardPlacement(current.revision); unavailable(current,t("Camera interrupted. Retry, or continue on screen.","कैमरा बाधित है। फिर कोशिश करें, या स्क्रीन पर जारी रखें।")) }
+        } catch(error: Exception) {
+            val message=t("Camera interrupted. Retry, or continue on screen.","कैमरा बाधित है। फिर कोशिश करें, या स्क्रीन पर जारी रखें।")
+            discardPlacement(current.revision);unavailable(current,message)
+            post { if(running && ar===session && scene.revision==current.revision)stopWithMessage(message) }
+        }
     }
     private fun drawCamera(frame: Frame) {
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)

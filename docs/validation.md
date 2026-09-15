@@ -1,4 +1,8 @@
-# Pilot validation — 15 September 2026
+# Pilot validation — 16 September 2026
+
+## v0.6.0 expanded missions and recovery
+
+See [version 0.6.0 evidence and remaining gates](release-0.6.0.md). The final build passes 143 JVM tests; expanded emulator flows, recovery, trainer imports and production build pass within the scopes recorded there. Physical AR remains unverified. Historical reports below describe their own versions.
 
 ## v0.5.6 recall challenge candidate
 

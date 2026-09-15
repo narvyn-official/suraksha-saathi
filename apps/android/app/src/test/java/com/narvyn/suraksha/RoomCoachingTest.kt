@@ -12,12 +12,26 @@ class RoomCoachingTest {
     }
     @Test fun onlyTheModulesActualPhasesCanRequestCues() {
         val fire=RoomCoaching("fire",true);val gas=RoomCoaching("gas",true)
-        listOf("ALARM","PIN","AIM","SWEEP","WITHDRAW").forEachIndexed { i,phase -> assertTrue(fire.requestCue(phase,i.toLong()));assertFalse(gas.requestCue(phase,i.toLong())) }
-        listOf("GAS_CHECK","BARRIER","ATTENDANT","REFUSE").forEachIndexed { i,phase -> assertTrue(gas.requestCue(phase,i.toLong()));assertFalse(fire.requestCue(phase,i.toLong())) }
+        listOf("ALARM","EXIT","EQUIPMENT","PIN","AIM","SWEEP","WITHDRAW","EVACUATE","ASSEMBLY","REPORT").forEachIndexed { i,phase -> assertTrue(fire.requestCue(phase,i.toLong()));assertFalse(gas.requestCue(phase,i.toLong())) }
+        listOf("GAS_CHECK","PPE","BARRIER","ATTENDANT","COMMUNICATE","ACKNOWLEDGE","REFUSE").forEachIndexed { i,phase -> assertTrue(gas.requestCue(phase,i.toLong()));assertFalse(fire.requestCue(phase,i.toLong())) }
         for(coaching in listOf(fire,gas))for(phase in listOf("COMPLETE","","alarm","invented")) {
             assertFalse(coaching.requestCue(phase,100));assertFalse(coaching.cueVisible(phase,100))
         }
         try { RoomCoaching("ppe",true);fail("Unknown module accepted") } catch(_:IllegalArgumentException) {}
+    }
+    @Test fun expandedJourneyCuesRemainVersionOneMetadataAndForkWithoutLoss() {
+        for(module in listOf("fire","gas")) {
+            val coaching=RoomCoaching(module,true)
+            val phases=RoomMission.phases(module).filterNot { it=="COMPLETE" }
+            phases.forEachIndexed { i,phase ->
+                assertTrue(coaching.requestCue(phase,i*100L));assertTrue(coaching.cueVisible(phase,i*100L))
+            }
+            val copy=coaching.fork();coaching.hideCue()
+            assertEquals(phases,copy.cues.map { it.phase });assertEquals(phases.size,copy.cueCount)
+            assertEquals(1,copy.toJson().getInt("version"));assertEquals("recall",copy.toJson().getString("mode"))
+            assertEquals(coaching.toJson().toString(),copy.toJson().toString())
+            assertFalse(copy.requestCue("COMPLETE",10_000));assertFalse(copy.cueVisible("COMPLETE",10_000))
+        }
     }
     @Test fun cueLastsSevenSecondsWithoutExtendingOnQueriesOrRepeatedRequests() {
         val coaching=RoomCoaching("fire",true)
@@ -81,4 +95,41 @@ class RoomCoachingTest {
         val expired=RoomCoaching("fire",true)
         assertTrue(expired.requestCue("WITHDRAW",Long.MAX_VALUE-7_000));assertFalse(expired.cueVisible("WITHDRAW",Long.MAX_VALUE))
     }
+    @Test fun restoreRetainsDetachedHistoryWithoutRevivingDisplayOrRegressingClock() {
+        val original=RoomCoaching("gas",true)
+        original.requestCue("PPE",100);original.requestCue("ACKNOWLEDGE",200)
+        val snapshot=original.toJson()
+        val restored=RoomCoaching.restore(snapshot,"gas")
+        assertEquals(original.cues,restored.cues);assertEquals(201L,restored.nextElapsedTime)
+        assertFalse(restored.cueVisible("ACKNOWLEDGE",200))
+        assertFalse(restored.requestCue("PPE",199))
+        assertTrue(restored.requestCue("ACKNOWLEDGE",201))
+        assertEquals(3,restored.cueCount)
+        snapshot.getJSONArray("cues").getJSONObject(0).put("at",999)
+        assertEquals(100L,restored.cues.first().at)
+        val guided=RoomCoaching.restore(RoomCoaching("fire").toJson(),"fire")
+        assertFalse(guided.recall);assertEquals(0L,guided.nextElapsedTime);assertEquals(0,guided.cueCount)
+    }
+    @Test fun restoreRejectsMalformedCrossModuleOrUncontinuableCoaching() {
+        val original=RoomCoaching("fire",true).apply { requestCue("EXIT",100);requestCue("AIM",200) }
+        val edits:List<(org.json.JSONObject)->Unit> = listOf(
+            { it.put("version",2) }, { it.put("version",1.0) }, { it.put("mode","guided") },
+            { it.put("certifiable",true) }, { it.put("mode","assessment") },
+            { it.getJSONArray("cues").getJSONObject(0).put("phase","COMPLETE") },
+            { it.getJSONArray("cues").getJSONObject(0).put("phase","PPE") },
+            { it.getJSONArray("cues").getJSONObject(0).put("at",-1) },
+            { it.getJSONArray("cues").getJSONObject(1).put("at",99) },
+            { it.getJSONArray("cues").getJSONObject(1).put("at",Long.MAX_VALUE) },
+            { it.getJSONArray("cues").getJSONObject(1).put("at",200.0) },
+            { it.getJSONArray("cues").getJSONObject(1).put("unexpected",true) },
+            { value -> val cues=value.getJSONArray("cues");repeat(RoomCoaching.MAX_CUES) { cues.put(cues.getJSONObject(1)) } }
+        )
+        for(edit in edits) {
+            try { RoomCoaching.restore(original.toJson().also(edit),"fire");fail("Corrupt coaching resumed") }
+            catch(_:IllegalArgumentException) {}
+        }
+        try { RoomCoaching.restore(original.toJson(),"gas");fail("Wrong module resumed") }
+        catch(_:IllegalArgumentException) {}
+    }
+
 }

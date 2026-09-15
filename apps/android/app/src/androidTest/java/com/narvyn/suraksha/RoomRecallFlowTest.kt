@@ -47,11 +47,14 @@ class RoomRecallFlowTest {
         shot("room-recall-cue.png")
         Thread.sleep(7300);ins.waitForIdleSync();assertFalse(cuesShown(s));assertFalse(prompt(s).contains("Hold the highlighted"))
         assertEquals(1,coaching(s).cues.size)
-        point(s,"meter").let{gesture(it,it,620)};assertEquals("BARRIER",phase(s));assertFalse(cuesShown(s))
+        point(s,"meter").let{gesture(it,it,620)};assertEquals("PPE",phase(s))
+        point(s,"select-specified-ppe").let{gesture(it,it,180)};assertEquals("BARRIER",phase(s));assertFalse(cuesShown(s))
         gesture(point(s,"barrier-left"),point(s,"barrier-right"),750);assertEquals("ATTENDANT",phase(s))
         button(s,"Hint");assertEquals(2,coaching(s).cues.size);assertTrue(cuesShown(s))
         s.recreate();point(s,"safe");assertEquals("ATTENDANT",phase(s));assertTrue(coaching(s).recall);assertEquals(2,coaching(s).cues.size);assertFalse(cuesShown(s))
-        gesture(point(s,"meter"),point(s,"safe"),750);assertEquals("REFUSE",phase(s));assertFalse(cuesShown(s))
+        gesture(point(s,"meter"),point(s,"safe"),750);assertEquals("COMMUNICATE",phase(s))
+        point(s,"send-buddy-check").let{gesture(it,it,180)};assertEquals("ACKNOWLEDGE",phase(s))
+        point(s,"confirm-buddy-ack").let{gesture(it,it,180)};assertEquals("REFUSE",phase(s));assertFalse(cuesShown(s))
         shot("room-recall-hidden.png")
         point(s,"safe").let{gesture(it,it,180)};assertEquals("COMPLETE",phase(s))
         Store(context).use{owner->RoomMissionStore(context,owner.workerId).use{store->val r=store.records().first{it.getString("module")=="gas"};assertEquals("screen",r.getString("mode"));val c=r.getJSONObject("coaching");assertEquals("recall",c.getString("mode"));assertEquals(2,c.getJSONArray("cues").length());assertFalse(r.getJSONObject("mission").getJSONObject("result").getBoolean("certifiable"))}}
@@ -66,18 +69,25 @@ class RoomRecallFlowTest {
         point(s,"alarm");assertFalse(cuesShown(s));button(s,"Hint");assertTrue(cuesShown(s))
         s.moveToState(Lifecycle.State.CREATED);s.moveToState(Lifecycle.State.RESUMED);point(s,"alarm")
         assertFalse(cuesShown(s));assertEquals(1,coaching(s).cues.size);assertFalse(prompt(s).contains("Tap the red"))
-        point(s,"alarm").let{gesture(it,it,180)};assertEquals("PIN",phase(s));assertFalse(cuesShown(s))
+        point(s,"alarm").let{gesture(it,it,180)};assertEquals("EXIT",phase(s))
+        point(s,"select-clear-exit").let{gesture(it,it,180)};assertEquals("EQUIPMENT",phase(s))
+        point(s,"select-suitable-extinguisher").let{gesture(it,it,180)};assertEquals("PIN",phase(s));assertFalse(cuesShown(s))
     }}
     @Test fun fireRecallCompletesWithNoRequestedHints(){start("fire").use{s->
         point(s,"alarm");assertFalse(cuesShown(s))
-        point(s,"alarm").let{gesture(it,it,180)};assertEquals("PIN",phase(s))
+        point(s,"alarm").let{gesture(it,it,180)};assertEquals("EXIT",phase(s))
+        point(s,"select-clear-exit").let{gesture(it,it,180)};assertEquals("EQUIPMENT",phase(s))
+        point(s,"select-suitable-extinguisher").let{gesture(it,it,180)};assertEquals("PIN",phase(s))
         val pin=point(s,"pin");val out=point(s,"pin-out");val dx=out.first-pin.first;val dy=out.second-pin.second;val length=kotlin.math.hypot(dx,dy);gesture(pin,pin.first+dx/length*220 to pin.second+dy/length*220,600);assertEquals("AIM",phase(s))
         point(s,"base").let{gesture(it,it,90)};Thread.sleep(450);assertEquals("AIM",phase(s)) // A released tap cannot accrue alignment.
         s.moveToState(Lifecycle.State.CREATED);s.moveToState(Lifecycle.State.RESUMED);Thread.sleep(500);assertEquals("AIM",phase(s))
         point(s,"base").let{gesture(it,it,650)};assertEquals("SWEEP",phase(s));shot("room-recall-fire-sweep.png")
         val left=point(s,"left");val right=point(s,"right");val a=left.first+3 to left.second;val b=right.first-3 to right.second
         gesture(a,b,2300){var detail="";var current="";ins.runOnMainSync{val activity=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<RoomMissionActivity>().single();val f=RoomMissionActivity::class.java.getDeclaredField("mission").apply{isAccessible=true};val m=f.get(activity)as RoomMission;detail=m.toJson().toString();current=m.phase};assertEquals(detail,"WITHDRAW",current)};assertEquals("WITHDRAW",phase(s));shot("room-recall-fire-withdraw.png")
-        point(s,"safe").let{gesture(it,it,180)};assertEquals("COMPLETE",phase(s))
+        point(s,"safe").let{gesture(it,it,180)};assertEquals("EVACUATE",phase(s))
+        point(s,"follow-clear-route").let{gesture(it,it,180)};assertEquals("ASSEMBLY",phase(s))
+        point(s,"reach-assembly-point").let{gesture(it,it,180)};assertEquals("REPORT",phase(s))
+        point(s,"report-missing-worker").let{gesture(it,it,180)};assertEquals("COMPLETE",phase(s))
         Store(context).use{owner->RoomMissionStore(context,owner.workerId).use{store->val r=store.records().first{it.getString("module")=="fire"};assertEquals("screen",r.getString("mode"));val m=r.getJSONObject("mission");assertTrue(m.getBoolean("completed"));assertFalse(m.getJSONObject("result").getBoolean("certifiable"));assertEquals(2,m.getJSONArray("measurements").length())}}
         assertTrue(coaching(s).recall);assertTrue(coaching(s).cues.isEmpty());s.recreate();assertEquals("COMPLETE",phase(s));assertFalse(cuesShown(s))
     }}

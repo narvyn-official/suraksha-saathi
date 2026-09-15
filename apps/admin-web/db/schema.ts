@@ -45,3 +45,14 @@ export const workers = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.owner, t.id] })],
 );
+
+/** Practice journals are stored separately and never referenced by credential issuance. */
+export const roomJournalHeads = sqliteTable("room_journal_heads", {
+  owner: text("owner").notNull(), id: text("id").notNull(), workerId: text("worker_id").notNull(),
+  workerName: text("worker_name").notNull(), workerSector: text("worker_sector").notNull(),
+  digest: text("digest").notNull(), capturedAt: integer("captured_at").notNull(), payload: text("payload").notNull(), importedAt: integer("imported_at").notNull(),
+}, (t) => [primaryKey({ columns: [t.owner, t.id] })]);
+export const roomJournalSnapshots = sqliteTable("room_journal_snapshots", {
+  owner: text("owner").notNull(), id: text("id").notNull(), digest: text("digest").notNull(),
+  previousDigest: text("previous_digest"), capturedAt: integer("captured_at").notNull(), importedAt: integer("imported_at").notNull(), payload: text("payload").notNull(),
+}, (t) => [primaryKey({ columns: [t.owner, t.id, t.digest] })]);

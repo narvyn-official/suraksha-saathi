@@ -1,6 +1,10 @@
 # Suraksha Saathi — continuous development roadmap
 
-Updated 15 September 2026. The user has authorized ongoing autonomous development and useful feature additions. Preserve the refined light theme and focus on workers using mid-range Android 10+ phones in Jharkhand. This document is the durable handoff between recurring development runs. Update it after each meaningful increment.
+Updated 16 September 2026. The user has authorized ongoing autonomous development and useful feature additions. Preserve the refined light theme and focus on workers using mid-range Android 10+ phones in Jharkhand. This document is the durable handoff between recurring development runs. Update it after each meaningful increment.
+
+## Current increment — 0.6.0
+
+[Expanded missions and validation](release-0.6.0.md) now cover the previously missing fire/gas choices, paged native lessons, saved mission recovery, separate trainer imports and shared camera lifecycle fixes. The next blocker is still physical-phone tracking and both complete camera missions; only an emulator is connected. Reviewed Santali, full official domain scope, machinery room training and governed practical assessment remain open. The baseline below is retained as development history.
 
 ## Baseline
 

@@ -31,7 +31,7 @@ class RoomMissionGeometry {
     private val bed=fireBed()
     private val flame=flame(orange)
     private val core=flame(amber)
-    private val markers=mapOf("safe-point" to safePoint(),"barrier" to barrier(closed=true),"attendant" to attendant(),"alarm" to alarm(),"confined-zone" to confinedZone())
+    private val markers=mapOf("safe-point" to safePoint(),"barrier" to barrier(closed=true),"attendant" to attendant(),"alarm" to alarm(),"confined-zone" to confinedZone(),"exit" to exitSign(false),"blocked-exit" to exitSign(true),"assembly" to assembly(),"ppe-kit" to ppeKit(),"dust-mask" to dustMask())
     private val openBarrier=barrier(closed=false)
     private val tongues=arrayOf(
         Tongue(-.30f,-.08f,.15f,.43f,.3f),Tongue(-.15f,.045f,.20f,.58f,1.6f),
@@ -278,6 +278,53 @@ class RoomMissionGeometry {
         box(.115f,1.055f,.132f,.058f,.10f,.035f,charcoal)
         rod(floatArrayOf(.132f,1.09f,.132f),floatArrayOf(.132f,1.20f,.132f),.005f,charcoal)
         for(i in 0..3)box(.114f,1.028f+i*.012f,.151f,.037f,.004f,.002f,steel)
+    }.finish()
+    private fun exitSign(blocked:Boolean)=Builder().apply {
+        val ink=if(blocked)red else green
+        for(x in floatArrayOf(-.27f,.27f))box(x,.48f,-.10f,.035f,.96f,.045f,steel)
+        box(0f,.94f,-.10f,.57f,.045f,.045f,steel)
+        box(0f,.80f,-.075f,.46f,.18f,.035f,ink)
+        if(blocked){
+            for(y in floatArrayOf(.34f,.52f))box(0f,y,-.045f,.56f,.08f,.035f,yellow)
+            rod(floatArrayOf(-.11f,.75f,-.045f),floatArrayOf(.11f,.85f,-.045f),.015f,white)
+            rod(floatArrayOf(-.11f,.85f,-.045f),floatArrayOf(.11f,.75f,-.045f),.015f,white)
+        }else{
+            rod(floatArrayOf(-.14f,.80f,-.045f),floatArrayOf(.14f,.80f,-.045f),.015f,white)
+            rod(floatArrayOf(.07f,.86f,-.045f),floatArrayOf(.14f,.80f,-.045f),.015f,white)
+            rod(floatArrayOf(.07f,.74f,-.045f),floatArrayOf(.14f,.80f,-.045f),.015f,white)
+        }
+    }.finish()
+    private fun assembly()=Builder().apply {
+        rod(floatArrayOf(0f,0f,0f),floatArrayOf(0f,.82f,0f),.022f,steel)
+        box(0f,.74f,.01f,.43f,.32f,.04f,green)
+        // Group pictogram on a virtual accountability marker.
+        for(x in floatArrayOf(-.10f,0f,.10f)){
+            ellipsoid(x,.79f,.04f,.025f,.025f,.010f,white)
+            box(x,.715f,.04f,.046f,.09f,.015f,white)
+        }
+    }.finish()
+    private fun ppeKit()=Builder().apply {
+        box(0f,.025f,0f,.64f,.05f,.42f,dark)
+        ellipsoid(-.14f,.18f,0f,.14f,.13f,.13f,yellow)
+        ellipsoid(-.14f,.14f,.02f,.17f,.014f,.16f,yellow)
+        for(x in floatArrayOf(.065f,.185f)){
+            ellipsoid(x,.10f,.035f,.044f,.08f,.075f,charcoal)
+            ellipsoid(x,.045f,.09f,.05f,.04f,.10f,charcoal)
+        }
+        box(-.14f,.075f,.17f,.19f,.055f,.015f,steel)
+        for(x in floatArrayOf(-.19f,-.09f))box(x,.075f,.18f,.063f,.034f,.012f,Material(.20f,.56f,.66f,.16f))
+        for(x in floatArrayOf(.085f,.19f)){
+            ellipsoid(x,.09f,-.13f,.043f,.016f,.055f,glove)
+            for(i in 0..3)rod(floatArrayOf(x-.03f+i*.02f,.09f,-.16f),floatArrayOf(x-.03f+i*.02f,.09f,-.205f),.007f,glove)
+        }
+    }.finish()
+    private fun dustMask()=Builder().apply {
+        ellipsoid(0f,.94f,0f,.105f,.075f,.055f,white)
+        for(x in floatArrayOf(-.12f,.12f)){
+            rod(floatArrayOf(x*.7f,.99f,0f),floatArrayOf(x,.95f,-.04f),.006f,steel)
+            rod(floatArrayOf(x,.95f,-.04f),floatArrayOf(x*.7f,.89f,0f),.006f,steel)
+        }
+        for(y in floatArrayOf(.92f,.95f,.98f))box(0f,y,.05f,.13f,.004f,.008f,steel)
     }.finish()
     private fun alarm()=Builder().apply {
         // Generic manual alarm cue with recessed activation face and corner fixings; no live controls.

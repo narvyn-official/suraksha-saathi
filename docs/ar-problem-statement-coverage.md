@@ -8,6 +8,8 @@ Subsequent engineering work is tracked separately in [0.5.5 AR technology and va
 
 The [0.5.6 recall challenge](ar-recall-challenge.md) subsequently adds optional cue fading and recorded assistance to the room missions. It addresses part of rehearsal support, but does not deliver an independent mission rubric, missing domain objectives, Santali or physical AR acceptance.
 
+**0.6.0 update:** [The new release report](release-0.6.0.md) supersedes the specific missing-objective findings below: exit/equipment/evacuation/assembly/reporting and an announced explosion branch are now in the fire room mission; outside-role PPE and buddy communication are in gas. Saved v2 room practice can resume, and room journals import into a separate trainer view. The table below remains the dated 0.5.4 baseline. Physical AR, reviewed languages, machinery room training, practical assessment and hosting remain open.
+
 ## 1. Scope and evidence rules
 
 The supplied description identifies fire/explosion response and gas/confined-space protocol, then stops at “(3) Machinery.” Machinery details and the remaining two official domains were not supplied. Continue with the existing five-domain implementation, but label machinery scope, PPE/exposure and emergency/reporting as provisional until the full brief is obtained. Do not describe these choices as the official DGMS syllabus.

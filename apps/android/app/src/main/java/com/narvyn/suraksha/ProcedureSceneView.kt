@@ -73,8 +73,13 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     @Volatile private var snapshot = Snapshot(0, Scene("fire", "", emptyList(), emptySet(), false), false, emptyList(), 1, 0, 0)
     private var rendererRunning = false
     private var installRequested = false
+    private var closed = false
+    private var blocked: String? = null
+    private val release = ArSessionRelease()
+    @Volatile private var textureRegistered = false
+    private val cameraPump = ArCameraFramePump(surface) { stopWithMessage(ArCameraSupport.coolingMessage(hi)) }
     private var anchor: Anchor? = null // GL owned until renderer is paused.
-    private var facing = 0f
+    private var facing = Pose.IDENTITY
     private var missedPlacement: Int? = null
     private var onAction: (String, String, org.json.JSONObject?) -> Unit = { _, _, _ -> }
     var onStatus: ((String) -> Unit)? = null
@@ -165,12 +170,18 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     fun useCamera(value: Boolean) {
         stopRenderer()
         cameraMode = value
-        if (value) installRequested = false // Explicit user retry can reopen a declined installation.
+        if (value) {
+            installRequested = false
+            val recovering = blocked != null
+            blocked = null
+            if(recovering)retireSession()
+        } // Ordinary phase rebinds preserve the tracked anchor; failed cameras are retired before retry.
         rebind()
         if (foreground) startRenderer()
     }
 
     fun resume() {
+        if(closed)return
         foreground = true
         rebind()
         startRenderer()
@@ -182,9 +193,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     }
 
     fun close() {
-        pause()
-        anchor?.detach(); anchor = null;placementMade=false
-        ar?.close(); ar = null
+        pause(); closed=true; retireSession()
     }
 
     private fun rebind() {
@@ -207,8 +216,16 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     }
 
     private fun startRenderer() {
-        if (!foreground || rendererRunning) return
+        if (!foreground || rendererRunning || closed) return
         if (cameraMode) {
+            blocked?.let { status(it); return }
+            if(release.failed) { status(ArCameraSupport.releaseMessage(hi,true)); return }
+            if(release.busy) {
+                status(ArCameraSupport.releaseMessage(hi,false))
+                release.awaitAvailable { if(!closed && foreground && cameraMode && blocked==null)startRenderer() }
+                return
+            }
+            if(cameraPump.tooHot()) { stopWithMessage(ArCameraSupport.coolingMessage(hi)); return }
             if (activity.checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 status(t("Camera permission is off. Enable it or continue on screen.", "कैमरा अनुमति बंद है। अनुमति दें या स्क्रीन पर जारी रखें।"))
                 return
@@ -220,29 +237,28 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
                         status(t("Complete AR installation or continue on screen.", "AR स्थापना पूरी करें या स्क्रीन पर जारी रखें।"))
                         return
                     }
-                    ar = Session(activity).apply { configure(Config(this).apply {
-                        planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
-                        updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                        lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
-                    }) }
+                    ar = Session(activity)
+                    ArCameraSupport.configure(ar!!)
                 }
-                freshness.requireNewImage()
+                freshness.requireNewImage();textureRegistered=false
                 ar!!.resume()
                 cameraRunning = true
-            } catch (_: Exception) {
-                cameraRunning = false
-                status(t("Camera AR is unavailable. Continue on screen or retry.", "कैमरा AR उपलब्ध नहीं है। स्क्रीन पर जारी रखें या फिर कोशिश करें।"))
+            } catch (error: Exception) {
+                android.util.Log.e("TrainingAR", "Procedure camera start failed: ${error.javaClass.simpleName}")
+                stopWithMessage(ArCameraSupport.startupMessage(error,hi))
                 return
             }
         }
         gate.activate()
         rendererRunning = true
         overlay.background = null
-        surface.renderMode = if (cameraMode) GLSurfaceView.RENDERMODE_CONTINUOUSLY else GLSurfaceView.RENDERMODE_WHEN_DIRTY
+        surface.renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
         surface.onResume(); surface.requestRender()
+        if(cameraMode)cameraPump.start()
     }
 
     private fun stopRenderer() {
+        cameraPump.stop();release.cancelPendingResume();textureRegistered=false
         val wasCameraRunning = cameraRunning
         cameraRunning = false
         gate.pause()
@@ -252,6 +268,16 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
         if (wasCameraRunning) try { ar?.pause() } catch (_: Exception) {}
         overlay.clear()
         overlay.setBackgroundColor(Palette.canvas)
+    }
+
+    private fun retireSession() {
+        val retired=ar ?: return
+        try { retired.pause() } catch(_: Exception) {}
+        anchor?.detach();anchor=null;placementMade=false;ar=null;freshness.clear();textureRegistered=false
+        release.retire(retired) { if(!closed && foreground && cameraMode && blocked==null)startRenderer() }
+    }
+    private fun stopWithMessage(message:String) {
+        blocked=message;stopRenderer();retireSession();status(message)
     }
 
     private fun status(message: String) {
@@ -322,6 +348,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        textureRegistered=false
         equipment.create()
         val textures = IntArray(1); GLES20.glGenTextures(1, textures, 0); texture = textures[0]
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texture)
@@ -348,10 +375,11 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
             if (current.camera) {
                 if (!cameraRunning) return
                 val session = ar ?: return
-                session.setCameraTextureName(texture)
+                if(!textureRegistered) { session.setCameraTextureName(texture);textureRegistered=true }
                 session.setDisplayGeometry(activity.windowManager.defaultDisplay.rotation, widthPx, heightPx)
-                val frame = session.update(); drawCamera(frame)
+                val frame = session.update()
                 val receipt = freshness.observedAt(frame.timestamp, SystemClock.elapsedRealtime())
+                if(frame.timestamp>0L && receipt!=null)drawCamera(frame)
                 if (receipt == null || frame.camera.trackingState != TrackingState.TRACKING) {
                     unavailable(current, trackingHelp(frame.camera.trackingFailureReason)); return
                 }
@@ -369,7 +397,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
                         gate.withCurrentRevision(current.revision) {
                             if(request.eligible(snapshot.revision,widthPx,heightPx,SystemClock.elapsedRealtime(),foreground && cameraRunning,true,SystemClock.elapsedRealtime()-receipt in 0..500) && current.revision==snapshot.revision) {
                                 anchor?.detach();anchor=next;placementMade=true;missedPlacement=null;committed=true
-                                facing=Math.toDegrees(kotlin.math.atan2((frame.camera.pose.tx()-next.pose.tx()).toDouble(),(frame.camera.pose.tz()-next.pose.tz()).toDouble())).toFloat()
+                                facing=RoomAnchorPose.facingOffset(next.pose,frame.camera.pose)
                             }
                         }
                         if(!committed)next.detach()
@@ -381,7 +409,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
                     unavailable(current, if (missedPlacement == current.revision) t("No tracked surface here. Aim at a clear tabletop and try again.", "यहाँ ट्रैक की गई सतह नहीं मिली। खाली मेज़ पर निशाना रखकर फिर कोशिश करें।") else t("Aim at a clear tabletop, then select Place at camera centre.", "खाली मेज़ पर निशाना रखें, फिर कैमरा दृश्य के बीच में रखें चुनें।")); return
                 }
                 frame.camera.getProjectionMatrix(projection, 0, .05f, 20f); frame.camera.getViewMatrix(view, 0)
-                Matrix.setIdentityM(model, 0); Matrix.translateM(model, 0, placed.pose.tx(), placed.pose.ty(), placed.pose.tz()); Matrix.rotateM(model, 0, facing, 0f, 1f, 0f)
+                RoomAnchorPose.model(placed.pose,facing).toMatrix(model,0)
                 eye = frame.camera.pose.translation
                 if (frame.lightEstimate.state == LightEstimate.State.VALID) {
                     frame.lightEstimate.getColorCorrection(estimatedLight, 0)
@@ -416,8 +444,10 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
             val action = pendingAction.get()
             if (action?.revision == current.revision && pendingAction.compareAndSet(action, null) && boxes != null && current.scene.enabled && gate.allows(current.revision, SystemClock.elapsedRealtime())) post { deliver(action) }
             publish(Preview(current.revision, current.camera, points, boxes, if (boxes == null) t("Keep every action in view. Use the text alternative if labels do not fit.", "सभी क्रियाएँ दृश्य में रखें। नाम न समाएँ तो लिखित विकल्प उपयोग करें।") else if (missedPlacement == current.revision && current.camera) t("No new surface found; the previous placement is kept.", "नई सतह नहीं मिली; पिछली रखी जगह बनी हुई है।") else t("Simulated procedure · select an action.", "काल्पनिक प्रक्रिया · एक क्रिया चुनें।")))
-        } catch (_: Exception) {
-            unavailable(current, t("Scene interrupted. Retry or continue with the text alternative.", "दृश्य बाधित है। फिर कोशिश करें या लिखित विकल्प से जारी रखें।"))
+        } catch (error: Exception) {
+            val message=t("Scene interrupted. Retry or continue with the text alternative.", "दृश्य बाधित है। फिर कोशिश करें या लिखित विकल्प से जारी रखें।")
+            unavailable(current,message)
+            if(current.camera)post { if(foreground && cameraRunning && snapshot.revision==current.revision)stopWithMessage(message) }
         }
     }
 

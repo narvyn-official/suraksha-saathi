@@ -85,7 +85,7 @@ class WorldEquipment {
  /** Prepare bounded variants before starting a procedure renderer; no mesh construction is needed per frame. */
  fun prepareProcedure(module:String){when(module){"fire"->{procedureFire;fireProcedureProps};"gas"->{procedureGas;gasProcedureProps}}}
  /** Anchor is rigid. Default calls retain one original mesh; procedures add a separate pre-baked scene mesh. */
- fun draw(vp:FloatArray,anchor:FloatArray,module:String,cameraPosition:FloatArray=defaultEye,lightCorrection:FloatArray=defaultLighting,completedActions:Set<String> = emptySet(),procedureMode:Boolean=false){
+ fun draw(vp:FloatArray,anchor:FloatArray,module:String,cameraPosition:FloatArray=defaultEye,lightCorrection:FloatArray=defaultLighting,completedActions:Set<String> = emptySet(),procedureMode:Boolean=false,clearDepth:Boolean=true){
   if(program==0)return
   val original=scenes[module]?:return
   val meshes=if(module=="fire" && (procedureMode || completedActions.isNotEmpty())){
@@ -98,7 +98,7 @@ class WorldEquipment {
    val key=(if("gas-boundary" in completedActions)1 else 0)+(if("gas-attendant" in completedActions)2 else 0)
    listOf(procedureGas) + if(procedureMode)listOf(gasProcedureProps[key])else emptyList()
   }else listOf(original)
-  GLES20.glEnable(GLES20.GL_DEPTH_TEST);GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT);GLES20.glUseProgram(program)
+  GLES20.glEnable(GLES20.GL_DEPTH_TEST);if(clearDepth)GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT);GLES20.glUseProgram(program)
   Matrix.multiplyMM(mvp,0,vp,0,anchor,0)
   GLES20.glUniformMatrix4fv(mvpLocation,1,false,mvp,0);GLES20.glUniformMatrix4fv(modelLocation,1,false,anchor,0)
   GLES20.glUniform3fv(eyeLocation,1,cameraPosition,0);GLES20.glUniform4fv(lightingLocation,1,lightCorrection,0)

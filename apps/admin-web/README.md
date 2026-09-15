@@ -43,3 +43,11 @@ The dashboard displays up to the latest 500 attempts and credentials per owner. 
 ## Evidence analytics
 
 Overview uses each worker’s latest assessment per module. Practice does not count toward assessment coverage. Workers supports name/ID search, sector and status filters, history review and CSV export. Workers are created or updated by validated Android imports. The coverage notice discloses when the latest-500 limit truncates evidence. Current curriculum 0.4.0 covers Fire, Gas / confined space, Machinery, PPE and Emergency response. All five latest module assessments must pass for complete coverage. Versions 0.1.0, 0.2.0 and 0.3.0 replay against their preserved archives; unknown versions and modules attributed to versions that did not contain them are rejected.
+
+## Room-practice journals (0.6.0)
+
+On Android use **My record → Export room practice journals**, then use the dashboard's **Room practice** tab. This is a separate export from assessment records. Apply migration `0002_room_journals.sql` through the normal D1 migration command before use.
+
+The authenticated `/api/room-journals` endpoint supports v1/v2 histories, including incomplete attempts and recorded assistance. Imports replay supported actions, preserve immutable snapshots and accept identical reuploads idempotently. Conflicting histories are rejected atomically. Records are owner-scoped and never qualify for credential issuance. The phone exports up to 100 latest journals, reports omissions and bounds the file to 950 KB; the API limits stored history per owner to 2,000 attempts and 10,000 snapshots. These are locally reported simulation events, not hardware-attested performance.
+
+Run `npx tsx tests/room-journals.integration.ts` against the local development server for the room API checks. Production hosting remains unresolved; this feature uses manual transfer.

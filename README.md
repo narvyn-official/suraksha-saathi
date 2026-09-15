@@ -1,14 +1,14 @@
 # Suraksha Saathi
 
-A **v0.5.6 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
+A **v0.6.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
 
-**Latest download: [v0.5.6 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.5.6-pilot)**
+**Latest download: [v0.6.0 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.6.0-pilot)**
 
-- [Download the Android APK — v0.5.6](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.6-pilot/suraksha-saathi-0.5.6-debug.apk) · Android 10+, debug-signed pilot.
-- [Watch the older v0.5.0 emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-demo.mp4) · Historical fire/gas screen walkthrough; it does not show the new recall challenge or verified physical AR.
-- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.6-pilot/SHA256SUMS-0.5.6.txt).
+- [Download the Android APK — v0.6.0](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/suraksha-saathi-0.6.0-debug.apk) · Android 10+, debug-signed pilot.
+- [Watch the v0.6.0 emulator walkthrough](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/suraksha-saathi-0.6.0-emulator-demo.mp4) · Screen fire/gas and explosion-evacuation practice; not physical AR evidence.
+- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/SHA256SUMS-0.6.0.txt).
 
-**In this version:** 0.5.6 adds **Remember, then do**, a fire/gas recall challenge with hidden action cues, seven-second recorded hints and a debrief of actions needing help. See [recall challenge and verification](docs/ar-recall-challenge.md), [AR technology](docs/ar-technology-and-validation.md) and the [problem-statement coverage report](docs/ar-problem-statement-coverage.md). Physical-phone AR validation remains pending. Version 0.5.6 is published for pilot testing, not as an AR-verified field release; 0.5.1 stays a draft.
+**In this version:** 0.6.0 expands fire room practice through exit selection, evacuation, assembly and reporting, adds an explosion-risk evacuation branch and gas PPE/buddy checks, introduces paged native lessons and saved room-practice recovery, and connects separate room journals to trainer review. All four camera paths share camera configuration, pacing, thermal recovery and session-release handling. See [implementation, verification and remaining gaps](docs/release-0.6.0.md). **Physical-phone AR still needs verification; this is a pilot prerelease.**
 
 ## What you can use now
 
@@ -37,7 +37,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/suraksha-saathi-0.5.6-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
+The debug-signed APK is copied to `artifacts/suraksha-saathi-0.6.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs
@@ -55,6 +55,8 @@ npm run dev
 ```
 
 Open the printed localhost address and select **Sign in** for the local development identity. Complete training on Android, use **My record → Export records for trainer**, and import the JSON in the dashboard. Open a passed assessment, choose the expiry approved by the site training policy, issue its pilot credential, then scan the QR or open its downloaded text file in Android.
+
+For room practice, use **My record → Export room practice journals** and the separate **Room practice** dashboard tab. These histories cannot issue certificates.
 
 See [dashboard setup](apps/admin-web/README.md) for issuer configuration, tests and deployment details. Internet hosting is not yet available: the Sites registration request failed and discovery found no created Suraksha site.
 

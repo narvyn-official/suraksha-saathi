@@ -46,6 +46,10 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private var missedPlacement: Int?=null
     private var anchor: Anchor?=null // Only accessed on GL thread while running; stopped before UI cleanup.
     private var installRequested=false
+    private var blocked: String?=null
+    private val release=ArSessionRelease()
+    @Volatile private var textureRegistered=false
+    private val cameraPump by lazy { ArCameraFramePump(surface) { stopWithMessage(ArCameraSupport.coolingMessage(hi)) } }
     private var widthPx=1;private var heightPx=1
     private var texture=0;private var program=0
     private val equipment=WorldEquipment()
@@ -87,7 +91,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         surface=GLSurfaceView(this).apply {
             setEGLContextClientVersion(2);setEGLConfigChooser(8,8,8,8,16,0);preserveEGLContextOnPause=true
             importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            setRenderer(this@ArActivity);renderMode=GLSurfaceView.RENDERMODE_CONTINUOUSLY;onPause()
+            setRenderer(this@ArActivity);renderMode=GLSurfaceView.RENDERMODE_WHEN_DIRTY;onPause()
         }
         viewport.addView(surface,FrameLayout.LayoutParams(-1,-1))
         overlay=AnswerOverlay();viewport.addView(overlay,FrameLayout.LayoutParams(-1,-1))
@@ -154,7 +158,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         flow.resume();renderState();if(!flow.finished && !flow.training.data.optBoolean("awaitingContinue"))startCamera(false)
     }
     override fun onPause() { active=false;if(::flow.isInitialized)flow.pause();stopCamera();super.onPause() }
-    override fun onDestroy() { anchor?.detach();ar?.close();ar=null;if(::store.isInitialized)store.close();super.onDestroy() }
+    override fun onDestroy() { active=false;stopCamera();retireSession();if(::store.isInitialized)store.close();super.onDestroy() }
     override fun onSaveInstanceState(out: Bundle) { out.putBoolean("installRequested",installRequested);if(::store.isInitialized)out.putString("workerId",store.workerId);super.onSaveInstanceState(out) }
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code,permissions,results)
@@ -168,6 +172,14 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     }
     private fun startCamera(requestPermission: Boolean) {
         if(!currentWorker() || !::flow.isInitialized || !active || flow.finished || flow.training.data.optBoolean("awaitingContinue") || running)return
+        blocked?.let { status.text=it; return }
+        if(release.failed) { status.text=ArCameraSupport.releaseMessage(hi,true); return }
+        if(release.busy) {
+            status.text=ArCameraSupport.releaseMessage(hi,false)
+            release.awaitAvailable { if(active && !isDestroyed && !isFinishing && blocked==null)startCamera(false) }
+            return
+        }
+        if(cameraPump.tooHot()) { stopWithMessage(ArCameraSupport.coolingMessage(hi)); return }
         if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) {
             status.text=t("Camera permission is off. Enable it, or continue on screen.","कैमरा अनुमति बंद है। अनुमति दें, या स्क्रीन पर जारी रखें।")
             if(requestPermission)requestPermissions(arrayOf(Manifest.permission.CAMERA),51)
@@ -178,21 +190,40 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
                 if(ArCoreApk.getInstance().requestInstall(this,!installRequested)==ArCoreApk.InstallStatus.INSTALL_REQUESTED) {
                     installRequested=true;status.text=t("Complete AR installation, or continue on screen.","AR स्थापना पूरी करें, या स्क्रीन पर जारी रखें।");return
                 }
-                ar=Session(this).apply { configure(Config(this).apply { planeFindingMode=Config.PlaneFindingMode.HORIZONTAL;updateMode=Config.UpdateMode.LATEST_CAMERA_IMAGE;lightEstimationMode=Config.LightEstimationMode.AMBIENT_INTENSITY }) }
+                ar=Session(this)
+                ArCameraSupport.configure(ar!!)
             }
-            freshness.requireNewImage();ar!!.resume();running=true;overlay.cameraVisible(true);surface.onResume()
-        } catch(_: Exception) { status.text=t("Camera AR is unavailable. Retry, or continue on screen.","कैमरा AR उपलब्ध नहीं है। फिर कोशिश करें, या स्क्रीन पर जारी रखें।");overlay.clear() }
+            freshness.requireNewImage();textureRegistered=false;ar!!.resume();running=true;overlay.cameraVisible(true);surface.onResume();cameraPump.start()
+        } catch(error: Exception) {
+            android.util.Log.e("TrainingAR", "Assessment camera start failed: ${error.javaClass.simpleName}")
+            stopWithMessage(ArCameraSupport.startupMessage(error,hi))
+        }
     }
     private fun stopCamera() {
+        release.cancelPendingResume()
+        if(::surface.isInitialized)cameraPump.stop()
+        textureRegistered=false
         val wasRunning=running;running=false
         pendingChoice.set(null);pendingPlacement.clear();pendingPreview.set(null)
         if(::overlay.isInitialized) { overlay.clear();overlay.cameraVisible(false) }
         if(::surface.isInitialized)surface.onPause()
         if(wasRunning) { try { ar?.pause() } catch(_: Exception) {} };running=false
     }
+    private fun retireSession() {
+        val retired=ar ?: return
+        try { retired.pause() } catch(_: Exception) {}
+        anchor?.detach();anchor=null;ar=null;freshness.clear();textureRegistered=false
+        release.retire(retired) { if(active && !isDestroyed && !isFinishing && blocked==null)startCamera(false) }
+    }
+    private fun stopWithMessage(message:String) {
+        blocked=message
+        if(::flow.isInitialized)flow.invalidate()
+        stopCamera();retireSession()
+        if(::status.isInitialized)status.text=message
+    }
     private fun retryCamera() {
         if(!active || !currentWorker())return
-        stopCamera();anchor?.detach();anchor=null;ar?.close();ar=null;freshness.clear();installRequested=false
+        stopCamera();blocked=null;retireSession();installRequested=false
         flow.invalidate();refreshScene();startCamera(true)
     }
     private fun saveFailed() {
@@ -217,7 +248,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         if(active && currentWorker() && flow.revision==revision && flow.ready(SystemClock.elapsedRealtime()) && overlay.targetsVisible()) pendingChoice.compareAndSet(null,Choice(revision,questionId,optionId))
     }
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        equipment.create()
+        textureRegistered=false;equipment.create()
         val textures=IntArray(1);GLES20.glGenTextures(1,textures,0);texture=textures[0];GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR)
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE)
@@ -236,9 +267,10 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         }
         val current=scene;val session=ar ?: return
         try {
-            session.setCameraTextureName(texture);session.setDisplayGeometry(windowManager.defaultDisplay.rotation,widthPx,heightPx)
-            val frame=session.update();drawCamera(frame)
+            if(!textureRegistered) { session.setCameraTextureName(texture);textureRegistered=true };session.setDisplayGeometry(windowManager.defaultDisplay.rotation,widthPx,heightPx)
+            val frame=session.update()
             val observedAt=freshness.observedAt(frame.timestamp,SystemClock.elapsedRealtime())
+            if(frame.timestamp>0L && observedAt!=null)drawCamera(frame)
             if(observedAt==null || frame.camera.trackingState!=TrackingState.TRACKING) { unavailable(current,t("Tracking paused. Wait for a fresh, tracked camera image.","ट्रैकिंग रुकी है। नए, ट्रैक किए गए कैमरा दृश्य की प्रतीक्षा करें।"));return }
             val tap=pendingPlacement.consumeFor(current.revision)
             if(tap?.eligible(flow.revision,widthPx,heightPx,SystemClock.elapsedRealtime(),active && running && current.canAnswer,frame.camera.trackingState==TrackingState.TRACKING,observedAt!=null)==true && current.revision==flow.revision) {
@@ -267,7 +299,11 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
                 }
             }
             publish(Preview(current.revision,points,boxes,if(missedPlacement==current.revision)placementMissMessage()else if(boxes==null)t("Keep every station in view. If choices do not fit, continue on screen.","सभी विकल्प दृश्य में रखें। विकल्प न समाएँ तो स्क्रीन पर जारी रखें।")else t("Stations placed · choose one response.","विकल्प रखे गए · एक उत्तर चुनें।")))
-        } catch(_: Exception) { unavailable(current,t("Camera interrupted. Retry, or continue on screen.","कैमरा बाधित है। फिर कोशिश करें, या स्क्रीन पर जारी रखें।")) }
+        } catch(error: Exception) {
+            val message=t("Camera interrupted. Retry, or continue on screen.","कैमरा बाधित है। फिर कोशिश करें, या स्क्रीन पर जारी रखें।")
+            unavailable(current,message)
+            runOnUiThread { if(active && running && ar===session && flow.revision==current.revision)stopWithMessage(message) }
+        }
     }
     private fun drawCamera(frame: Frame) {
         GLES20.glDisable(GLES20.GL_DEPTH_TEST);vertices.position(0);uv.position(0)

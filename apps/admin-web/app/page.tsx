@@ -17,6 +17,7 @@ import {
   FileCheck2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RoomJournals } from "@/components/training/RoomJournals";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import {
@@ -323,7 +324,7 @@ export default function Home() {
           </div>
         )}
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="mb-6 h-12 bg-[#e9edf5]">
+          <TabsList className="mb-6 h-auto min-h-12 flex-wrap bg-[#e9edf5]">
             <TabsTrigger value="insights" className="px-5">
               Overview
             </TabsTrigger>
@@ -332,6 +333,9 @@ export default function Home() {
             </TabsTrigger>
             <TabsTrigger value="records" className="px-5">
               Training records
+            </TabsTrigger>
+            <TabsTrigger value="room-practice" className="px-5">
+              Practice journals
             </TabsTrigger>
             <TabsTrigger value="credentials" className="px-5">
               Credentials
@@ -363,6 +367,7 @@ export default function Home() {
               onReview={setSelected}
             />
           </TabsContent>
+          <TabsContent value="room-practice"><RoomJournals /></TabsContent>
           <TabsContent value="records">
             <div className="dashboard-grid">
               <section className="panel records-panel">

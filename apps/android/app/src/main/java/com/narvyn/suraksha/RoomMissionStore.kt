@@ -81,8 +81,8 @@ class RoomMissionStore(context: Context, private val worker: String, name: Strin
         val cues = value.optJSONArray("cues")
         require(cues != null && cues.length() <= 128) { "Invalid coaching cue list." }
         require(mode != "guided" || cues.length() == 0) { "Guided missions cannot contain recalled cues." }
-        val phases = if (module == "fire") setOf("ALARM", "PIN", "AIM", "SWEEP", "WITHDRAW")
-                     else setOf("GAS_CHECK", "BARRIER", "ATTENDANT", "REFUSE")
+        // The v2 journey retains every v1 phase, so legacy cue histories remain readable without migration.
+        val phases = RoomMission.phases(module).filterNot { it == "COMPLETE" }.toSet()
         val parsed = mutableListOf<Cue>()
         for (index in 0 until cues.length()) {
             val cue = cues.opt(index)
@@ -97,6 +97,10 @@ class RoomMissionStore(context: Context, private val worker: String, name: Strin
         }
         return Coaching(mode, parsed)
     }
+
+    fun record(id:String):JSONObject? = readableDatabase.rawQuery(
+        "SELECT payload FROM room_missions WHERE id=? AND worker=?",arrayOf(id,worker)
+    ).use{cursor->if(cursor.moveToFirst())JSONObject(cursor.getString(0))else null}
 
     fun records(): List<JSONObject> = readableDatabase.rawQuery(
         "SELECT payload FROM room_missions WHERE worker=? ORDER BY updated DESC,id DESC", arrayOf(worker)
