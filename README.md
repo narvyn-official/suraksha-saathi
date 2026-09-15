@@ -2,7 +2,13 @@
 
 A working **v0.5.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
 
-[Download the APK and emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.5.0-pilot).
+**Latest release: [v0.5.0 pilot](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.5.0-pilot)**
+
+- [Download the Android APK — v0.5.0](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-debug.apk) · Android 10+, debug-signed pilot.
+- [Watch the v0.5.0 emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/suraksha-saathi-0.5.0-demo.mp4) · Fire/gas screen procedure walkthrough; physical-phone AR validation remains pending.
+- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.5.0-pilot/SHA256SUMS-0.5.0.txt).
+
+This update adds function-coloured Mineral Light controls, ordered fire/gas procedure drafts, separate shared-phone learner profiles and explicit credential expiry handling.
 
 ## What you can use now
 
