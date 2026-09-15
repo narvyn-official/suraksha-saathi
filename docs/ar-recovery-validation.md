@@ -1,5 +1,7 @@
 # AR recovery candidate 0.5.3
 
+**Follow-up:** the 0.5.4 rendering/placement candidate passes complete fire and gas screen flows with hardware-backed emulator graphics. See [the investigation and current device limits](ar-rendering-and-placement.md). The failures below remain the historical 0.5.3 test record.
+
 ## Why this patch exists
 
 A physical Samsung SM-S921B opened the live camera but stayed at the first station with tracking paused. No floor placement, anchor stability, or completed camera mission was verified. App-scoped ARCore logs showed delayed motion-sensor poses and skipped estimator frames. Android reported severe/critical thermal throttling. This is evidence of a failing test, not proof that temperature was the sole cause.

@@ -1,5 +1,11 @@
 # Pilot validation — 15 September 2026
 
+## v0.5.4 rendering and placement candidate
+
+See [rendering and placement validation](ar-rendering-and-placement.md). The earlier screen sweep failure was reproduced under software graphics emulation; the same full fire/gas tests pass using hardware graphics acceleration. The camera feed from the physical phone still has not yielded verified placement, and no phone was connected during this increment. Preserve that distinction.
+
+Final 0.5.4 build: **93 JVM tests and eight Android test methods passed**, including both complete screen missions, equipment/context recreation, spatial procedures, heat/retry guards, camera denial and Hindi at 200% font. Rendered screens were inspected. Exact timings and APK checksum are in the linked report. These results do not establish physical AR tracking.
+
 ## v0.5.3 AR recovery candidate
 
 See [AR recovery validation](ar-recovery-validation.md). Physical AR is still failing/unverified: a camera feed alone was observed, with no successful plane placement. The phone disconnected after a preliminary recovery APK installed; the final 0.5.3 APK has not been tested on the physical phone. The screen fire sweep check currently fails under emulator sampling delays; do not carry forward the 0.5.2 pass as proof that the latest whole system passes.

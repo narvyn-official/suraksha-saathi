@@ -5,6 +5,7 @@ import android.opengl.Matrix
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.util.IdentityHashMap
 import kotlin.math.*
 
 /** Original procedural training illustrations, in metres. No operational readings or manufacturer claims. */
@@ -35,12 +36,17 @@ class WorldEquipment {
  private val fireProcedureProps by lazy { listOf(fireProps(false),fireProps(true)) }
  private val gasProcedureProps by lazy { (0..3).map { gasProps((it and 1) != 0,(it and 2) != 0) } }
  private var program=0
+ // Buffer equality depends on mutable positions/content; GPU ownership follows buffer identity.
+ private val vertexBuffers=IdentityHashMap<FloatBuffer,Int>()
  private var position=0;private var normal=0;private var color=0;private var surface=0
  private var mvpLocation=0;private var modelLocation=0;private var eyeLocation=0;private var lightingLocation=0
  private val mvp=FloatArray(16)
  private val defaultEye=floatArrayOf(0f,.8f,2.5f)
  private val defaultLighting=floatArrayOf(1f,1f,1f,1f)
  fun create(){
+  // Called once per new EGL context. Old names belong to the destroyed context, not this one.
+  vertexBuffers.clear()
+  GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,0)
   fun compile(type:Int,source:String):Int{val s=GLES20.glCreateShader(type);GLES20.glShaderSource(s,source);GLES20.glCompileShader(s);val ok=IntArray(1);GLES20.glGetShaderiv(s,GLES20.GL_COMPILE_STATUS,ok,0);check(ok[0]!=0){GLES20.glGetShaderInfoLog(s)};return s}
   val vertex=compile(GLES20.GL_VERTEX_SHADER,"""
    uniform mat4 mvp; uniform mat4 model;
@@ -96,12 +102,28 @@ class WorldEquipment {
   Matrix.multiplyMM(mvp,0,vp,0,anchor,0)
   GLES20.glUniformMatrix4fv(mvpLocation,1,false,mvp,0);GLES20.glUniformMatrix4fv(modelLocation,1,false,anchor,0)
   GLES20.glUniform3fv(eyeLocation,1,cameraPosition,0);GLES20.glUniform4fv(lightingLocation,1,lightCorrection,0)
-  for(mesh in meshes){
-   for((location,offset) in listOf(position to 0,normal to 3,color to 6,surface to 9)){mesh.position(offset);GLES20.glVertexAttribPointer(location,3,GLES20.GL_FLOAT,false,48,mesh);GLES20.glEnableVertexAttribArray(location)}
-   GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,mesh.capacity()/12)
+  try {
+   for(mesh in meshes){
+    bindVertices(mesh)
+    for((location,offset) in listOf(position to 0,normal to 3,color to 6,surface to 9)){GLES20.glVertexAttribPointer(location,3,GLES20.GL_FLOAT,false,48,offset*4);GLES20.glEnableVertexAttribArray(location)}
+    GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,mesh.capacity()/12)
+   }
+  } finally {
+   for(location in intArrayOf(position,normal,color,surface))GLES20.glDisableVertexAttribArray(location)
+   // Camera renderers use client FloatBuffers, which require no array buffer to be bound.
+   GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,0)
+   GLES20.glDisable(GLES20.GL_DEPTH_TEST)
   }
-  for(location in intArrayOf(position,normal,color,surface))GLES20.glDisableVertexAttribArray(location)
-  GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+ }
+ private fun bindVertices(mesh:FloatBuffer){
+  val cached=vertexBuffers[mesh]
+  if(cached!=null){GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,cached);return}
+  val names=IntArray(1);GLES20.glGenBuffers(1,names,0)
+  check(names[0]!=0){"Could not allocate equipment vertex buffer"}
+  GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,names[0])
+  val data=mesh.duplicate().apply{clear()}
+  GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER,mesh.capacity()*4,data,GLES20.GL_STATIC_DRAW)
+  vertexBuffers[mesh]=names[0]
  }
  private fun base(b:Builder){
   b.box(0f,.017f,0f,.77f,.034f,.49f,.012f,Material(floatArrayOf(.77f,.83f,.89f),.65f))

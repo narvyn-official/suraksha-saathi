@@ -87,7 +87,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
     private var down:Pair<Float,Float>?=null
     private var downAt=0L
     private var gestureSerial=0L
-    private var gestureTarget:String?=null
+    @Volatile private var gestureTarget:String?=null
     private var screenCursor:Pair<Float,Float>?=null
     var onImage:(Image)->Unit={}
     var onAim:(Float,Float,Boolean,Long,Boolean)->Unit={_,_,_,_,_->}
@@ -172,9 +172,13 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
                 };at=receipt
                 if(anchors.size<3){
                     placementHit=frame.hitTest(w/2f,h/2f).firstOrNull{(it.trackable as? Plane)?.let{p->p.type==Plane.Type.HORIZONTAL_UPWARD_FACING && p.trackingState==TrackingState.TRACKING && p.isPoseInPolygon(it.hitPose)}==true}
-                    placementReady=placementHit?.let{hit->anchors.withIndex().all{(i,a)->val dx=a.pose.tx()-hit.hitPose.tx();val dz=a.pose.tz()-hit.hitPose.tz();a.trackingState==TrackingState.TRACKING && kotlin.math.hypot(dx,dz)>if(anchors.size==2&&i==1)1f else .5f}}==true
+                    val decision=placementHit?.let{hit->RoomStationPlacement.evaluate(module,
+                        anchors.mapIndexed{i,a->RoomStationPlacement.Station(a.pose.tx(),a.pose.tz(),facing[i])},
+                        RoomStationPlacement.Station(hit.hitPose.tx(),hit.hitPose.tz()))}
+                    placementReady=decision?.allowed==true && anchors.all{it.trackingState==TrackingState.TRACKING}
                     placementMessage=when{
                         placementHit==null->t("Tracking active · searching for a surface. Move gently sideways; aim down until the ring turns green.","ट्रैकिंग चालू · सतह खोज रहे हैं। फ़ोन धीरे दाएँ-बाएँ हिलाएँ; हरा घेरा आने तक नीचे निशाना रखें।")
+                        decision?.reason in listOf(RoomStationPlacement.Reason.GAS_WRONG_SIDE,RoomStationPlacement.Reason.GAS_FOOTPRINT_OVERLAP)->t("Keep the green ring entirely on the outside of the barrier, away from the simulated opening.","हरे घेरे को पूरा अवरोध के बाहर रखें, काल्पनिक खुले स्थान से दूर।")
                         !placementReady->t("Surface found · choose a separate point, farther from the other stations.","सतह मिली · दूसरे स्थलों से दूर अलग बिंदु चुनें।")
                         else->t("Surface found · green ring shows placement. Tap Place station.","सतह मिली · हरा घेरा रखने की जगह है। स्थल रखें दबाएँ।")
                     }
@@ -202,7 +206,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
             }
             Matrix.multiplyMM(vp,0,projection,0,view,0)
             val footprint=placementHit?.let{hit->(0..32).mapNotNull{i->
-                val angle=i*2.0*Math.PI/32;val point=hit.hitPose.transformPoint(floatArrayOf((kotlin.math.cos(angle)*.22).toFloat(),.005f,(kotlin.math.sin(angle)*.22).toFloat()))
+                val angle=i*2.0*Math.PI/32;val radius=if(anchors.size==2).45 else .22;val point=hit.hitPose.transformPoint(floatArrayOf((kotlin.math.cos(angle)*radius).toFloat(),.005f,(kotlin.math.sin(angle)*radius).toFloat()))
                 ComponentProjection.project(point,vp,w,h)
             }}.orEmpty()
             val targets=mutableMapOf<String,ComponentProjection.Point>();var inverse:FloatArray?=null
@@ -226,7 +230,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
                 val mvp=FloatArray(16);Matrix.multiplyMM(mvp,0,vp,0,m,0);val inv=FloatArray(16);if(Matrix.invertM(inv,0,mvp,0))inverse=inv
             }
             models.getOrNull(2)?.let{m->geometry.draw(vp,m,"safe-point",at/1000f);if(module=="gas"&&state.phase in listOf("REFUSE","COMPLETE"))geometry.draw(vp,m,"attendant",at/1000f);target("safe",2,floatArrayOf(0f,.15f,0f))}
-            val needed=when(state.phase){"ALARM"->"alarm";"PIN"->"pin";"GAS_CHECK","ATTENDANT"->"meter";"BARRIER"->"barrier-left";"WITHDRAW","REFUSE"->"safe";else->"base"}
+            val needed=when(state.phase){"ALARM"->"alarm";"PIN"->"pin";"GAS_CHECK"->"meter";"ATTENDANT"->if(gestureTarget=="meter")"safe" else "meter";"BARRIER"->"barrier-left";"WITHDRAW","REFUSE"->"safe";else->"base"}
             val orientationHint=if(camera&&models.size==3&&needed !in targets)t("Turn the phone slowly towards "+(if(needed=="safe")"your green withdrawal point." else if(needed in listOf("alarm","pin","meter"))"the equipment station." else "the virtual hazard."),"फ़ोन धीरे घुमाकर "+(if(needed=="safe")"हरा वापसी बिंदु खोजें।" else if(needed in listOf("alarm","pin","meter"))"उपकरण स्थल खोजें।" else "काल्पनिक खतरा खोजें।"))else null
             publish(Image(rev,at,models.size,true,orientationHint?:if(models.size<3)(placementMessage?:t("Aim at the next clear point.","अगले खाली बिंदु पर निशाना रखें।"))else t("Stations anchored · stay in your clear practice area", "स्थल जुड़े हैं · अपने खाली अभ्यास क्षेत्र में रहें"),targets,inverse,w,h,state.phase,canPlace=placementReady,footprint=footprint))
         }catch(e:Exception){placement.set(false);Log.e("RoomAR","Frame failed: ${e.javaClass.simpleName}");requestStop(rev,t("AR session interrupted. Tap Retry camera to recover.","AR सत्र बाधित हुआ। कैमरा फिर चलाएँ।"))}

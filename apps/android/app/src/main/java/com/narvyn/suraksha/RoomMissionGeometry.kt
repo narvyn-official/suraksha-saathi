@@ -5,6 +5,7 @@ import android.opengl.Matrix
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.util.IdentityHashMap
 import kotlin.math.*
 
 /** Original room-scale training illustrations, in metres; +Y up, +Z front, origin at the base.
@@ -39,6 +40,8 @@ class RoomMissionGeometry {
         Tongue(.15f,-.20f,.12f,.36f,4f)
     )
     private var program=0
+    // All flame instances share the same immutable mesh buffer and therefore one VBO.
+    private val vertexBuffers=IdentityHashMap<FloatBuffer,Int>()
     private var positionLocation=0;private var normalLocation=0;private var colorLocation=0;private var materialLocation=0
     private var mvpLocation=0;private var normalMatrixLocation=0;private var viewDirectionLocation=0;private var pulseLocation=0
     private val transform=FloatArray(16);private val mvp=FloatArray(16)
@@ -48,6 +51,9 @@ class RoomMissionGeometry {
     private val viewDirection=floatArrayOf(0f,0f,1f)
 
     fun create() {
+        // Old buffer names are invalid after context loss; never delete them in the new context.
+        vertexBuffers.clear()
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,0)
         fun compile(type:Int,source:String):Int {
             val shader=GLES20.glCreateShader(type)
             GLES20.glShaderSource(shader,source);GLES20.glCompileShader(shader)
@@ -97,7 +103,8 @@ class RoomMissionGeometry {
         val time=if(timeSeconds.isFinite())timeSeconds%3600f else 0f
         val suppression=if(progress.isFinite())progress.coerceIn(0f,1f)else 0f
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);GLES20.glDepthMask(true)
-        GLES20.glUseProgram(program);GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,0)
+        GLES20.glUseProgram(program)
+        try {
         // The centre view ray supplies a stable highlight direction using only the public VP contract.
         if(Matrix.invertM(inverseVp,0,vp,0)) {
             Matrix.multiplyMV(near,0,inverseVp,0,clipNear,0);Matrix.multiplyMV(far,0,inverseVp,0,clipFar,0)
@@ -129,17 +136,32 @@ class RoomMissionGeometry {
                 render(core,vp,transform)
             }
         } else render(if(kind=="barrier" && !active)openBarrier else markers.getValue(kind),vp,model)
-        GLES20.glDisableVertexAttribArray(positionLocation);GLES20.glDisableVertexAttribArray(normalLocation)
-        GLES20.glDisableVertexAttribArray(colorLocation);GLES20.glDisableVertexAttribArray(materialLocation)
+        } finally {
+            GLES20.glDisableVertexAttribArray(positionLocation);GLES20.glDisableVertexAttribArray(normalLocation)
+            GLES20.glDisableVertexAttribArray(colorLocation);GLES20.glDisableVertexAttribArray(materialLocation)
+            // The camera pass in the next frame supplies client FloatBuffers.
+            GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,0)
+        }
     }
     private fun render(mesh:Mesh,vp:FloatArray,model:FloatArray) {
         Matrix.multiplyMM(mvp,0,vp,0,model,0)
         if(!Matrix.invertM(inverse,0,model,0))return
         Matrix.transposeM(normalMatrix,0,inverse,0)
         GLES20.glUniformMatrix4fv(mvpLocation,1,false,mvp,0);GLES20.glUniformMatrix4fv(normalMatrixLocation,1,false,normalMatrix,0)
-        fun bind(location:Int,offset:Int,size:Int) { mesh.buffer.position(offset);GLES20.glVertexAttribPointer(location,size,GLES20.GL_FLOAT,false,44,mesh.buffer);GLES20.glEnableVertexAttribArray(location) }
+        bindVertices(mesh.buffer)
+        fun bind(location:Int,offset:Int,size:Int) { GLES20.glVertexAttribPointer(location,size,GLES20.GL_FLOAT,false,44,offset*4);GLES20.glEnableVertexAttribArray(location) }
         bind(positionLocation,0,3);bind(normalLocation,3,3);bind(colorLocation,6,3);bind(materialLocation,9,2)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,mesh.count)
+    }
+    private fun bindVertices(buffer:FloatBuffer) {
+        val cached=vertexBuffers[buffer]
+        if(cached!=null) { GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,cached);return }
+        val names=IntArray(1);GLES20.glGenBuffers(1,names,0)
+        check(names[0]!=0) { "Could not allocate room vertex buffer" }
+        GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,names[0])
+        val data=buffer.duplicate().apply { clear() }
+        GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER,buffer.capacity()*4,data,GLES20.GL_STATIC_DRAW)
+        vertexBuffers[buffer]=names[0]
     }
     private fun fireBed()=Builder().apply {
         // Uneven fuel and ember bed directly on the room floor, with no plinth, table or miniature room.
