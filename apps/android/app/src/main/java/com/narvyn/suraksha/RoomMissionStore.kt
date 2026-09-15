@@ -35,15 +35,22 @@ class RoomMissionStore(context: Context, private val worker: String, name: Strin
         require(mission != null && mission.opt("module") == module) { "Mission module does not match its record." }
         val result = mission.optJSONObject("result")
         require(result != null && result.opt("certifiable") == false) { "Room missions cannot certify competence." }
+        val incomingCoaching = coaching(snapshot, module)
 
         val db = writableDatabase
         db.beginTransaction()
         try {
-            db.rawQuery("SELECT worker,module,mode FROM room_missions WHERE id=?", arrayOf(id)).use { cursor ->
+            db.rawQuery("SELECT worker,module,mode,payload FROM room_missions WHERE id=?", arrayOf(id)).use { cursor ->
                 if (cursor.moveToFirst()) {
                     require(cursor.getString(0) == worker) { "Mission ID belongs to another worker." }
                     require(cursor.getString(1) == module) { "A mission ID cannot change module." }
                     require(cursor.getString(2) == mode) { "A mission ID cannot change presentation." }
+                    val previousCoaching = coaching(JSONObject(cursor.getString(3)), module)
+                    require(previousCoaching.mode == incomingCoaching.mode) { "A mission ID cannot change coaching mode." }
+                    require(incomingCoaching.cues.size >= previousCoaching.cues.size &&
+                        previousCoaching.cues.indices.all { incomingCoaching.cues[it] == previousCoaching.cues[it] }) {
+                        "Previously saved coaching cues cannot be removed or changed."
+                    }
                 }
             }
             val values = ContentValues().apply {
@@ -55,6 +62,40 @@ class RoomMissionStore(context: Context, private val worker: String, name: Strin
         } finally {
             db.endTransaction()
         }
+    }
+
+    private data class Cue(val phase: String, val at: Long)
+    private data class Coaching(val mode: String, val cues: List<Cue>)
+
+    /** Legacy payloads retain their bytes and mean guided practice without recalled cues. */
+    private fun coaching(record: JSONObject, module: String): Coaching {
+        if (!record.has("coaching")) return Coaching("guided", emptyList())
+        val value = record.opt("coaching")
+        require(value is JSONObject && value.keys().asSequence().toSet() == setOf("version", "mode", "cues")) {
+            "Invalid coaching metadata."
+        }
+        val version = value.opt("version")
+        require((version is Int || version is Long) && (version as Number).toLong() == 1L) { "Unsupported coaching version." }
+        val mode = value.opt("mode")
+        require(mode is String && mode in setOf("guided", "recall")) { "Invalid coaching mode." }
+        val cues = value.optJSONArray("cues")
+        require(cues != null && cues.length() <= 128) { "Invalid coaching cue list." }
+        require(mode != "guided" || cues.length() == 0) { "Guided missions cannot contain recalled cues." }
+        val phases = if (module == "fire") setOf("ALARM", "PIN", "AIM", "SWEEP", "WITHDRAW")
+                     else setOf("GAS_CHECK", "BARRIER", "ATTENDANT", "REFUSE")
+        val parsed = mutableListOf<Cue>()
+        for (index in 0 until cues.length()) {
+            val cue = cues.opt(index)
+            require(cue is JSONObject && cue.keys().asSequence().toSet() == setOf("phase", "at")) { "Invalid coaching cue." }
+            val phase = cue.opt("phase")
+            val at = cue.opt("at")
+            require(phase is String && phase in phases) { "Coaching cue phase does not match its module." }
+            require((at is Int || at is Long) && (at as Number).toLong() >= 0L) { "Invalid coaching cue timestamp." }
+            val time = (at as Number).toLong()
+            require(parsed.lastOrNull()?.let { time >= it.at } != false) { "Coaching cue timestamps cannot decrease." }
+            parsed.add(Cue(phase, time))
+        }
+        return Coaching(mode, parsed)
     }
 
     fun records(): List<JSONObject> = readableDatabase.rawQuery(

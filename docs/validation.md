@@ -1,5 +1,9 @@
 # Pilot validation — 15 September 2026
 
+## v0.5.6 recall challenge candidate
+
+See [recall challenge implementation and evidence](ar-recall-challenge.md). **128 JVM tests and 18 Android methods passed** on the emulator: complete recall and guided fire/gas missions, recorded hint expiry and lifecycle hiding, immutable help history, Hindi at 200% font, thermal recovery and camera denial. Fresh screen renders were inspected. This proves the scoped screen/synthetic behavior; physical AR remains unverified. The local APK checksum and individual run timings are in the linked report. No new safety-content, retention-gain or certification claim is made.
+
 ## v0.5.5 AR technology candidate
 
 See [AR technology and validation](ar-technology-and-validation.md). Updated to ARCore 1.56.0; corrected pose-relative facing, texture registration and session retirement; added full-size previews, surface clipping, coverage/range checks and stable-frame placement. **118 JVM tests and eleven Android methods passed** on the emulator. English/Hindi 200% preview overlays and final mission captures were inspected. These are synthetic/screen/recovery checks; physical AR placement and completion remain unverified. The [coverage report](ar-problem-statement-coverage.md) explicitly tracks missing fire/gas objectives, Santali, trainer integration and real-phone delivery proof.

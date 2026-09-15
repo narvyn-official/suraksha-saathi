@@ -1,12 +1,14 @@
 # Implementation status — 15 September 2026
 
-This document describes the implemented v0.5.5 AR technology candidate (public downloads remain 0.5.0; 0.5.1 is held as a draft) (curriculum 0.4.0). Earlier architecture documents describe the target system; they are not claims that every feature is shipped.
+This document describes the implemented v0.5.6 recall challenge candidate (public downloads remain 0.5.0; 0.5.1 is held as a draft) (curriculum 0.4.0). Earlier architecture documents describe the target system; they are not claims that every feature is shipped.
 
 See [current AR engineering work](ar-technology-and-validation.md) and [full problem-statement coverage](ar-problem-statement-coverage.md) for implemented changes and remaining acceptance gates.
 
 **AR status:** physical camera feed confirmed, usable tracking/placement not confirmed. The screen fire timing investigation and current camera limits are recorded in [ar-rendering-and-placement.md](ar-rendering-and-placement.md).
 
 ## Implemented
+
+- Fire/gas **Remember, then do** rehearsal hides gesture cues, offers seven-second hints saved before display, preserves assistance history and provides a phase-specific rehearsal debrief. English/Hindi and screen fallback are implemented; practice remains non-certifying. See [recall challenge](ar-recall-challenge.md).
 
 - Native Kotlin Android application, Android 10+ minimum, fixed light theme, English and Hindi text.
 - Five bundled modules: fire response, gas/confined-space decisions, machinery/isolation, PPE/exposure and emergency/reporting. Each has learning content, guided practice and eight assessment decisions.

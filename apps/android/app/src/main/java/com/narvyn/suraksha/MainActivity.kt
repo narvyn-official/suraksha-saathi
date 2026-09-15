@@ -122,6 +122,7 @@ class MainActivity: Activity() {
         body.add(action(t("Explore in 3D","3D में देखें"),false,role=ActionRole.CAMERA){startActivity(Intent(this,EquipmentActivity::class.java).putExtra("moduleId",selected))},bottom=20)
         if(selected in listOf("fire","gas")) {
             body.add(action(t("Start immersive AR mission","इमर्सिव AR मिशन शुरू करें"),role=ActionRole.CAMERA){startActivity(Intent(this,RoomMissionActivity::class.java).putExtra("moduleId",selected).putExtra("guided",true).putExtra("camera",true))},bottom=12)
+            body.add(action(t("Remember, then do · AR challenge","याद करके करें · AR अभ्यास"),role=ActionRole.REVIEW){startActivity(Intent(this,RoomMissionActivity::class.java).putExtra("moduleId",selected).putExtra("camera",true).putExtra("recall",true))},bottom=12)
             body.add(action(t("Practise the full procedure","पूरी प्रक्रिया का अभ्यास करें")){startActivity(Intent(this,ProcedureActivity::class.java).putExtra("moduleId",selected).putExtra("guided",true))},bottom=12)
             body.add(action(t("Independent procedure check","स्वतंत्र प्रक्रिया जाँच"),false,role=ActionRole.REVIEW){startActivity(Intent(this,ProcedureActivity::class.java).putExtra("moduleId",selected).putExtra("guided",false))},bottom=20)
         }

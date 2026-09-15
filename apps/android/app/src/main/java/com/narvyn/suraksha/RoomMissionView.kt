@@ -29,7 +29,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
                      val targets:Map<String,ComponentProjection.Point> = emptyMap(),val inverse:FloatArray?=null,val frameWidth:Int=0,val frameHeight:Int=0,val phase:String="",val canPlace:Boolean=false,val retry:Boolean=false,
                      val footprint:List<ComponentProjection.Point> = emptyList(),
                      val surfaceBoundary:List<ComponentProjection.Point> = emptyList(),val scanProgress:Float=0f,val preview:Boolean=false)
-    private data class Visual(val phase:String="ALARM",val progress:Float=0f,val held:Boolean=false)
+    private data class Visual(val phase:String="ALARM",val progress:Float=0f,val held:Boolean=false,val showCues:Boolean=true)
     private val surface=GLSurfaceView(host)
     private val overlay=Overlay()
     private val equipment=WorldEquipment()
@@ -114,7 +114,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
         surface.setRenderer(this);surface.renderMode=GLSurfaceView.RENDERMODE_WHEN_DIRTY;surface.onPause()
         overlay.contentDescription=t("Interactive mission scene. Use screen procedure for text controls.","इंटरैक्टिव मिशन दृश्य। लिखित नियंत्रणों के लिए स्क्रीन प्रक्रिया उपयोग करें।")
     }
-    fun update(phase:String,progress:Float,held:Boolean) { visual=Visual(phase,progress,held);overlay.invalidate() }
+    fun update(phase:String,progress:Float,held:Boolean,showCues:Boolean=true) { visual=Visual(phase,progress,held,showCues);overlay.invalidate() }
     fun place() { if(camera && canPlace)placement.set(true) }
     fun resume() {
         if(running || closed)return
@@ -296,7 +296,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
                 }
             }
             val needed=when(state.phase){"ALARM"->"alarm";"PIN"->"pin";"GAS_CHECK"->"meter";"ATTENDANT"->if(gestureTarget=="meter")"safe" else "meter";"BARRIER"->"barrier-left";"WITHDRAW","REFUSE"->"safe";else->"base"}
-            val orientationHint=if(camera&&models.size==3&&needed !in targets)t("Turn the phone slowly towards "+(if(needed=="safe")"your green withdrawal point." else if(needed in listOf("alarm","pin","meter"))"the equipment station." else "the virtual hazard."),"फ़ोन धीरे घुमाकर "+(if(needed=="safe")"हरा वापसी बिंदु खोजें।" else if(needed in listOf("alarm","pin","meter"))"उपकरण स्थल खोजें।" else "काल्पनिक खतरा खोजें।"))else null
+            val orientationHint=if(camera&&state.showCues&&models.size==3&&needed !in targets)t("Turn the phone slowly towards "+(if(needed=="safe")"your green withdrawal point." else if(needed in listOf("alarm","pin","meter"))"the equipment station." else "the virtual hazard."),"फ़ोन धीरे घुमाकर "+(if(needed=="safe")"हरा वापसी बिंदु खोजें।" else if(needed in listOf("alarm","pin","meter"))"उपकरण स्थल खोजें।" else "काल्पनिक खतरा खोजें।"))else null
             publish(Image(rev,at,models.size,true,orientationHint?:if(models.size<3)(placementMessage?:t("Aim at the next clear point.","अगले खाली बिंदु पर निशाना रखें।"))else if(camera)t("Stations anchored · stay in your clear practice area", "स्थल जुड़े हैं · अपने खाली अभ्यास क्षेत्र में रहें")else t("Screen simulation · virtual actions only","स्क्रीन सिमुलेशन · केवल काल्पनिक क्रियाएँ"),targets,inverse,w,h,state.phase,canPlace=placementReady,footprint=footprint,surfaceBoundary=surfaceBoundary,scanProgress=scanProgress,preview=showPreview))
         }catch(e:Exception){placement.set(false);Log.e("RoomAR","Frame failed: ${e.javaClass.simpleName}");requestStop(rev,t("AR session interrupted. Tap Retry camera to recover.","AR सत्र बाधित हुआ। कैमरा फिर चलाएँ।"))}
     }
@@ -365,8 +365,8 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
             val ids=when(state.phase){"ALARM"->listOf("alarm");"PIN"->listOf("pin");"GAS_CHECK"->listOf("meter");"BARRIER"->listOf("barrier-left","barrier-right");"ATTENDANT"->listOf("meter","safe");"WITHDRAW","REFUSE"->listOf("safe");else->listOf("left","right")}
             if(img?.tracked==true&&img.placement==3){
                 paint.color=if(state.phase=="WITHDRAW")Palette.danger else Palette.teal
-                for(id in ids)img.targets[id]?.let{p->c.drawCircle(p.x,p.y,radius(),paint)}
-                if(state.phase in listOf("AIM","SWEEP")){val a=img.targets["left"];val b=img.targets["right"];if(a!=null&&b!=null)c.drawLine(a.x,a.y,b.x,b.y,paint)}
+                if(state.showCues)for(id in ids)img.targets[id]?.let{p->c.drawCircle(p.x,p.y,radius(),paint)}
+                if(state.showCues && state.phase in listOf("AIM","SWEEP")){val a=img.targets["left"];val b=img.targets["right"];if(a!=null&&b!=null)c.drawLine(a.x,a.y,b.x,b.y,paint)}
                 if(state.held&&state.phase=="SWEEP"&&cursor!=null){paint.color=0xffc9eefa.toInt();paint.strokeWidth=host.dp(9).toFloat();c.drawLine(width*.7f,height.toFloat(),cursor.first,cursor.second,paint)}
                 down?.let{start->screenCursor?.let{end->paint.color=Palette.violet;c.drawLine(start.first,start.second,end.first,end.second,paint)}}
             }
