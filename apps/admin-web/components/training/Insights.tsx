@@ -47,15 +47,17 @@ import { curriculum } from "@/lib/grading";
 export function TrainingInsights({
   records,
   certificates,
+  now = Date.now(),
   onReview,
 }: {
   records: TrainingRow[];
   certificates: CertificateRow[];
+  now?: number;
   onReview: (row: TrainingRow) => void;
 }) {
   const data = useMemo(
-    () => insights(records, certificates),
-    [records, certificates],
+    () => insights(records, certificates, now),
+    [records, certificates, now],
   );
   return (
     <>
@@ -244,15 +246,17 @@ export function TrainingInsights({
 export function WorkerDirectory({
   records,
   certificates,
+  now = Date.now(),
   onReview,
 }: {
   records: TrainingRow[];
   certificates: CertificateRow[];
+  now?: number;
   onReview: (row: TrainingRow) => void;
 }) {
   const data = useMemo(
-    () => insights(records, certificates),
-    [records, certificates],
+    () => insights(records, certificates, now),
+    [records, certificates, now],
   );
   const [search, setSearch] = useState(""),
     [sector, setSector] = useState("all"),

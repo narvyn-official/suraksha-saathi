@@ -1,8 +1,8 @@
 # Suraksha Saathi
 
-A working **v0.4.4 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
+A working **v0.5.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
 
-[Download the APK and emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.4.4-pilot).
+[Download the APK and emulator demo](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.5.0-pilot).
 
 ## What you can use now
 
@@ -15,7 +15,10 @@ A working **v0.4.4 pilot** for Android safety learning and trainer review, built
 - AR decision recovery preserves saved practice explanations and assessment acknowledgements until explicit Continue; fresh camera images, tracked placement and readable native answer controls gate new answers. [Recovery details](docs/ar-assessment-recovery.md).
 - Scrollable equipment inspection with native rotation/tilt/zoom controls, meaningful accessibility headings and distinct review actions. Text-based component practice remains separately attributed. See [accessibility scope](docs/accessibility.md).
 - Native centre-placement actions and a camera aiming cross for fire component practice and AR decisions, with fresh-frame/revision guards and screen alternatives. [Placement scope and limits](docs/ar-placement.md).
-- Android credential wallet with pinned-issuer signature verification offline.
+- Ordered fire/gas procedure drafts with persistent action journals and visible pin, nozzle, boundary and attendant states; camera/screen/text alternatives. [Procedure scope](docs/procedure-training.md).
+- Shared-phone learner profiles with separate local progress and wallets.
+- Android credential wallet with pinned-issuer signature verification offline, explicit expiry and legacy-date handling; renewal requires a new passed assessment.
+- Role-coloured Mineral Light controls with native ripple/focus feedback and a responsive trainer dashboard.
 
 **Pilot scope:** these are simulation learning records, not statutory safety certificates, identity verification, practical competence or permission to work. Santali is visibly pending native review. Actual AR tracking needs physical-phone validation.
 
@@ -27,7 +30,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/suraksha-saathi-0.4.4-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
+The debug-signed APK is copied to `artifacts/suraksha-saathi-0.5.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs
@@ -44,7 +47,7 @@ npx wrangler d1 migrations apply DB --local --config wrangler.local.json --persi
 npm run dev
 ```
 
-Open the printed localhost address and select **Sign in** for the local development identity. Complete training on Android, use **My record → Export records for trainer**, and import the JSON in the dashboard. Open a passed assessment, issue its pilot credential, then scan the QR or open its downloaded text file in Android.
+Open the printed localhost address and select **Sign in** for the local development identity. Complete training on Android, use **My record → Export records for trainer**, and import the JSON in the dashboard. Open a passed assessment, choose the expiry approved by the site training policy, issue its pilot credential, then scan the QR or open its downloaded text file in Android.
 
 See [dashboard setup](apps/admin-web/README.md) for issuer configuration, tests and deployment details. Internet hosting is not yet available: the Sites registration request failed and discovery found no created Suraksha site.
 
@@ -52,7 +55,7 @@ See [dashboard setup](apps/admin-web/README.md) for issuer configuration, tests 
 
 Run `bash scripts/build-android.sh` for grading unit tests and APK build. Android instrumented tests are in `apps/android/app/src/androidTest` and exercise an assessment across activity recreation, Hindi home rendering, signed credentials, critical failure, all five 3D equipment models, staged component recognition, assistance tracking and database migration. The web checks are `npm test`, `npx tsc --noEmit`, `npm run build`, and `node tests/integration.mjs` with the local server running. Integration tests create explicitly labelled demo records.
 
-See the [source-based reference comparison](docs/reference-benchmark.md) and [current implementation and remaining work](docs/build-status.md). Target architecture and delivery plans are in [solution blueprint](docs/solution-blueprint.md), [engineering specification](docs/engineering-specification.md), [delivery plan](docs/delivery-and-demo.md), and [design system](docs/design-system.md). Those plans include features not yet implemented.
+See the [complete requirements tracker](docs/requirements-tracker.md), [source-based reference comparison](docs/reference-benchmark.md) and [current implementation and remaining work](docs/build-status.md). Target architecture and delivery plans are in [solution blueprint](docs/solution-blueprint.md), [engineering specification](docs/engineering-specification.md), [delivery plan](docs/delivery-and-demo.md), and [design system](docs/design-system.md). Those plans include features not yet implemented.
 
 ## Before field release
 

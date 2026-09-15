@@ -1,4 +1,5 @@
 import { curriculum, curriculumFor } from "./grading";
+import { recordStatus } from "./validity";
 export type TrainingRow = {
   id: string;
   worker_name: string;
@@ -10,10 +11,13 @@ export type CertificateRow = {
   id: string;
   attempt_id: string;
   revoked_at: number | null;
+  issued_at: number;
+  expiresAt?: number | null;
 };
 export function insights(
   records: TrainingRow[],
   certificates: CertificateRow[],
+  now = Date.now(),
 ) {
   const workers = new Map<
     string,
@@ -51,7 +55,7 @@ export function insights(
     const passed = latest.filter((r) => r.payload.result.passed).length;
     const needsPractice = latest.some((r) => !r.payload.result.passed);
     const activeCredentials = certificates.filter(
-      (c) => !c.revoked_at && w.attempts.some((a) => a.id === c.attempt_id),
+      (c) => recordStatus(c, now) === "active" && w.attempts.some((a) => a.id === c.attempt_id),
     ).length;
     return {
       ...w,

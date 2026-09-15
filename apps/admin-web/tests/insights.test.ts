@@ -50,8 +50,8 @@ test("latest failure replaces earlier pass; practice cannot inflate coverage", (
 test("all available latest assessments required and revoked credentials excluded", () => {
   const rows = curriculum.modules.map((m) => row(m.id, m.id));
   const data = insights(rows, [
-    { id: "a", attempt_id: "fire", revoked_at: 1 },
-    { id: "b", attempt_id: "gas", revoked_at: null },
+    { id: "a", attempt_id: "fire", revoked_at: 1, issued_at: 1, expiresAt: 9999999999999 },
+    { id: "b", attempt_id: "gas", revoked_at: null, issued_at: 1, expiresAt: 9999999999999 },
   ]);
   assert.equal(data.fullyPassed, 1);
   assert.equal(data.workers[0].activeCredentials, 1);
@@ -153,4 +153,15 @@ test("0.3.0 replays its four archived domains and cannot claim emergency evidenc
     () => grade("emergency", row("new", "emergency").payload.events, "0.3.0"),
     /Unknown module/,
   );
+});
+
+
+test("expired and unrecorded credentials are excluded as the clock advances", () => {
+  const records = [row("fire", "fire")];
+  const certificates = [
+    { id: "legacy", attempt_id: "fire", revoked_at: null, issued_at: 10 },
+    { id: "dated", attempt_id: "fire", revoked_at: null, issued_at: 10, expiresAt: 100 },
+  ];
+  assert.equal(insights(records, certificates, 99).workers[0].activeCredentials, 1);
+  assert.equal(insights(records, certificates, 100).workers[0].activeCredentials, 0);
 });

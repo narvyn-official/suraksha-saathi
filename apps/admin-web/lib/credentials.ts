@@ -1,5 +1,6 @@
 import trust from "./trusted-issuer.json" with { type: "json" };
 export { trust };
+import { validity, credentialStatus } from "./validity";
 const enc = new TextEncoder();
 function b64(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes))
@@ -31,7 +32,7 @@ export async function sign(payload: object, jwk: JsonWebKey) {
   );
   return `${header}.${body}.${b64(new Uint8Array(signature))}`;
 }
-export async function verify(raw: string) {
+export async function verify(raw: string, now = Date.now()) {
   if (typeof raw !== "string" || raw.length > 6000)
     throw new Error("Invalid credential text.");
   const token = raw.trim().replace(/^SURAKSHA:CREDENTIAL:/, "");
@@ -73,5 +74,12 @@ export async function verify(raw: string) {
     !Number.isSafeInteger(payload.iat)
   )
     throw new Error("Invalid credential scope.");
-  return { token, payload };
+  return { token, payload, ...validity(payload, now) };
+}
+
+/** Metadata for trusted issuer records already stored in this workspace. This is not public-token verification. */
+export function credentialView<T extends { token: string; revoked_at: number | null }>(row: T, now = Date.now()) {
+  const payload = JSON.parse(new TextDecoder().decode(decode(row.token.split(".")[1])));
+  const dates = validity(payload, now);
+  return { ...row, expiresAt: payload.expiresAt ?? null, ...dates, status: credentialStatus(dates, row.revoked_at) };
 }

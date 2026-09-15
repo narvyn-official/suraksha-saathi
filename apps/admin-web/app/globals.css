@@ -2,13 +2,13 @@
 @import "tw-animate-css";
 :root {
   color-scheme: light;
-  --background: #f6f7fb;
+  --background: #f4f8f9;
   --foreground: #14263d;
   --card: #fff;
   --card-foreground: #14263d;
   --popover: #fff;
   --popover-foreground: #14263d;
-  --primary: #3157d5;
+  --primary: #006963;
   --primary-foreground: #fff;
   --secondary: #edf1fa;
   --secondary-foreground: #243a62;
@@ -19,7 +19,7 @@
   --destructive: #b8333d;
   --border: #dde4ee;
   --input: #cad5e5;
-  --ring: #3157d5;
+  --ring: #006963;
   --radius: 0.75rem;
 }
 @theme inline {
@@ -620,4 +620,28 @@ td strong {
     align-items: flex-start;
     flex-wrap: wrap;
   }
+}
+
+/* Colour reinforces labelled actions; it never substitutes for their names. */
+[data-slot="button"] {
+  border-radius: 12px;
+  font-weight: 600;
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
+}
+[data-slot="button"]:enabled:hover {
+  box-shadow: 0 4px 12px #193f5514;
+}
+[data-slot="button"]:enabled:active { transform: translateY(1px); }
+[data-slot="button"]:focus-visible { outline: 3px solid #19736e; outline-offset: 3px; }
+[data-slot="button"]:disabled { cursor: not-allowed; box-shadow: none; }
+[role="tablist"] { padding: 6px; background: #e8f0f2; border-radius: 14px; }
+[role="tab"][data-state="active"] { background: #006963; color: white; box-shadow: 0 2px 5px #00696320; }
+.stat { border-top: 4px solid #3157d5; background: linear-gradient(135deg,#eef3ff,#fff 70%); }
+.stat:nth-child(2) { border-top-color: #006963; background: linear-gradient(135deg,#e2f5ef,#fff 70%); }
+.stat:nth-child(3) { border-top-color: #926010; background: linear-gradient(135deg,#fff2d8,#fff 70%); }
+.import-panel { background: #eef3ff; }
+.feature-icon { background: #dfe9ff; color: #244ab6; border-color: #c9d8fa; }
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="button"] { transition: none; }
+  [data-slot="button"]:enabled:active { transform: none; }
 }

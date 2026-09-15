@@ -33,6 +33,7 @@ class ComponentPracticeActivity: Activity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         store = Store(this)
+        if(state?.getString("workerId")?.let { it!=store.workerId }==true) { finish();return }
         val module = intent.getStringExtra("moduleId")?.takeIf { ComponentCatalog.modules.containsKey(it) } ?: "fire"
         session = ComponentSession.restore(module,store.componentRecords()[module])
         // Consume the launch request once; recreation or later reopening must not discard an active session.
@@ -56,38 +57,48 @@ class ComponentPracticeActivity: Activity() {
         scroll = ScrollView(this).apply { isFillViewport = true; addView(body) }
         scroll.setOnScrollChangeListener { _,_,_,_,_ -> if(!cameraSelected) scene.reportVisibility() }
         root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-        root.add(action(t("Save & return","सहेजें और लौटें"),false) { finish() },top=12)
+        root.add(action(t("Save & return","सहेजें और लौटें"),false,role=ActionRole.NEUTRAL) { finish() },top=12)
         setContentView(root)
         render()
     }
     override fun onResume() {
-        super.onResume(); activeForeground=true
+        super.onResume()
+        if(!currentWorker() || !::session.isInitialized)return
+        activeForeground=true
         if(cameraSelected && !session.done) startCamera() else if(::scene.isInitialized) scene.resume()
     }
     override fun onPause() { activeForeground=false; camera?.pauseCamera(); if (::scene.isInitialized) scene.pause(); super.onPause() }
-    override fun onDestroy() { camera?.close(); store.close(); super.onDestroy() }
-    override fun onSaveInstanceState(out: Bundle) { out.putBoolean("cameraSelected",cameraSelected); super.onSaveInstanceState(out) }
+    override fun onDestroy() { camera?.close(); if(::store.isInitialized)store.close(); super.onDestroy() }
+    override fun onSaveInstanceState(out: Bundle) { out.putBoolean("cameraSelected",cameraSelected); if(::store.isInitialized)out.putString("workerId",store.workerId); super.onSaveInstanceState(out) }
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code,permissions,results)
         if(code==41 && cameraSelected && activeForeground) startCamera()
     }
+    // UI-thread eligibility: retire the old worker's screen before resuming a view or changing evidence.
+    private fun currentWorker(): Boolean {
+        if(!::store.isInitialized || isFinishing || isDestroyed)return false
+        if(store.isCurrentProfile())return true
+        activeForeground=false; camera?.pauseCamera(); if(::scene.isInitialized)scene.pause(); finish();return false
+    }
+    private fun mayChange() = activeForeground && currentWorker()
     private fun ensureCamera(): ComponentCameraView {
         return camera ?: ComponentCameraView(this).also { view ->
             camera=view; sceneContainer.addView(view,FrameLayout.LayoutParams(-1,-1))
-            view.onStatus={ message -> if(cameraStatus?.text?.toString()!=message) cameraStatus?.text=message; updateCameraActions() }
+            view.onStatus={ message -> if(currentWorker()) { if(cameraStatus?.text?.toString()!=message) cameraStatus?.text=message; updateCameraActions() } }
             view.onVisible={ if(activeForeground && cameraSelected && !session.descriptions) recordPresentation("camera") }
         }
     }
     private fun recordPresentation(mode: String) {
-        if(session.stage !in 1..2 || session.answer!=null || session.descriptions || session.data.optBoolean(if(mode=="camera")"cameraSeen" else "screenSeen")) return
+        if(!mayChange() || session.stage !in 1..2 || session.answer!=null || session.descriptions || session.data.optBoolean(if(mode=="camera")"cameraSeen" else "screenSeen")) return
         session.notePresentation(mode); store.saveComponent(session.data)
     }
     private fun startCamera() {
-        if(!activeForeground || !cameraSelected || session.done) return
+        if(!mayChange() || !::session.isInitialized || !cameraSelected || session.done) return
         if(checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED) ensureCamera().resumeCamera()
         else { cameraStatus?.text=t("Camera permission is off. Enable it to use AR, or continue on screen.","कैमरा अनुमति बंद है। AR के लिए अनुमति दें, या स्क्रीन पर जारी रखें।"); updateCameraActions() }
     }
     private fun switchCamera(value: Boolean) {
+        if(!mayChange())return
         cameraSelected=value
         if(value) { session.useDescriptions(false); scene.pause() } else { camera?.pauseCamera(); if(activeForeground) scene.resume() }
         saveAndRender()
@@ -98,11 +109,12 @@ class ComponentPracticeActivity: Activity() {
     }
     private fun updateCameraActions() { cameraActions.forEach { it.isEnabled= !cameraSelected || camera?.ready()==true } }
     private fun gated(button: Button): Button { if(cameraSelected) { cameraActions.add(button); button.isEnabled=camera?.ready()==true }; return button }
-    private fun mayInteract() = !cameraSelected || (activeForeground && camera?.ready()==true)
-    private fun advance() { if(activeForeground) { session.advance(System.currentTimeMillis()); saveAndRender() } }
+    private fun mayInteract() = mayChange() && (!cameraSelected || camera?.ready()==true)
+    private fun advance() { if(mayChange()) { session.advance(System.currentTimeMillis()); saveAndRender() } }
 
 
     private fun render() {
+        if(!currentWorker() || !::session.isInitialized)return
         header.removeAllViews(); lower.removeAllViews(); cameraActions.clear(); cameraStatus=null
         header.add(label(t("Find the part","पुर्ज़ा पहचानें"),26f,Palette.ink,true).asHeading(),bottom=8)
         header.add(label(t("Personal practice · generic equipment · no certificate score","व्यक्तिगत अभ्यास · सामान्य उपकरण · प्रमाणपत्र का अंक नहीं"),13f,Palette.muted),bottom=12)
@@ -116,7 +128,7 @@ class ComponentPracticeActivity: Activity() {
             summary.add(label(t("These are recognition exercises. They do not establish practical competence.","ये पहचान के अभ्यास हैं। इनसे व्यावहारिक योग्यता साबित नहीं होती।"),14f,Palette.muted))
             lower.add(summary,bottom=16)
             lower.add(label(t("Return in your review queue: ","दोहराव सूची में वापसी: ")+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(Date(session.data.getLong("dueAt")))),bottom=16)
-            lower.add(action(t("Practise again now","अभी फिर अभ्यास करें")) { session = ComponentSession.start(session.module,session.data); saveAndRender(); if(cameraSelected) startCamera() })
+            lower.add(action(t("Practise again now","अभी फिर अभ्यास करें")) { if(mayChange()) { session = ComponentSession.start(session.module,session.data); saveAndRender(); if(cameraSelected) startCamera() } })
             return
         }
         sceneContainer.visibility = if(session.descriptions) View.GONE else View.VISIBLE
@@ -130,7 +142,7 @@ class ComponentPracticeActivity: Activity() {
             header.add(cameraStatus!!,bottom=8)
             header.add(action(t("Continue on screen","स्क्रीन पर जारी रखें"),false) { switchCamera(false) },bottom=10)
         }
-        if (session.answer == null) header.add(action(if(session.descriptions)t("Use the model","मॉडल उपयोग करें")else t("Use text descriptions","लिखित विवरण उपयोग करें"),false) { if(cameraSelected) { cameraSelected=false; camera?.pauseCamera(); scene.resume() }; session.useDescriptions(!session.descriptions); saveAndRender() },top=8)
+        if (session.answer == null) header.add(action(if(session.descriptions)t("Use the model","मॉडल उपयोग करें")else t("Use text descriptions","लिखित विवरण उपयोग करें"),false) { if(mayChange()) { if(cameraSelected) { cameraSelected=false; camera?.pauseCamera(); scene.resume() }; session.useDescriptions(!session.descriptions); saveAndRender() } },top=8)
         val stage = when(session.stage) { 0 -> t("1 · See an example","1 · उदाहरण देखें"); 1 -> t("2 · Find without labels","2 · बिना नाम के पहचानें"); else -> if (session.descriptions) t("3 · Recall with reordered choices","3 · बदले क्रम में याद करें") else t("3 · Find from another angle","3 · दूसरे कोण से पहचानें") }
         header.accessibilityPaneTitle=if(session.answer!=null)t("Part feedback: ","पुर्ज़े की प्रतिक्रिया: ")+session.target.title(hi) else t("Part ${session.index+1}: ","पुर्ज़ा ${session.index+1}: ")+stage
         header.add(label(t("Part ${session.index+1} of ${session.parts.size} · ","पुर्ज़ा ${session.index+1} / ${session.parts.size} · ")+stage,14f,Palette.blue,true),bottom=12)
@@ -147,7 +159,7 @@ class ComponentPracticeActivity: Activity() {
         } else if (session.answer == null) {
             if (session.descriptions) session.order.forEach { part -> lower.add(action(part.description(hi),false) { choose(part.id) }.apply { tag = "component-description-${part.id}" },bottom=10) }
             if (session.helped) lower.add(label(if(session.descriptions) session.target.description(hi) else t("Labels are visible for this retry. Take your time.","इस कोशिश में नाम दिख रहे हैं। आराम से पहचानें।"),15f,Palette.blue),bottom=12)
-            else lower.add(gated(action(t("Show a hint","संकेत दिखाएँ"),false) { if(mayInteract()) { session.hint(); saveAndRender() } }),bottom=10)
+            else lower.add(gated(action(t("Show a hint","संकेत दिखाएँ"),false,role=ActionRole.REVIEW) { if(mayInteract()) { session.hint(); saveAndRender() } }),bottom=10)
             lower.add(gated(action(t("I’m not sure","मुझे निश्चित नहीं है"),false) { choose("_unsure") }),bottom=10)
         } else {
             val feedback = card(if(session.correct)Palette.successBg else Palette.amberBg)
@@ -160,20 +172,21 @@ class ComponentPracticeActivity: Activity() {
         }
 
         if(session.module=="fire") {
-            if(!cameraSelected) lower.add(action(t("Use camera AR · fire","कैमरा AR उपयोग करें · आग"),false) { switchCamera(true) },top=12)
+            if(!cameraSelected) lower.add(action(t("Use camera AR · fire","कैमरा AR उपयोग करें · आग"),false,role=ActionRole.CAMERA) { switchCamera(true) },top=12)
             else {
                 lower.add(label(t("Use a clear training surface. The model turns between stages; stay in one safe position. This does not detect real equipment.","खाली प्रशिक्षण सतह उपयोग करें। चरणों के बीच मॉडल घूमता है; एक सुरक्षित जगह पर रहें। यह असली उपकरण नहीं पहचानता।"),14f,Palette.muted),top=12,bottom=10)
-                lower.add(action(t("Place model again","मॉडल फिर रखें"),false) { camera?.reposition(); updateCameraActions() },bottom=10)
-                lower.add(action(t("Retry camera","कैमरा फिर आज़माएँ"),false) { camera?.prepareRetry(); switchCamera(true) },bottom=10)
-                if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) lower.add(action(t("Camera permission settings","कैमरा अनुमति सेटिंग"),false) {
-                    startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName")))
+                lower.add(action(t("Place model again","मॉडल फिर रखें"),false,role=ActionRole.CAMERA) { if(mayChange()) { camera?.reposition(); updateCameraActions() } },bottom=10)
+                lower.add(action(t("Retry camera","कैमरा फिर आज़माएँ"),false,role=ActionRole.CAMERA) { if(mayChange()) { camera?.prepareRetry(); switchCamera(true) } },bottom=10)
+                if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) lower.add(action(t("Camera permission settings","कैमरा अनुमति सेटिंग"),false,role=ActionRole.NEUTRAL) {
+                    if(mayChange())startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName")))
                 })
             }
         }
     }
     private fun choose(id: String) {
+        if(!mayInteract())return
         if(cameraSelected) camera?.requestChoice(id) else chooseNow(id,"screen")
     }
-    private fun chooseNow(id: String, presentation: String) { session.choose(id,System.currentTimeMillis(),presentation); saveAndRender() }
-    private fun saveAndRender() { store.saveComponent(session.data); render(); scroll.post { scroll.scrollTo(0,0) } }
+    private fun chooseNow(id: String, presentation: String) { if(!mayChange())return; session.choose(id,System.currentTimeMillis(),presentation); saveAndRender() }
+    private fun saveAndRender() { if(!mayChange())return; store.saveComponent(session.data); render(); scroll.post { scroll.scrollTo(0,0) } }
 }

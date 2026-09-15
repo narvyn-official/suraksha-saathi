@@ -1,12 +1,12 @@
 # Implementation status — 15 September 2026
 
-This document describes the implemented v0.4.4 pilot (curriculum 0.4.0). Earlier architecture documents describe the target system; they are not claims that every feature is shipped.
+This document describes the implemented v0.5.0 pilot (curriculum 0.4.0). Earlier architecture documents describe the target system; they are not claims that every feature is shipped.
 
 ## Implemented
 
 - Native Kotlin Android application, Android 10+ minimum, fixed light theme, English and Hindi text.
 - Five bundled modules: fire response, gas/confined-space decisions, machinery/isolation, PPE/exposure and emergency/reporting. Each has learning content, guided practice and eight assessment decisions.
-- Native ARCore camera rendering with plane placement and pose-anchored 3D equipment and action cards; on-screen fallback and an offline orbit/zoom equipment viewer for unsupported phones. These are decision stations, not animated equipment manipulation or live hazard detection.
+- Native ARCore camera rendering with plane placement and pose-anchored 3D equipment and action cards; on-screen fallback and an offline orbit/zoom equipment viewer for unsupported phones. The original scored AR flow uses decision stations; the new separate procedural draft changes equipment state. Neither performs live hazard detection.
 - AR decision stations use lifecycle/question revisions, fresh-image and visible-callout gates to reject stale or duplicate choices. Saved guided feedback survives recreation; assessment acknowledgements reveal no hint and require explicit Continue. Permission-off screens retain the light theme and a screen alternative. See ar-assessment-recovery.md.
 - Equipment inspection uses scrollable content and native rotation/tilt/zoom controls with readable view state. Scoped headings, pane titles, distinct review labels and earlier description access support assistive services. Saved component feedback can advance without tracking; new camera choices remain gated. See accessibility.md for the exact tested subset.
 - Native English/Hindi centre-placement actions share tracked-plane hit testing with direct taps. A visible camera cross, expiring viewport/revision requests, preserved anchors after missed hits and scrollable decision controls improve placement access. Positive physical-camera placement remains unverified; see ar-placement.md.
@@ -18,6 +18,11 @@ This document describes the implemented v0.4.4 pilot (curriculum 0.4.0). Earlier
 - Signed pilot credentials: ES256 verification on Android with a bundled trust anchor, saved credential wallet, QR and text-file import. Offline verification explicitly reports unknown revocation status.
 - React trainer dashboard, D1 persistence, owner-scoped routes, import validation and score replay, worker sectors, directory filters/history, latest-assessment analytics, CSV export, critical-decision follow-up, decision review, pilot issuance, credential QR/download, signature checking and revocation.
 
+- Ordered fire (12 steps) and gas (9 steps) procedures with guided retry/independent stop, worker-scoped replayable journals, camera/screen/text attribution and equipment-state variants. See procedure-training.md. These drafts are not practical skill measurements or credential evidence.
+- Shared-phone learner profiles, schema-4 migration preserving earlier payloads, separate histories/recalls/component records and credential wallets. Old learner screens retire on profile change, saved state is owner-bound and pending exports use separate request files. No PIN, remote authentication or identity assurance is claimed.
+- Signed explicit certificate expiry, fresh validity checks, legacy no-expiry status and renewal requiring a new passed assessment. Signature authenticity and present validity are separate.
+- Mineral Light action roles: teal primary actions, blue learning, violet camera/3D, amber review/caution and red destructive actions. Native ripples/focus/disabled states and dashboard hover/pressed/reduced-motion support.
+
 ## Architecture choices in this build
 
 Native Kotlin/ARCore replaces the initially proposed Unity integration for the first build. The app uses native Android views and SQLiteOpenHelper. The dashboard uses the Sites React/Vinext starter with D1. Android-to-trainer transfer uses exported JSON files, not automatic network sync. Issuer secrets stay in ignored local runtime configuration; only the public trust anchor is in source.
@@ -27,7 +32,7 @@ Native Kotlin/ARCore replaces the initially proposed Unity integration for the f
 1. Test real ARCore phones, camera tracking, recovery, thermal performance, and Android 10 hardware. Emulator testing does not verify real AR performance.
 2. Commission and review Santali text/Ol Chiki fonts and native audio. The language selector shows review pending instead of fabricated translations.
 3. Have a competent industrial safety reviewer approve scenarios, thresholds, terms and practical assessment policy. All supplied learning content is pilot draft.
-4. Add tactile/animated AR tasks, spatial scoring, facilitator-controlled practical assessment, identity/organisation roles and tamper-resistant sync.
+4. Extend the new labelled-action procedures into validated equipment manipulation/spatial scoring, add facilitator-controlled practical assessment, identity/organisation roles and tamper-resistant sync.
 5. Review site-specific emergency contacts, routes and responder roles; the new emergency domain is a general pilot, not first-aid/rescue qualification. The original brief was truncated, so this domain remains a product proposal.
 6. Complete hosting and secure issuer provisioning; support revocation freshness and key rotation. The current dashboard is local.
 7. Complete field evaluation, accessibility testing with target workers, production APK signing/distribution and an end-to-end real-device AR demo.

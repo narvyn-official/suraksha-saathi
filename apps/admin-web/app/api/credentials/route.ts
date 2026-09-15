@@ -1,5 +1,6 @@
 import { db, owner, failure, json, signingKey } from "@/lib/server";
-import { sign, trust } from "@/lib/credentials";
+import { sign, trust, credentialView } from "@/lib/credentials";
+import { requestedExpiry } from "@/lib/validity";
 export async function POST(request: Request) {
   try {
     const who = await owner(),
@@ -18,13 +19,19 @@ export async function POST(request: Request) {
       );
     const prior = await db()
       .prepare(
-        "SELECT id,token,revoked_at FROM credentials WHERE owner=? AND attempt_id=?",
+        "SELECT id,attempt_id,token,issued_at,revoked_at,reason FROM credentials WHERE owner=? AND attempt_id=?",
       )
       .bind(who, input.attemptId)
-      .first();
-    if (prior) return Response.json(prior);
+      .first<{ id: string; attempt_id: string; token: string; issued_at: number; revoked_at: number | null; reason: string | null }>();
+    if (prior) {
+      const saved = credentialView(prior);
+      if (input.expiresAt !== undefined && input.expiresAt !== saved.expiresAt)
+        throw new Error("Invalid renewal: this assessment already has a credential. Renewal requires a new passed assessment.");
+      return Response.json(saved);
+    }
     const id = crypto.randomUUID(),
       now = Date.now();
+    const expiresAt = requestedExpiry(input.expiresAt, now);
     const token = await sign(
       {
         iss: trust.issuer,
@@ -38,6 +45,7 @@ export async function POST(request: Request) {
         mode: a.mode,
         practical: "not-assessed",
         iat: now,
+        expiresAt,
       },
       signingKey(),
     );
@@ -47,7 +55,7 @@ export async function POST(request: Request) {
       )
       .bind(who, id, a.id, token, now)
       .run();
-    return Response.json({ id, token, revoked_at: null });
+    return Response.json(credentialView({ id, token, attempt_id: a.id, issued_at: now, revoked_at: null, reason: null }));
   } catch (e) {
     return failure(e);
   }

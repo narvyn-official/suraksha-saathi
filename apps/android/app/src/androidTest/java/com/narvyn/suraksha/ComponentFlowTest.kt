@@ -87,7 +87,7 @@ class ComponentFlowTest {
         }
         Store(context).use {
             assertEquals(attempts,it.attempts().map { a -> a.toString() }); assertEquals(credentials,it.credentials().map { a -> a.toString() })
-            assertFalse(it.export().has("component_learning")); assertEquals(3,it.readableDatabase.version)
+            assertFalse(it.export().has("component_learning")); assertEquals(4,it.readableDatabase.version)
         }
         ActivityScenario.launch(RecallActivity::class.java).use { s ->
             s.onActivity { a -> assertTrue(all(a.window.decorView).filterIsInstance<TextView>().any { it.text.toString()=="Equipment recognition" }) }
@@ -131,7 +131,7 @@ class ComponentFlowTest {
             Store(context,name).use { store ->
                 assertEquals("old",store.attempt("old")!!.getString("id")); assertEquals(1,store.credentials().size);assertEquals(1,store.recalls().size)
                 store.saveComponent(ComponentSession.start("fire",null).data)
-                assertEquals(1,store.componentRecords().size); assertEquals(3,store.readableDatabase.version)
+                assertEquals(1,store.componentRecords().size); assertEquals(4,store.readableDatabase.version)
             }
         } finally { context.deleteDatabase(name) }
     }

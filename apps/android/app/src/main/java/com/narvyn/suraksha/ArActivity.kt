@@ -56,18 +56,20 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private val pendingPlacement=ArPlacementQueue()
     private val pendingPreview=AtomicReference<Preview?>(null)
     private val previewPosted=AtomicBoolean(false)
+    private val profileRetirementPosted=AtomicBoolean(false)
     private val vertices=floats(floatArrayOf(-1f,-1f,1f,-1f,-1f,1f,1f,1f))
     private val uv=floats(FloatArray(8))
     private fun t(en: String,hindi: String)=if(hi)hindi else en
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state);store=Store(this);hi=store.hi
+        if(state?.getString("workerId")?.let { it!=store.workerId }==true) { finish();return }
         val data=store.attempt(intent.getStringExtra("attemptId") ?: "")
         if(data==null) { finish();return }
         val curriculum=Curriculum(this)
         val module=curriculum.versions[data.optString("contentVersion")]?.getJSONArray("modules")?.objects()?.firstOrNull { it.getString("id")==data.optString("moduleId") }
         if(module==null) { Toast.makeText(this,t("This training version cannot be resumed.","प्रशिक्षण का यह संस्करण जारी नहीं किया जा सकता।"),Toast.LENGTH_LONG).show();finish();return }
-        flow=ArDecisionFlow(TrainingSession(data,module)) { store.save(it) }
+        flow=ArDecisionFlow(TrainingSession(data,module)) { check(active && currentWorker()) { "Worker profile changed" };store.save(it) }
         installRequested=state?.getBoolean("installRequested") ?: false
         val root=column(16).apply { setBackgroundColor(Palette.canvas) }
         root.setOnApplyWindowInsetsListener { v,i ->
@@ -96,13 +98,14 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         controls=column();body.add(controls,top=12)
         root.add(action(t("Continue on screen","स्क्रीन पर जारी रखें"),false) { setResult(RESULT_OK);finish() },top=10)
         viewport.addOnLayoutChangeListener { _,l,top,r,b,ol,ot,or,ob ->
-            if((r-l!=or-ol || b-top!=ob-ot) && ::flow.isInitialized && !flow.finished && !flow.training.data.optBoolean("awaitingContinue")) {
+            if((r-l!=or-ol || b-top!=ob-ot) && ::flow.isInitialized && currentWorker() && !flow.finished && !flow.training.data.optBoolean("awaitingContinue")) {
                 flow.invalidate();refreshScene()
             }
         }
         setContentView(root);renderState()
     }
     private fun renderState() {
+        if(!currentWorker() || !::flow.isInitialized)return
         if(flow.finished) { stopCamera();setResult(RESULT_OK);finish();return }
         val training=flow.training
         mode.text=if(training.guided)t("AR PRACTICE · SIMULATED","AR अभ्यास · काल्पनिक")else t("AR ASSESSMENT · NO HINTS","AR मूल्यांकन · कोई संकेत नहीं")
@@ -121,20 +124,20 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
             feedbackBody.add(card,bottom=16)
             val revision=flow.revision
             feedbackBody.add(action(t("Continue","आगे बढ़ें")) {
-                try { if(flow.continueSaved(revision)) { renderState();if(!flow.finished)startCamera(false) } } catch(_: Exception) { saveFailed() }
+                if(active && currentWorker())try { if(flow.continueSaved(revision)) { renderState();if(!flow.finished)startCamera(false) } } catch(_: Exception) { saveFailed() }
             })
         } else {
             status.text=t("Place the simulated stations on a clear training surface.","काल्पनिक विकल्प खाली प्रशिक्षण सतह पर रखें।")
             val row=LinearLayout(this)
-            row.addView(action(t("Place at centre","बीच में रखें"),false) { requestPlacementAt(viewport.width/2f,viewport.height/2f) }.apply { tag="ar-place-center";contentDescription=t("Place decision stations at camera centre","निर्णय विकल्प कैमरा दृश्य के बीच में रखें") },LinearLayout.LayoutParams(0,-2,1f).apply { marginEnd=dp(8) })
+            row.addView(action(t("Place at centre","बीच में रखें"),false,role=ActionRole.CAMERA) { requestPlacementAt(viewport.width/2f,viewport.height/2f) }.apply { tag="ar-place-center";contentDescription=t("Place decision stations at camera centre","निर्णय विकल्प कैमरा दृश्य के बीच में रखें") },LinearLayout.LayoutParams(0,-2,1f).apply { marginEnd=dp(8) })
             row.addView(action(if(checkSelfPermission(Manifest.permission.CAMERA)==PackageManager.PERMISSION_GRANTED)t("Retry camera","कैमरा फिर आज़माएँ")else t("Enable camera","कैमरा चालू करें"),false) { retryCamera() },LinearLayout.LayoutParams(0,-2,1f))
             controls.add(row)
-            if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) controls.add(action(t("Camera permission settings","कैमरा अनुमति सेटिंग"),false) { startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName"))) },top=8)
+            if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) controls.add(action(t("Camera permission settings","कैमरा अनुमति सेटिंग"),false,role=ActionRole.NEUTRAL) { if(active && currentWorker())startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName"))) },top=8)
         }
         refreshScene();scroll.post { scroll.scrollTo(0,0) }
     }
     private fun refreshScene() {
-        if(!::overlay.isInitialized || flow.finished) return
+        if(!currentWorker() || !::overlay.isInitialized || !::flow.isInitialized || flow.finished) return
         pendingChoice.set(null);pendingPlacement.clear()
         val training=flow.training
         val options=training.options().map { Option(it.getString("id"),it.local("text",hi)) }
@@ -145,19 +148,26 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         scene=Scene(revision,training.current.getString("id"),training.data.getString("moduleId"),options,heights,columns,viewport.width,viewport.height,!training.data.optBoolean("awaitingContinue"))
     }
     override fun onResume() {
-        super.onResume();active=true
-        if(!::flow.isInitialized)return
+        super.onResume()
+        if(!currentWorker() || !::flow.isInitialized)return
+        active=true
         flow.resume();renderState();if(!flow.finished && !flow.training.data.optBoolean("awaitingContinue"))startCamera(false)
     }
     override fun onPause() { active=false;if(::flow.isInitialized)flow.pause();stopCamera();super.onPause() }
     override fun onDestroy() { anchor?.detach();ar?.close();ar=null;if(::store.isInitialized)store.close();super.onDestroy() }
-    override fun onSaveInstanceState(out: Bundle) { out.putBoolean("installRequested",installRequested);super.onSaveInstanceState(out) }
+    override fun onSaveInstanceState(out: Bundle) { out.putBoolean("installRequested",installRequested);if(::store.isInitialized)out.putString("workerId",store.workerId);super.onSaveInstanceState(out) }
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code,permissions,results)
         if(code==51 && active && ::flow.isInitialized) { renderState();startCamera(false) }
     }
+    // Called on the UI thread, including before applying a renderer's delayed choice.
+    private fun currentWorker(): Boolean {
+        if(!::store.isInitialized || isFinishing || isDestroyed)return false
+        if(store.isCurrentProfile())return true
+        active=false;if(::flow.isInitialized)flow.pause();stopCamera();finish();return false
+    }
     private fun startCamera(requestPermission: Boolean) {
-        if(!active || flow.finished || flow.training.data.optBoolean("awaitingContinue") || running)return
+        if(!currentWorker() || !::flow.isInitialized || !active || flow.finished || flow.training.data.optBoolean("awaitingContinue") || running)return
         if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) {
             status.text=t("Camera permission is off. Enable it, or continue on screen.","कैमरा अनुमति बंद है। अनुमति दें, या स्क्रीन पर जारी रखें।")
             if(requestPermission)requestPermissions(arrayOf(Manifest.permission.CAMERA),51)
@@ -181,15 +191,18 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         if(wasRunning) { try { ar?.pause() } catch(_: Exception) {} };running=false
     }
     private fun retryCamera() {
+        if(!active || !currentWorker())return
         stopCamera();anchor?.detach();anchor=null;ar?.close();ar=null;freshness.clear();installRequested=false
         flow.invalidate();refreshScene();startCamera(true)
     }
     private fun saveFailed() {
+        if(!currentWorker())return
         flow.invalidate();stopCamera();renderState()
         status.text=t("Could not save. Your previously saved progress is preserved.","सहेजा नहीं जा सका। पहले सहेजी गई प्रगति सुरक्षित है।")
         notice(t("Could not save","सहेजा नहीं जा सका"),t("Check available storage, then retry from your saved progress.","उपलब्ध स्टोरेज जाँचें, फिर सहेजी गई प्रगति से कोशिश करें।"))
     }
     private fun requestPlacementAt(x: Float,y: Float) {
+        if(!currentWorker())return
         if(!active || !running || !scene.canAnswer) {
             status.text=t("Camera is not running. Enable it, or continue on screen.","कैमरा चालू नहीं है। चालू करें, या स्क्रीन पर जारी रखें।");return
         }
@@ -201,7 +214,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         pendingPlacement.offer(ArPlacementRequest.createAt(flow.revision,x,y,viewport.width,viewport.height,SystemClock.elapsedRealtime()))
     }
     private fun queueChoice(optionId: String, revision: Int, questionId: String) {
-        if(active && flow.revision==revision && flow.ready(SystemClock.elapsedRealtime()) && overlay.targetsVisible()) pendingChoice.compareAndSet(null,Choice(revision,questionId,optionId))
+        if(active && currentWorker() && flow.revision==revision && flow.ready(SystemClock.elapsedRealtime()) && overlay.targetsVisible()) pendingChoice.compareAndSet(null,Choice(revision,questionId,optionId))
     }
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         equipment.create()
@@ -216,6 +229,11 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClearColor(.965f,.973f,.99f,1f);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         if(!running)return
+        if(!store.isCurrentProfile()) {
+            // Never stop GLSurfaceView from its renderer thread; clear eligibility and retire on the UI thread.
+            if(profileRetirementPosted.compareAndSet(false,true))runOnUiThread { profileRetirementPosted.set(false);currentWorker() }
+            return
+        }
         val current=scene;val session=ar ?: return
         try {
             session.setCameraTextureName(texture);session.setDisplayGeometry(windowManager.defaultDisplay.rotation,widthPx,heightPx)
@@ -243,7 +261,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
             val choice=pendingChoice.getAndSet(null)
             if(boxes!=null && choice!=null && choice.revision==current.revision && choice.questionId==current.questionId && flow.ready(SystemClock.elapsedRealtime())) {
                 runOnUiThread {
-                    if(active && flow.revision==choice.revision && overlay.targetsVisible()) {
+                    if(active && currentWorker() && flow.revision==choice.revision && overlay.targetsVisible()) {
                         try { if(flow.choose(choice.optionId,choice.questionId,choice.revision,SystemClock.elapsedRealtime()))renderState() } catch(_: Exception) { saveFailed() }
                     }
                 }
@@ -269,7 +287,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         pendingPreview.set(value)
         if(previewPosted.compareAndSet(false,true))runOnUiThread {
             previewPosted.set(false);val latest=pendingPreview.getAndSet(null)
-            if(active && latest!=null && flow.revision==latest.revision && scene.canAnswer) {
+            if(active && currentWorker() && latest!=null && flow.revision==latest.revision && scene.canAnswer) {
                 if(latest.boxes!=null && flow.ready(SystemClock.elapsedRealtime()))overlay.position(latest.points,latest.boxes)else overlay.clear()
                 if(status.text.toString()!=latest.message)status.text=latest.message
             }

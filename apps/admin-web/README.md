@@ -17,7 +17,7 @@ npm run dev
 
 Open the printed localhost address and choose **Sign in**. The starter's development sign-in uses a local-only identity; it is not a production login. Production routes require the Sites-injected identity and are scoped by owner ID. There is no bypass based on a user-supplied owner field.
 
-Import the Android JSON export, select **View**, and issue a pilot credential for a passed assessment. The QR is signed with ES256. The Android app pins the public issuer key. Offline verification confirms signature and scope, **not** revocation. The dashboard checks its stored current status. Records do not prove the learner's identity or practical competence.
+Import the Android JSON export, select **View**, and choose a policy-approved expiry and issue a pilot credential for a passed assessment. Renewal requires a new passed assessment; existing dates cannot be extended. Legacy tokens remain signature-verifiable but display “No expiry recorded” and are excluded from active counts. The QR is signed with ES256. The Android app pins the public issuer key. Offline verification confirms signature and scope, **not** revocation. The dashboard checks its stored current status. Records do not prove the learner's identity or practical competence.
 
 ## Checks
 

@@ -1,6 +1,6 @@
 # Suraksha Saathi — delivery and demo plan
 
-This is a proposed plan. None of the acceptance checks below have been executed against an Android implementation.
+This is the original target delivery plan. The current Android pilot and its executed checks are documented in validation.md; the full field/submission acceptance criteria below remain open. Pilot release videos are emulator walkthroughs, not physical camera validation.
 
 ## 1. Scope that can win a demonstration
 

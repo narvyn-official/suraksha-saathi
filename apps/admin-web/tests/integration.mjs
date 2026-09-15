@@ -16,6 +16,13 @@ async function call(path, body, method = "POST", auth = true) {
   return { status: r.status, data: await r.json() };
 }
 assert.equal((await call("records", undefined, "GET", false)).status, 401);
+const testExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // Test fixture only.
+const legacyToken = readFileSync(new URL("../../android/app/src/androidTest/assets/legacy-no-expiry-credential.txt", import.meta.url), "utf8");
+const legacyVerified = await call("verify", { token: legacyToken });
+assert.equal(legacyVerified.status, 200);
+assert.equal(legacyVerified.data.signatureValid, true);
+assert.equal(legacyVerified.data.expiryStatus, "not-recorded");
+assert.notEqual(legacyVerified.data.status, "active");
 const now = Date.now(),
   worker = {
     id: randomUUID(),
@@ -52,14 +59,17 @@ assert.equal(
   100,
 );
 assert.equal(rows.find((r) => r.id === attempts[0].id).worker_sector, "Mining");
-const machinery = await call("credentials", { attemptId: attempts[2].id });
+for (const invalidExpiry of [undefined, null, "invalid", testExpiry + .5, 0, now - 1, 8_640_000_000_000_001]) {
+  assert.equal((await call("credentials", { attemptId: attempts[0].id, expiresAt: invalidExpiry })).status, 400);
+}
+const machinery = await call("credentials", { attemptId: attempts[2].id, expiresAt: testExpiry });
 assert.equal(machinery.status, 200);
 assert.equal(
   (await call("verify", { token: machinery.data.token })).data.moduleId,
   "machinery",
 );
 const ppeAttempt = attempts.find((a) => a.moduleId === "ppe");
-const ppeCertificate = await call("credentials", { attemptId: ppeAttempt.id });
+const ppeCertificate = await call("credentials", { attemptId: ppeAttempt.id, expiresAt: testExpiry });
 assert.equal(ppeCertificate.status, 200);
 assert.equal(
   (await call("verify", { token: ppeCertificate.data.token })).data.moduleId,
@@ -69,6 +79,7 @@ const emergencyAttempt = attempts.find((a) => a.moduleId === "emergency");
 assert.ok(emergencyAttempt, "Emergency assessment fixture is required");
 const emergencyCertificate = await call("credentials", {
   attemptId: emergencyAttempt.id,
+  expiresAt: testExpiry,
 });
 assert.equal(
   emergencyCertificate.status,
@@ -138,7 +149,7 @@ failed.attempts = [
 ];
 assert.equal((await call("import", failed)).status, 200);
 assert.equal(
-  (await call("credentials", { attemptId: failed.attempts[0].id })).status,
+  (await call("credentials", { attemptId: failed.attempts[0].id, expiresAt: testExpiry })).status,
   400,
 );
 const emergencyModule = curriculum.modules.find((m) => m.id === "emergency");
@@ -171,7 +182,7 @@ assert.equal(
   JSON.stringify(importedFailedEmergency),
 );
 assert.equal(
-  (await call("credentials", { attemptId: failedEmergency.attempts[0].id }))
+  (await call("credentials", { attemptId: failedEmergency.attempts[0].id, expiresAt: testExpiry }))
     .status,
   400,
 );
@@ -182,10 +193,13 @@ const invalid = structuredClone(batch);
 invalid.attempts[0].id = randomUUID();
 invalid.attempts[0].events[0].optionId = "invented";
 assert.equal((await call("import", invalid)).status, 400);
-const cert = await call("credentials", { attemptId: attempts[0].id });
+const cert = await call("credentials", { attemptId: attempts[0].id, expiresAt: testExpiry });
 assert.equal(cert.status, 200, JSON.stringify(cert));
+assert.equal(cert.data.expiresAt, testExpiry);
+assert.equal(cert.data.expiryStatus, "within-validity");
+assert.equal((await call("credentials", { attemptId: attempts[0].id, expiresAt: testExpiry + 1000 })).status, 400);
 assert.equal(
-  (await call("credentials", { attemptId: attempts[0].id })).data.id,
+  (await call("credentials", { attemptId: attempts[0].id, expiresAt: testExpiry })).data.id,
   cert.data.id,
 );
 assert.equal(
@@ -194,7 +208,7 @@ assert.equal(
 );
 const parts = cert.data.token.split(".");
 const p = JSON.parse(Buffer.from(parts[1], "base64url"));
-p.score = 99;
+p.expiresAt = testExpiry + 86_400_000;
 parts[1] = Buffer.from(JSON.stringify(p)).toString("base64url");
 assert.equal((await call("verify", { token: parts.join(".") })).status, 400);
 assert.equal(
@@ -211,7 +225,7 @@ assert.equal(
   (await call("verify", { token: cert.data.token })).data.status,
   "revoked",
 );
-const active = await call("credentials", { attemptId: attempts[1].id });
+const active = await call("credentials", { attemptId: attempts[1].id, expiresAt: testExpiry });
 assert.equal(active.status, 200);
 mkdirSync(new URL("../../../artifacts", import.meta.url), { recursive: true });
 writeFileSync(

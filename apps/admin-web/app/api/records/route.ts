@@ -1,4 +1,5 @@
 import { db, owner, failure } from "@/lib/server";
+import { credentialView } from "@/lib/credentials";
 export async function GET() {
   try {
     const who = await owner();
@@ -24,7 +25,7 @@ export async function GET() {
           ...r,
           payload: JSON.parse(r.payload),
         })),
-        credentials: certificates.results,
+        credentials: certificates.results.map((row: any) => credentialView(row)),
         coverage: {
           returned: records.results.length,
           total: total?.n ?? 0,

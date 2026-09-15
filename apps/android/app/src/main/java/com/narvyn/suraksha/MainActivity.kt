@@ -24,9 +24,21 @@ class MainActivity: Activity() {
     private var page="home"
     private var selected="fire"
     private var session: TrainingSession?=null
+    private var pendingExportId: String?=null
+    private var pendingExportWorker: String?=null
+    private fun pendingExportFile()=pendingExportId?.let { java.io.File(cacheDir,"pending-export-$it") }
     private var exportBytes: ByteArray?
-        get()=java.io.File(cacheDir,"pending-export").takeIf{it.exists()}?.readBytes()
-        set(value){val file=java.io.File(cacheDir,"pending-export");if(value==null)file.delete()else file.writeBytes(value)}
+        get() {
+            check(store.isCurrentProfile() && pendingExportWorker==store.workerId) { "The active learner changed." }
+            return pendingExportFile()?.takeIf { it.exists() }?.readBytes()
+        }
+        set(value) {
+            if(value==null) { pendingExportFile()?.delete();pendingExportId=null;pendingExportWorker=null;return }
+            check(store.isCurrentProfile()) { "The active learner changed." }
+            val id=UUID.randomUUID().toString();val file=java.io.File(cacheDir,"pending-export-$id")
+            file.writeBytes(value)
+            pendingExportFile()?.delete();pendingExportId=id;pendingExportWorker=store.workerId
+        }
     private var tts: TextToSpeech?=null
     private var speechReady=false
     private val hi get()=store.hi
@@ -34,14 +46,16 @@ class MainActivity: Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState);store=Store(this);curriculum=Curriculum(this)
+        pendingExportId=savedInstanceState?.getString("pendingExportId")?.takeIf { runCatching { UUID.fromString(it).toString()==it }.getOrDefault(false) }
+        pendingExportWorker=savedInstanceState?.getString("pendingExportWorker")
         page=savedInstanceState?.getString("page")?:"home";selected=savedInstanceState?.getString("selected")?:"fire"
         savedInstanceState?.getString("session")?.let{store.attempt(it)?.let{data->session=TrainingSession(data,curriculum.module(data.getString("moduleId")))}}
         if(page=="training"&&session==null)page="home"
         tts=TextToSpeech(this){status->speechReady=status==TextToSpeech.SUCCESS}
         render()
     }
-    override fun onResume(){super.onResume();if(::store.isInitialized && page=="records") render()}
-    override fun onSaveInstanceState(out: Bundle) {super.onSaveInstanceState(out);out.putString("page",page);out.putString("selected",selected);out.putString("session",session?.data?.getString("id"))}
+    override fun onResume(){super.onResume();if(::store.isInitialized && !store.isCurrentProfile()){store.close();store=Store(this);session=null;page="home";exportBytes=null;render()}else if(::store.isInitialized && page=="records") render()}
+    override fun onSaveInstanceState(out: Bundle) {super.onSaveInstanceState(out);out.putString("page",page);out.putString("selected",selected);out.putString("session",session?.data?.getString("id"));out.putString("pendingExportId",pendingExportId);out.putString("pendingExportWorker",pendingExportWorker)}
     override fun onDestroy(){tts?.shutdown();store.close();super.onDestroy()}
     override fun onPause(){tts?.stop();super.onPause()}
     @Deprecated("Compatibility") override fun onBackPressed(){if(page!="home"){page=if(page=="training")"module" else "home";render()}else super.onBackPressed()}
@@ -53,14 +67,14 @@ class MainActivity: Activity() {
         val header=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL;setPadding(dp(20),dp(16),dp(20),dp(10))}
         header.addView(label("S",20f,Palette.blue,true).apply{gravity=Gravity.CENTER;background=shape(Palette.soft,12)},LinearLayout.LayoutParams(dp(40),dp(40)))
         header.addView(label("Suraksha Saathi",16f,Palette.ink,true).apply{setPadding(dp(10),0,0,0)},LinearLayout.LayoutParams(0,-2,1f))
-        header.addView(action(if(hi)"हिन्दी ▾" else "English ▾",false){language()},LinearLayout.LayoutParams(dp(105),dp(48)))
+        header.addView(action(if(hi)"हिन्दी ▾" else "English ▾",false){language()},LinearLayout.LayoutParams(dp(112),-2))
         root.add(header)
         val scroll=ScrollView(this).apply{isFillViewport=true;clipToPadding=false}
         body=column(20);scroll.addView(body);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         when(page){"home"->home();"module"->module();"training"->training();"records"->records();"help"->help();"verify"->verifyPage();else->home()}
         val nav=LinearLayout(this).apply{setPadding(dp(12),dp(10),dp(12),dp(10));setBackgroundColor(Color.WHITE)}
         listOf(Triple("home","Learn","सीखें"),Triple("records","My record","मेरा रिकॉर्ड"),Triple("help","Help","मदद")).forEach{(dest,en,h)->
-            nav.addView(action(t(en,h),false){go(dest)}.apply{background=shape(if(page==dest||(dest=="home"&&page in listOf("module","training")))Palette.soft else Color.WHITE,12)},LinearLayout.LayoutParams(0,dp(56),1f).apply{marginEnd=dp(6)})
+            nav.addView(action(t(en,h),false){go(dest)}.apply{isSelected=page==dest||(dest=="home"&&page in listOf("module","training"));actionRole(if(isSelected)ActionRole.PRIMARY else ActionRole.NEUTRAL)},LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(6)})
         }
         root.add(nav);setContentView(root);root.requestApplyInsets()
     }
@@ -85,26 +99,31 @@ class MainActivity: Activity() {
         val history=store.attempts();val latest=curriculum.modules.associate{m->m.getString("id") to history.firstOrNull{it.optString("moduleId")==m.getString("id")&&it.optString("kind")=="assessment"&&it.optBoolean("finished")}}
         val passed=latest.values.count{it?.optJSONObject("result")?.optBoolean("passed")==true}
         body.add(label(t("$passed / ${curriculum.modules.size} module assessments passed","$passed / ${curriculum.modules.size} पाठ मूल्यांकन पास"),14f,Palette.muted),bottom=16)
-        body.add(action(t("Review decisions over time","समय के साथ निर्णय दोहराएँ"),false){startActivity(Intent(this,RecallActivity::class.java))},bottom=18)
+        body.add(action(t("Review decisions over time","समय के साथ निर्णय दोहराएँ"),false,role=ActionRole.REVIEW){startActivity(Intent(this,RecallActivity::class.java))},bottom=18)
         val active=history.firstOrNull{!it.optBoolean("finished")}
         if(active!=null)body.add(action(t("Continue saved training","सहेजा गया प्रशिक्षण जारी रखें"),false){session=TrainingSession(active,curriculum.module(active.getString("moduleId")));selected=active.getString("moduleId");go("training")},bottom=20)
         curriculum.modules.forEachIndexed{i,m->
-            val c=card(if(i==0)0xffecf1fc.toInt() else Color.WHITE)
+            val c=card(if(i==0)Palette.tealBg else Palette.surface)
             c.add(label(t("LESSON ${i+1}  ·  ${m.getString("duration")} MIN","पाठ ${i+1}  ·  ${m.getString("duration")} मिनट"),13f,Palette.blue),bottom=14)
             c.add(SceneView(this,m.getString("id"),hi,false,true),bottom=16)
             latest[m.getString("id")]?.let{a->val ok=a.getJSONObject("result").optBoolean("passed");c.add(chip(if(ok)t("Assessment passed","मूल्यांकन पास")else t("Practice recommended","अभ्यास सुझाया गया"),if(ok)Palette.successBg else Palette.amberBg,if(ok)Palette.success else Palette.amber),bottom=12)}
             c.add(label(m.local("title",hi),23f,Palette.ink,true),bottom=8);c.add(label(m.local("subtitle",hi),16f,Palette.muted),bottom=20)
-            c.add(action(t("Start learning","सीखना शुरू करें"),i==0){selected=m.getString("id");go("module")})
+            c.add(action(t("Start learning","सीखना शुरू करें"),role=ActionRole.LEARN){selected=m.getString("id");go("module")})
             body.add(c,bottom=16)
         }
         body.add(action(if(store.name.isBlank())t("Add your name","अपना नाम जोड़ें") else t("Learning as ${store.name}","${store.name} के रूप में सीख रहे हैं"),false){profile()},top=4)
+        body.add(action(t("Learners on this phone","इस फ़ोन के शिक्षार्थी"),false,role=ActionRole.NEUTRAL){startActivity(Intent(this,WorkerProfilesActivity::class.java))},top=12)
         body.add(label(t("Your progress stays on this phone. Training results are not permission to perform hazardous work.","आपकी प्रगति इस फ़ोन पर रहती है। प्रशिक्षण परिणाम खतरनाक काम करने की अनुमति नहीं है।"),14f,Palette.muted),top=16)
     }
     private fun module(){
         val m=curriculum.module(selected)
         title(m.local("title",hi),m.local("subtitle",hi))
         body.add(SceneView(this,selected,hi),bottom=12)
-        body.add(action(t("Explore in 3D","3D में देखें"),false){startActivity(Intent(this,EquipmentActivity::class.java).putExtra("moduleId",selected))},bottom=20)
+        body.add(action(t("Explore in 3D","3D में देखें"),false,role=ActionRole.CAMERA){startActivity(Intent(this,EquipmentActivity::class.java).putExtra("moduleId",selected))},bottom=20)
+        if(selected in listOf("fire","gas")) {
+            body.add(action(t("Practise the full procedure","पूरी प्रक्रिया का अभ्यास करें")){startActivity(Intent(this,ProcedureActivity::class.java).putExtra("moduleId",selected).putExtra("guided",true))},bottom=12)
+            body.add(action(t("Independent procedure check","स्वतंत्र प्रक्रिया जाँच"),false,role=ActionRole.REVIEW){startActivity(Intent(this,ProcedureActivity::class.java).putExtra("moduleId",selected).putExtra("guided",false))},bottom=20)
+        }
         val objectives=card();objectives.add(label(t("What you’ll learn","आप क्या सीखेंगे"),19f,Palette.ink,true),bottom=12)
         val obj=m.getJSONArray("objectives");for(i in 0 until obj.length())objectives.add(label("✓  "+obj.getJSONArray(i).getString(if(hi)1 else 0),16f),bottom=10)
         body.add(objectives,bottom=16)
@@ -113,8 +132,8 @@ class MainActivity: Activity() {
             c.add(action(t("Listen","सुनें"),false){speak(l.local("body",hi))});body.add(c,bottom=12)
         }
         body.add(action(t("Guided practice","निर्देशित अभ्यास")){startTraining(true,false)},top=8,bottom=12)
-        body.add(action(t("Practise with camera AR","कैमरा AR में अभ्यास करें"),false){startTraining(true,true)},bottom=12)
-        body.add(action(t("Take an assessment","मूल्यांकन शुरू करें"),false){AlertDialog.Builder(this).setTitle(t("Assessment mode","मूल्यांकन का तरीका")).setItems(arrayOf(t("On-screen decisions","स्क्रीन पर निर्णय"),t("Camera AR","कैमरा AR"))){_,i->startTraining(false,i==1)}.show()})
+        body.add(action(t("Practise with camera AR","कैमरा AR में अभ्यास करें"),false,role=ActionRole.CAMERA){startTraining(true,true)},bottom=12)
+        body.add(action(t("Take an assessment","मूल्यांकन शुरू करें"),false,role=ActionRole.REVIEW){AlertDialog.Builder(this).setTitle(t("Assessment mode","मूल्यांकन का तरीका")).setItems(arrayOf(t("On-screen decisions","स्क्रीन पर निर्णय"),t("Camera AR","कैमरा AR"))){_,i->startTraining(false,i==1)}.show()})
     }
     private fun speak(text: String){
         val engine=tts?:return
@@ -161,7 +180,7 @@ class MainActivity: Activity() {
         if(r.getJSONArray("criticalFailures").length()>0)c.add(label(t("A critical safety decision needs more practice.","एक महत्वपूर्ण सुरक्षा निर्णय का और अभ्यास चाहिए।"),16f,Palette.danger,true))
         body.add(c,bottom=16)
         body.add(label(t("Practical observation: not assessed. This pilot result is not a statutory safety certificate.","व्यावहारिक निरीक्षण: मूल्यांकन नहीं हुआ। यह पायलट परिणाम वैधानिक सुरक्षा प्रमाणपत्र नहीं है।"),14f,Palette.muted),bottom=16)
-        body.add(action(t("Review my decisions","मेरे निर्णय देखें"),false){review(s)},bottom=12)
+        body.add(action(t("Review my decisions","मेरे निर्णय देखें"),false,role=ActionRole.REVIEW){review(s)},bottom=12)
         if(!s.guided&&passed)body.add(action(t("Save completion receipt (PDF)","पूर्णता रसीद सहेजें (PDF)")){saveReceipt(s)},bottom=12)
         body.add(action(t("Practise again","फिर अभ्यास करें"),false){selected=m.getString("id");startTraining(true,false)},bottom=12)
         body.add(action(t("My learning record","मेरा सीखने का रिकॉर्ड"),false){go("records")})
@@ -180,16 +199,16 @@ class MainActivity: Activity() {
             c.add(action(if(finished)t("View result","परिणाम देखें")else t("Continue","जारी रखें"),false){session=TrainingSession(a,m);selected=m.getString("id");go("training")});body.add(c,bottom=14)
         }
         if(attempts.any{it.optBoolean("finished")})body.add(action(t("Export records for trainer","प्रशिक्षक के लिए रिकॉर्ड भेजें")){exportBytes=store.export().toString(2).toByteArray();createDocument("application/json","suraksha-training-record.json")},top=8,bottom=12)
-        body.add(action(t("Verify a QR record","QR रिकॉर्ड जाँचें"),false){go("verify")},bottom=12)
-        store.credentials().forEach{c->body.add(action(t("View signed pilot credential","हस्ताक्षरित पायलट प्रमाणपत्र देखें"),false){showCredential(c)},bottom=12)}
-        body.add(action(t("Edit my profile","मेरी प्रोफ़ाइल बदलें"),false){profile()})
+        body.add(action(t("Verify a QR record","QR रिकॉर्ड जाँचें"),false,role=ActionRole.PRIMARY){go("verify")},bottom=12)
+        store.credentials().forEach{c->body.add(action(t("View signed pilot credential","हस्ताक्षरित पायलट प्रमाणपत्र देखें"),false,role=ActionRole.PRIMARY){showCredential(c)},bottom=12)}
+        body.add(action(t("Edit my profile","मेरी प्रोफ़ाइल बदलें"),false,role=ActionRole.NEUTRAL){profile()})
     }
     private fun help(){
         title(t("Here to help","आपकी मदद के लिए"))
         listOf(t("1. Choose a lesson and learn the steps.","1. पाठ चुनें और चरण सीखें।"),t("2. Practise with guidance, then try an assessment.","2. निर्देशों के साथ अभ्यास करें, फिर मूल्यांकन करें।"),t("3. Your progress is saved after every answer.","3. हर उत्तर के बाद प्रगति सहेजी जाती है।"),t("4. Export records for your trainer. Completed practice does not authorise hazardous work.","4. प्रशिक्षक के लिए रिकॉर्ड भेजें। अभ्यास पूरा करना खतरनाक काम की अनुमति नहीं है।")).forEach{body.add(card().apply{add(label(it))},bottom=12)}
-        body.add(action(t("Choose language","भाषा चुनें"),false){language()},top=8,bottom=12)
-        body.add(action(t("Check AR support","AR समर्थन जाँचें"),false){ArCoreApk.getInstance().checkAvailabilityAsync(this){a->notice(t("AR support","AR समर्थन"),a.name)}},bottom=12)
-        body.add(label(t("Version 0.4.4 • Pilot content requires safety review. Santali lessons await native-speaker review. Audio uses installed offline Android voices.","संस्करण 0.4.4 • पायलट सामग्री की सुरक्षा समीक्षा ज़रूरी है। संताली पाठों की स्थानीय वक्ता समीक्षा बाकी है। आवाज़ Android की इंस्टॉल ऑफ़लाइन आवाज़ से आती है।"),14f,Palette.muted))
+        body.add(action(t("Choose language","भाषा चुनें"),false,role=ActionRole.NEUTRAL){language()},top=8,bottom=12)
+        body.add(action(t("Check AR support","AR समर्थन जाँचें"),false,role=ActionRole.CAMERA){ArCoreApk.getInstance().checkAvailabilityAsync(this){a->notice(t("AR support","AR समर्थन"),a.name)}},bottom=12)
+        body.add(label(t("Version 0.5.0 • Pilot content requires safety review. Santali lessons await native-speaker review. Audio uses installed offline Android voices.","संस्करण 0.5.0 • पायलट सामग्री की सुरक्षा समीक्षा ज़रूरी है। संताली पाठों की स्थानीय वक्ता समीक्षा बाकी है। आवाज़ Android की इंस्टॉल ऑफ़लाइन आवाज़ से आती है।"),14f,Palette.muted))
     }
     private fun verifyPage(){
         title(t("Verify a record","रिकॉर्ड जाँचें"),t("Scan a receipt or signed training credential.","रसीद या हस्ताक्षरित प्रशिक्षण प्रमाणपत्र स्कैन करें।"))
@@ -207,9 +226,18 @@ class MainActivity: Activity() {
             } else notice(t("Cannot verify this record","यह रिकॉर्ड सत्यापित नहीं हो सका"),t("No trusted issuer is configured for this QR. Ask your trainer to verify it in the dashboard. Never treat an unknown QR as a valid certificate.","इस QR के लिए विश्वसनीय जारीकर्ता नहीं है। प्रशिक्षक से डैशबोर्ड में जाँच करवाएँ। अज्ञात QR को वैध प्रमाणपत्र न मानें।"))
         }catch(_:Exception){notice(t("Invalid QR","अमान्य QR"),t("This is not a readable Suraksha training record.","यह पढ़ने योग्य सुरक्षा प्रशिक्षण रिकॉर्ड नहीं है।"))}
     }
-    private fun showCredential(c:JSONObject){
+    private fun showCredential(saved:JSONObject){
+        val c=try { CredentialVerifier.verify(this,saved.getString("token")) } catch(_:Exception) { notice(t("Cannot verify credential","प्रमाणपत्र सत्यापित नहीं हो सका"),t("The saved credential is not valid under the installed issuer trust.","इंस्टॉल जारीकर्ता भरोसे के अनुसार सहेजा प्रमाणपत्र मान्य नहीं है।"));return }
         val box=column(20);box.add(label(t("Signature verified offline","हस्ताक्षर ऑफ़लाइन सत्यापित"),20f,Palette.success,true),bottom=12)
         box.add(label(curriculum.module(c.getString("moduleId")).local("title",hi)),bottom=8)
+        val expiry=c.optString("expiryStatus")
+        val validity=when {
+            c.optBoolean("issuedInFuture") -> t("Device date is earlier than issue date. Check the clock before relying on validity.","फ़ोन की तारीख जारी होने से पहले है। वैधता पर भरोसा करने से पहले घड़ी जाँचें।")
+            expiry=="expired" -> t("Training validity expired. Ask your trainer about renewal.","प्रशिक्षण की वैधता समाप्त है। नवीनीकरण के लिए प्रशिक्षक से पूछें।")
+            expiry=="within-validity" -> t("Recorded validity ends: ","दर्ज वैधता समाप्ति: ")+date(c.getLong("expiresAt"))
+            else -> t("No validity end date was recorded. Ask your trainer about current requirements.","वैधता समाप्ति की तारीख दर्ज नहीं है। मौजूदा ज़रूरतों के लिए प्रशिक्षक से पूछें।")
+        }
+        box.add(label(validity,16f,if(expiry=="expired" || c.optBoolean("issuedInFuture"))Palette.amber else Palette.muted),bottom=12)
         box.add(label(t("Pilot simulation • ${c.getInt("score")}%\nPractical observation: not assessed.\nRevocation status: unknown offline. Ask your trainer for current status.","पायलट सिमुलेशन • ${c.getInt("score")}%\nव्यावहारिक निरीक्षण नहीं हुआ।\nऑफ़लाइन निरस्तीकरण की स्थिति अज्ञात है। वर्तमान स्थिति प्रशिक्षक से पूछें।"),14f,Palette.muted),bottom=12)
         val matrix=MultiFormatWriter().encode("SURAKSHA:CREDENTIAL:"+c.getString("token"),BarcodeFormat.QR_CODE,500,500)
         val bitmap=Bitmap.createBitmap(500,500,Bitmap.Config.ARGB_8888);for(x in 0 until 500)for(y in 0 until 500)bitmap.setPixel(x,y,if(matrix[x,y])Color.BLACK else Color.WHITE)
@@ -219,9 +247,20 @@ class MainActivity: Activity() {
     private fun createDocument(mime:String,name:String){startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime).putExtra(Intent.EXTRA_TITLE,name),10)}
     @Deprecated("Compatibility") override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){
         super.onActivityResult(requestCode,resultCode,data)
+        if(!store.isCurrentProfile()) { exportBytes=null;return }
         val scan=IntentIntegrator.parseActivityResult(requestCode,resultCode,data);if(scan!=null){scan.contents?.let{checkRecord(it)};return}
         if(requestCode==30&&resultCode==RESULT_OK){try{data?.data?.let{uri->val text=contentResolver.openInputStream(uri)?.use{run{val output=java.io.ByteArrayOutputStream();val buf=ByteArray(1024);var n=it.read(buf);while(n!=-1){require(output.size()+n<=6000);output.write(buf,0,n);n=it.read(buf)};output.toString("UTF-8")}}?:error("No file");checkRecord(text)}}catch(_:Exception){notice("Cannot read credential","Choose a valid credential text file.")};return}
-        if(requestCode==10&&resultCode==RESULT_OK){try{data?.data?.let{uri->contentResolver.openOutputStream(uri)?.use{it.write(exportBytes?:error("No pending export"))};Toast.makeText(this,t("Saved","सहेजा गया"),Toast.LENGTH_SHORT).show()}}catch(_:Exception){notice(t("Could not save","सहेजा नहीं जा सका"),t("Choose another destination and try again.","दूसरी जगह चुनें और फिर कोशिश करें।"))};exportBytes=null}
+        if(requestCode==10) {
+            try { if(resultCode==RESULT_OK) {
+                val bytes=exportBytes ?: error("No pending export")
+                val uri=data?.data ?: error("No destination")
+                val output=contentResolver.openOutputStream(uri) ?: error("Destination unavailable")
+                output.use { it.write(bytes) }
+                Toast.makeText(this,t("Saved","सहेजा गया"),Toast.LENGTH_SHORT).show()
+            } } catch(_:Exception) { notice(t("Could not save","सहेजा नहीं जा सका"),t("Return to the learner's record and export again.","शिक्षार्थी के रिकॉर्ड में लौटकर फिर निर्यात करें।")) }
+            finally { exportBytes=null }
+            return
+        }
         if(requestCode==20){session?.data?.getString("id")?.let{store.attempt(it)?.let{a->session=TrainingSession(a,curriculum.module(a.getString("moduleId")))}};go("training")}
     }
     private fun saveReceipt(s:TrainingSession){

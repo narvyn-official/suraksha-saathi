@@ -58,6 +58,7 @@ import {
   WorkerDirectory,
 } from "@/components/training/Insights";
 import { curriculum, curriculumFor } from "@/lib/grading";
+import { recordStatus, statusLabel, credentialStatus, validity } from "@/lib/validity";
 type Row = {
   id: string;
   worker_name: string;
@@ -70,6 +71,7 @@ type Credential = {
   attempt_id: string;
   token: string;
   issued_at: number;
+  expiresAt: number | null;
   revoked_at: number | null;
   reason: string | null;
 };
@@ -95,6 +97,9 @@ function download(name: string, content: string, type = "application/json") {
 }
 export default function Home() {
   const [tab, setTab] = useState("insights");
+  const [expiryInput, setExpiryInput] = useState("");
+  const [clock, setClock] = useState(Date.now());
+  useEffect(() => { const timer = setInterval(() => setClock(Date.now()), 30_000); return () => clearInterval(timer); }, []);
   const [records, setRecords] = useState<Row[]>([]),
     [credentials, setCredentials] = useState<Credential[]>([]),
     [loading, setLoading] = useState(true),
@@ -209,13 +214,20 @@ export default function Home() {
   }
   async function issue(row: Row) {
     await run(async () => {
-      const result = await api("credentials", "POST", { attemptId: row.id });
+      const existing = credentials.find((c) => c.attempt_id === row.id);
+      if (existing) { setActive(existing); setSelected(null); return; }
+      const expiresAt = new Date(expiryInput).getTime();
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error("Choose a future expiry approved by your site's training policy.");
+      const result = await api("credentials", "POST", { attemptId: row.id, expiresAt });
       await load();
-      setActive({ ...result, attempt_id: row.id, issued_at: Date.now() });
+      setActive(result);
+      setExpiryInput("");
       setSelected(null);
       setMessage("Pilot simulation credential issued.");
     });
   }
+  useEffect(() => { setExpiryInput(""); }, [selected?.id]);
+  const verificationStatus = verification ? credentialStatus(validity(verification, clock), verification.revocationStatus === "revoked" ? 0 : null, verification.revocationStatus !== "unknown") : "";
   const matches = records.filter((r) =>
     `${r.worker_name} ${r.worker_id} ${title(r.payload.moduleId)}`
       .toLowerCase()
@@ -268,7 +280,7 @@ export default function Home() {
             {
               icon: BadgeCheck,
               title: "Active pilot credentials",
-              value: credentials.filter((c) => !c.revoked_at).length,
+              value: credentials.filter((c) => recordStatus(c, clock) === "active").length,
               desc: "Simulation learning only",
             },
           ].map((s) => (
@@ -292,7 +304,7 @@ export default function Home() {
             {error.includes("Sign in") ? (
               <a href="/signin-with-chatgpt?return_to=/">Sign in</a>
             ) : (
-              <Button variant="outline" onClick={() => run(load)}>
+              <Button variant="caution" onClick={() => run(load)}>
                 Retry loading
               </Button>
             )}
@@ -338,6 +350,7 @@ export default function Home() {
               <TrainingInsights
                 records={records}
                 certificates={credentials}
+                now={clock}
                 onReview={setSelected}
               />
             )}
@@ -346,6 +359,7 @@ export default function Home() {
             <WorkerDirectory
               records={records}
               certificates={credentials}
+                now={clock}
               onReview={setSelected}
             />
           </TabsContent>
@@ -508,12 +522,15 @@ export default function Home() {
                             {c.id.slice(0, 8)} ·{" "}
                             {new Date(c.issued_at).toLocaleDateString()}
                           </span>
+                          <span className="table-sub">
+                            {c.expiresAt == null ? "No expiry recorded" : `Expires ${new Date(c.expiresAt).toLocaleString()}`}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <span
-                            className={`badge ${c.revoked_at ? "review" : "good"}`}
+                            className={`badge ${recordStatus(c, clock) === "active" ? "good" : "review"}`}
                           >
-                            {c.revoked_at ? "Revoked" : "Active pilot"}
+                            {statusLabel(recordStatus(c, clock))}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -522,7 +539,7 @@ export default function Home() {
                           </Button>
                           {!c.revoked_at && (
                             <Button
-                              variant="ghost"
+                              variant="destructive"
                               onClick={() => {
                                 setReason("");
                                 setRevoke(c);
@@ -617,15 +634,11 @@ export default function Home() {
               </Button>
               {verification && (
                 <div
-                  className={`verification ${verification.status === "active" ? "success" : "error"}`}
+                  className={`verification ${verificationStatus === "active" ? "success" : "error"}`}
                   role="status"
                 >
                   <h3>
-                    {verification.status === "active"
-                      ? "Signature verified · active pilot"
-                      : verification.status === "revoked"
-                        ? "Credential revoked"
-                        : "Signature verified · status unknown"}
+                    {statusLabel(verificationStatus)}
                   </h3>
                   <p>
                     {title(verification.moduleId)} · {verification.score}%
@@ -635,7 +648,8 @@ export default function Home() {
                       verification.message ||
                       "Current status checked in this workspace."}
                   </p>
-                  <p>Practical observation: not assessed.</p>
+                  <p>{verification.expiresAt == null ? "No expiry recorded; current validity is not established." : `Recorded expiry: ${new Date(verification.expiresAt).toLocaleString()}`}</p>
+                  <p>Signature verified. Practical observation: not assessed.</p>
                 </div>
               )}
             </section>
@@ -701,8 +715,17 @@ export default function Home() {
                       Issue a pilot simulation credential. This does not certify
                       identity, practical competence or statutory compliance.
                     </p>
-                    <Button disabled={busy} onClick={() => issue(selected)}>
-                      Issue / view pilot credential
+                    {credentials.some((c) => c.attempt_id === selected.id) ? (
+                      <p className="fine">This assessment already has a credential. Renewal requires a new passed assessment; an existing expiry cannot be extended.</p>
+                    ) : (
+                      <>
+                        <label htmlFor="credential-expiry" className="field-label">Expiry date and time · your local time</label>
+                        <Input id="credential-expiry" type="datetime-local" value={expiryInput} onChange={(e) => setExpiryInput(e.target.value)} required aria-describedby="expiry-policy" />
+                        <p id="expiry-policy" className="fine">Use the date approved in your site's training policy. No statutory validity period is assumed.</p>
+                      </>
+                    )}
+                    <Button disabled={busy || (!credentials.some((c) => c.attempt_id === selected.id) && !expiryInput)} onClick={() => issue(selected)}>
+                      {credentials.some((c) => c.attempt_id === selected.id) ? "View existing credential" : "Issue pilot credential"}
                     </Button>
                   </>
                 )}
@@ -727,6 +750,7 @@ export default function Home() {
               Signed learning evidence · practical observation not assessed
             </DialogDescription>
           </DialogHeader>
+          {active && <p role="status">{statusLabel(recordStatus(active, clock))}<br />{active.expiresAt == null ? "No expiry recorded" : `Expires ${new Date(active.expiresAt).toLocaleString()}`}</p>}
           {qr ? (
             <img
               className="credential-qr"

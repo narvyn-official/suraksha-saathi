@@ -12,13 +12,22 @@ class RecallActivity:Activity(){
  private lateinit var curriculum:Curriculum
  private var selected:String?=null
  private var answer:String?=null
+ private var activeForeground=false
  private val hi get()=store.hi
  private fun t(en:String,hindi:String)=if(hi)hindi else en
- override fun onCreate(state:Bundle?){super.onCreate(state);store=Store(this);curriculum=Curriculum(this);selected=state?.getString("selected");answer=state?.getString("answer");render()}
- override fun onResume(){super.onResume();if(::store.isInitialized)render()}
- override fun onSaveInstanceState(out:Bundle){super.onSaveInstanceState(out);out.putString("selected",selected);out.putString("answer",answer)}
- override fun onDestroy(){store.close();super.onDestroy()}
+ override fun onCreate(state:Bundle?){super.onCreate(state);store=Store(this);if(state?.getString("workerId")?.let{it!=store.workerId}==true){finish();return};curriculum=Curriculum(this);selected=state?.getString("selected");answer=state?.getString("answer");render()}
+ override fun onResume(){super.onResume();if(!currentWorker())return;activeForeground=true;render()}
+ override fun onPause(){activeForeground=false;super.onPause()}
+ override fun onSaveInstanceState(out:Bundle){super.onSaveInstanceState(out);out.putString("selected",selected);out.putString("answer",answer);if(::store.isInitialized)out.putString("workerId",store.workerId)}
+ override fun onDestroy(){if(::store.isInitialized)store.close();super.onDestroy()}
+ // Check at resume and delayed UI callbacks; this Store remains bound to the opening worker.
+ private fun currentWorker():Boolean{
+  if(!::store.isInitialized||isFinishing||isDestroyed)return false
+  if(store.isCurrentProfile())return true
+  activeForeground=false;finish();return false
+ }
  private fun render(){
+  if(!currentWorker()||!::curriculum.isInitialized)return
   val items=RecallPlanner.plan(curriculum.json,curriculum.versions,store.attempts(),store.recalls());val now=System.currentTimeMillis();val item=items.firstOrNull{it.key==selected}
   val root=column(20);root.setBackgroundColor(Palette.canvas)
   root.accessibilityPaneTitle=if(item==null)t("Review queue","दोहराव सूची")else if(answer==null)t("Recall a decision","निर्णय याद करें")else t("Review feedback","दोहराव की प्रतिक्रिया")
@@ -34,7 +43,7 @@ class RecallActivity:Activity(){
      val done=record.optInt("stage")==3; val dueAt=record.optLong("dueAt"); val ready=!done||dueAt<=now
      val card=card();card.add(label(curriculum.module(module).local("title",hi),17f,Palette.ink,true),bottom=8)
      card.add(label(if(!done)t("Saved part practice","सहेजा हुआ पुर्ज़ा अभ्यास")else if(ready)t("Ready to recognize again","फिर पहचानने के लिए तैयार")else t("Next: ","अगला: ")+DateFormat.getDateTimeInstance(DateFormat.MEDIUM,DateFormat.SHORT).format(Date(dueAt)),14f,Palette.muted),bottom=10)
-     card.add(action(if(!done)t("Resume part practice","पुर्ज़ा अभ्यास जारी रखें")else if(ready)t("Review equipment","उपकरण दोहराएँ")else t("Practise equipment early","उपकरण का अभ्यास अभी करें"),false){startActivity(android.content.Intent(this,ComponentPracticeActivity::class.java).putExtra("moduleId",module).putExtra("startReview",true))}.apply { contentDescription=text.toString()+": "+curriculum.module(module).local("title",hi) })
+     card.add(action(if(!done)t("Resume part practice","पुर्ज़ा अभ्यास जारी रखें")else if(ready)t("Review equipment","उपकरण दोहराएँ")else t("Practise equipment early","उपकरण का अभ्यास अभी करें"),false){if(activeForeground&&currentWorker())startActivity(android.content.Intent(this,ComponentPracticeActivity::class.java).putExtra("moduleId",module).putExtra("startReview",true))}.apply { contentDescription=text.toString()+": "+curriculum.module(module).local("title",hi) })
      body.add(card,bottom=14)
     }
    }
@@ -64,7 +73,7 @@ class RecallActivity:Activity(){
     body.add(action(t("Back to reviews","दोहराव पर वापस जाएँ")){selected=null;answer=null;render()},bottom=16)
    }
   }
-  root.add(action(t("Back to learning","सीखने पर वापस जाएँ"),false){finish()},top=12);setContentView(root)
+  root.add(action(t("Back to learning","सीखने पर वापस जाएँ"),false,role=ActionRole.NEUTRAL){finish()},top=12);setContentView(root)
  }
- private fun respond(item:RecallPlanner.Item,id:String){if(answer!=null)return;val correct=item.question.getJSONArray("options").objects().firstOrNull{it.optString("id")==id}?.optBoolean("correct")==true;store.saveRecall(RecallPlanner.record(item,correct,System.currentTimeMillis()).put("answer",id));answer=id;render()}
+ private fun respond(item:RecallPlanner.Item,id:String){if(!activeForeground||!currentWorker()||answer!=null)return;val correct=item.question.getJSONArray("options").objects().firstOrNull{it.optString("id")==id}?.optBoolean("correct")==true;store.saveRecall(RecallPlanner.record(item,correct,System.currentTimeMillis()).put("answer",id));answer=id;render()}
 }

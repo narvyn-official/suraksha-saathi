@@ -21,6 +21,19 @@ class WorldEquipment {
  private val dark=Material(floatArrayOf(.10f,.15f,.20f),.49f)
  private val screen=Material(floatArrayOf(.43f,.75f,.57f),.28f,0f,.23f)
  private val scenes=mapOf("fire" to fire(),"gas" to gas(),"machinery" to machinery(),"ppe" to ppe(),"emergency" to emergency())
+ // Only the procedure view requests these meshes. Existing viewers keep their original buffers.
+ private val procedureFire by lazy {
+  buildMap<Int,FloatBuffer>{
+   put(0,scenes.getValue("fire"));put(1,fire(pinRemoved=true))
+   for(direction in -1..1)for(pressed in listOf(false,true)){
+    val target=when(direction){-1->-.24f;1->.20f;else->-.12f}
+    put(2+(direction+1)*2+if(pressed)1 else 0,fire(pinRemoved=true,aimX=target,pressed=pressed))
+   }
+  }
+ }
+ private val procedureGas by lazy { gas(includeBarrier=false) }
+ private val fireProcedureProps by lazy { listOf(fireProps(false),fireProps(true)) }
+ private val gasProcedureProps by lazy { (0..3).map { gasProps((it and 1) != 0,(it and 2) != 0) } }
  private var program=0
  private var position=0;private var normal=0;private var color=0;private var surface=0
  private var mvpLocation=0;private var modelLocation=0;private var eyeLocation=0;private var lightingLocation=0
@@ -63,16 +76,30 @@ class WorldEquipment {
   position=GLES20.glGetAttribLocation(program,"position");normal=GLES20.glGetAttribLocation(program,"normal");color=GLES20.glGetAttribLocation(program,"color");surface=GLES20.glGetAttribLocation(program,"surface")
   mvpLocation=GLES20.glGetUniformLocation(program,"mvp");modelLocation=GLES20.glGetUniformLocation(program,"model");eyeLocation=GLES20.glGetUniformLocation(program,"eye");lightingLocation=GLES20.glGetUniformLocation(program,"lighting")
  }
- /** Anchor is rigid (AR pose/orbit rotation). Geometry and normals are pre-baked; one draw call per model. */
- fun draw(vp:FloatArray,anchor:FloatArray,module:String,cameraPosition:FloatArray=defaultEye,lightCorrection:FloatArray=defaultLighting){
+ /** Prepare bounded variants before starting a procedure renderer; no mesh construction is needed per frame. */
+ fun prepareProcedure(module:String){when(module){"fire"->{procedureFire;fireProcedureProps};"gas"->{procedureGas;gasProcedureProps}}}
+ /** Anchor is rigid. Default calls retain one original mesh; procedures add a separate pre-baked scene mesh. */
+ fun draw(vp:FloatArray,anchor:FloatArray,module:String,cameraPosition:FloatArray=defaultEye,lightCorrection:FloatArray=defaultLighting,completedActions:Set<String> = emptySet(),procedureMode:Boolean=false){
   if(program==0)return
-  val mesh=scenes[module]?:return
+  val original=scenes[module]?:return
+  val meshes=if(module=="fire" && (procedureMode || completedActions.isNotEmpty())){
+   val pin="fire-pin" in completedActions;val aimed=pin && "fire-aim" in completedActions
+   val pressed=aimed && "fire-squeeze" in completedActions && "fire-withdraw" !in completedActions
+   val direction=if("fire-sweep-return" in completedActions)-1 else if("fire-sweep-right" in completedActions)1 else if("fire-sweep-left" in completedActions)-1 else 0
+   val key=if(!pin)0 else if(!aimed)1 else 2+(direction+1)*2+if(pressed)1 else 0
+   listOf(procedureFire.getValue(key)) + if(procedureMode)listOf(fireProcedureProps[if("fire-sweep-return" in completedActions)1 else 0])else emptyList()
+  }else if(module=="gas" && procedureMode){
+   val key=(if("gas-boundary" in completedActions)1 else 0)+(if("gas-attendant" in completedActions)2 else 0)
+   listOf(procedureGas,gasProcedureProps[key])
+  }else listOf(original)
   GLES20.glEnable(GLES20.GL_DEPTH_TEST);GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT);GLES20.glUseProgram(program)
   Matrix.multiplyMM(mvp,0,vp,0,anchor,0)
   GLES20.glUniformMatrix4fv(mvpLocation,1,false,mvp,0);GLES20.glUniformMatrix4fv(modelLocation,1,false,anchor,0)
   GLES20.glUniform3fv(eyeLocation,1,cameraPosition,0);GLES20.glUniform4fv(lightingLocation,1,lightCorrection,0)
-  for((location,offset) in listOf(position to 0,normal to 3,color to 6,surface to 9)){mesh.position(offset);GLES20.glVertexAttribPointer(location,3,GLES20.GL_FLOAT,false,48,mesh);GLES20.glEnableVertexAttribArray(location)}
-  GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,mesh.capacity()/12)
+  for(mesh in meshes){
+   for((location,offset) in listOf(position to 0,normal to 3,color to 6,surface to 9)){mesh.position(offset);GLES20.glVertexAttribPointer(location,3,GLES20.GL_FLOAT,false,48,mesh);GLES20.glEnableVertexAttribArray(location)}
+   GLES20.glDrawArrays(GLES20.GL_TRIANGLES,0,mesh.capacity()/12)
+  }
   for(location in intArrayOf(position,normal,color,surface))GLES20.glDisableVertexAttribArray(location)
   GLES20.glDisable(GLES20.GL_DEPTH_TEST)
  }
@@ -81,20 +108,38 @@ class WorldEquipment {
   b.box(0f,.035f,0f,.72f,.008f,.44f,.003f,Material(floatArrayOf(.89f,.92f,.94f),.8f))
   for(x in listOf(-.32f,.32f))for(z in listOf(-.17f,.17f))b.sphere(x,.008f,z,.038f,.012f,.038f,rubber)
  }
- private fun fire():FloatBuffer=Builder().apply{
+ private fun fire(pinRemoved:Boolean=false,aimX:Float?=null,pressed:Boolean=false):FloatBuffer=Builder().apply{
   base(this)
   // Turned vessel: rounded foot, cylindrical wall, shoulder and neck, not stacked flat cylinders.
   lathe(0f,0f,0f,listOf(.039f to .051f,.044f to .069f,.061f to .082f,.095f to .085f,.365f to .085f,.39f to .080f,.410f to .061f,.424f to .029f,.439f to .026f),red)
   lathe(0f,0f,0f,listOf(.040f to .058f,.046f to .075f,.059f to .077f),rubber)
   cylinder(0f,.439f,0f,.038f,.023f,brass)
   box(0f,.463f,0f,.069f,.038f,.040f,.007f,brass)
-  box(.033f,.504f,0f,.138f,.018f,.030f,.005f,red,rz=-8f)
+  box(.033f,if(pressed).493f else .504f,0f,.138f,.018f,.030f,.005f,red,rz=if(pressed)4f else -8f)
   box(.042f,.480f,0f,.13f,.015f,.032f,.005f,rubber,rz=4f)
   // Pull pin and retaining ring, plus a flexible curved discharge hose.
-  rod(floatArrayOf(-.044f,.478f,.015f),floatArrayOf(.03f,.478f,.015f),.003f,metal)
-  torus(-.055f,.478f,.015f,.019f,.0028f,metal)
-  tube(listOf(floatArrayOf(.03f,.458f,-.006f),floatArrayOf(.092f,.466f,-.006f),floatArrayOf(.133f,.430f,-.006f),floatArrayOf(.142f,.346f,-.006f),floatArrayOf(.138f,.240f,-.006f),floatArrayOf(.12f,.157f,-.006f)),.008f,rubber)
-  rod(floatArrayOf(.12f,.17f,-.006f),floatArrayOf(.12f,.115f,-.006f),.014f,dark)
+  if(!pinRemoved){
+   rod(floatArrayOf(-.044f,.478f,.015f),floatArrayOf(.03f,.478f,.015f),.003f,metal)
+   torus(-.055f,.478f,.015f,.019f,.0028f,metal)
+  }
+  if(aimX==null){
+   tube(listOf(floatArrayOf(.03f,.458f,-.006f),floatArrayOf(.092f,.466f,-.006f),floatArrayOf(.133f,.430f,-.006f),floatArrayOf(.142f,.346f,-.006f),floatArrayOf(.138f,.240f,-.006f),floatArrayOf(.12f,.157f,-.006f)),.008f,rubber)
+   rod(floatArrayOf(.12f,.17f,-.006f),floatArrayOf(.12f,.115f,-.006f),.014f,dark)
+  }else{
+   val nozzle=floatArrayOf(.14f,.23f,.15f);val target=floatArrayOf(aimX,.065f,-.27f)
+   val delta=FloatArray(3){target[it]-nozzle[it]};val length=sqrt(delta.sumOf{(it*it).toDouble()}).toFloat()
+   val tip=FloatArray(3){nozzle[it]+delta[it]*.075f/length}
+   tube(listOf(floatArrayOf(.03f,.458f,-.006f),floatArrayOf(.115f,.456f,.015f),floatArrayOf(.18f,.385f,.10f),floatArrayOf(.18f,.30f,.16f),nozzle),.008f,rubber)
+   rod(nozzle,tip,.014f,dark)
+   if(pressed){
+    // Segmented pale rods are a symbolic discharge path, not particle/fluid physics or range guidance.
+    val stream=Material(floatArrayOf(.70f,.88f,.96f),.68f,0f,.12f)
+    for(segment in 0..5){
+     val a=.10f+segment*.14f;val b=a+.08f
+     rod(FloatArray(3){tip[it]+(target[it]-tip[it])*a},FloatArray(3){tip[it]+(target[it]-tip[it])*b},.0025f,stream)
+    }
+   }
+  }
   cylinder(0f,.455f,.044f,.041f,.018f,metal,rx=90f)
   cylinder(0f,.455f,.055f,.034f,.003f,white,rx=90f)
   // Gauge markings are illustrative only; no pressure value is shown.
@@ -105,7 +150,7 @@ class WorldEquipment {
   for(i in 0..3)box(-.008f,.273f-i*.016f,.087f,.075f-i*.009f,.003f,.001f,0f,dark)
   for(i in -1..1)box(i*.025f,.213f,.087f,.016f,.014f,.001f,.002f,blue)
  }.finish()
- private fun gas():FloatBuffer=Builder().apply{
+ private fun gas(includeBarrier:Boolean=true):FloatBuffer=Builder().apply{
   base(this)
   box(0f,.242f,0f,.254f,.397f,.117f,.035f,rubber)
   box(0f,.242f,.009f,.230f,.370f,.111f,.028f,yellow)
@@ -121,8 +166,67 @@ class WorldEquipment {
   box(0f,.251f,-.073f,.095f,.239f,.021f,.008f,metal)
   box(0f,.349f,-.082f,.118f,.039f,.012f,.005f,rubber)
   cylinder(-.055f,.455f,0f,.026f,.038f,metal);cylinder(-.055f,.474f,0f,.038f,.009f,rubber)
-  for(x in listOf(-.295f,.295f)){cylinder(x,.058f,-.04f,.105f,.027f,rubber);cylinder(x,.239f,-.04f,.022f,.345f,yellow);cylinder(x,.406f,-.04f,.029f,.021f,dark)}
-  box(0f,.386f,-.064f,.61f,.021f,.012f,.004f,yellow)
+  if(includeBarrier){
+   for(x in listOf(-.295f,.295f)){cylinder(x,.058f,-.04f,.105f,.027f,rubber);cylinder(x,.239f,-.04f,.022f,.345f,yellow);cylinder(x,.406f,-.04f,.029f,.021f,dark)}
+   box(0f,.386f,-.064f,.61f,.021f,.012f,.004f,yellow)
+  }
+ }.finish()
+ private fun fireProps(worsening:Boolean):FloatBuffer=Builder().apply{
+  box(0f,.012f,-.025f,1.12f,.018f,.72f,.009f,Material(floatArrayOf(.83f,.86f,.88f),.88f))
+  // Persistent tray and sculpted flames align with the catalogue's base/sweep targets.
+  box(-.02f,.052f,-.27f,.57f,.018f,.15f,.004f,dark)
+  val orange=Material(floatArrayOf(.99f,.24f,.025f),.7f,0f,.22f)
+  val amber=Material(floatArrayOf(1f,.66f,.045f),.68f,0f,.28f)
+  for((index,x) in listOf(-.22f,-.12f,-.01f,.10f,.20f).withIndex()){
+   val h=(if(index%2==0).135f else .19f)*(if(worsening)1.45f else 1f)
+   lathe(x,.064f,-.27f,listOf(0f to .028f,h*.24f to .037f,h*.67f to .020f,h to .001f),orange,scaleZ=.72f)
+   lathe(x,.066f,-.239f,listOf(0f to .013f,h*.32f to .018f,h*.70f to .001f),amber,scaleZ=.5f)
+  }
+  if(worsening){
+   val smoke=Material(floatArrayOf(.24f,.27f,.30f),.96f)
+   for(i in 0..2)sphere(-.04f+i*.09f,.35f+i*.065f,-.29f,.14f+i*.018f,.11f,.095f,smoke)
+  }
+  // Left doorway stays clear; the other doorway is visibly crossed by an obstruction.
+  for(x in listOf(-.48f,.46f)){
+   for(side in listOf(-1f,1f))box(x+side*.055f,.226f,-.115f,.014f,.35f,.025f,.003f,metal)
+   box(x,.40f,-.115f,.124f,.018f,.025f,.003f,metal)
+   box(x,.435f,-.115f,.144f,.048f,.017f,.004f,blue)
+  }
+  rod(floatArrayOf(-.515f,.435f,-.102f),floatArrayOf(-.45f,.435f,-.102f),.003f,white)
+  rod(floatArrayOf(-.515f,.435f,-.102f),floatArrayOf(-.494f,.449f,-.102f),.003f,white)
+  rod(floatArrayOf(-.515f,.435f,-.102f),floatArrayOf(-.494f,.421f,-.102f),.003f,white)
+  rod(floatArrayOf(.405f,.11f,-.087f),floatArrayOf(.515f,.34f,-.087f),.009f,yellow)
+  rod(floatArrayOf(.405f,.34f,-.083f),floatArrayOf(.515f,.11f,-.083f),.009f,yellow)
+  // Assembly marker remains outside the tray and the illustrative retreat path.
+  cylinder(-.23f,.07f,.23f,.14f,.007f,blue)
+  for(x in listOf(-.252f,-.23f,-.208f)){sphere(x,.083f,.23f,.011f,.011f,.011f,white);box(x,.075f,.23f,.01f,.01f,.024f,.002f,white)}
+ }.finish()
+ private fun gasProps(boundary:Boolean,attendant:Boolean):FloatBuffer=Builder().apply{
+  box(0f,.012f,-.025f,1.12f,.018f,.72f,.009f,Material(floatArrayOf(.83f,.86f,.88f),.88f))
+  // Recessed opening is a generic excluded area, never a measured safe atmosphere.
+  box(.265f,.033f,-.205f,.32f,.018f,.22f,.012f,metal)
+  box(.265f,.044f,-.205f,.274f,.008f,.172f,.009f,rubber)
+  for(x in listOf(-.36f,.46f)){
+   cylinder(x,.044f,.105f,.079f,.015f,dark)
+   cylinder(x,.18f,.105f,.015f,.265f,metal)
+  }
+  if(boundary){
+   box(.05f,.252f,.105f,.82f,.034f,.015f,.003f,yellow)
+   for(i in 0..9)box(-.30f+i*.075f,.252f,.114f,.027f,.031f,.002f,0f,dark,rz=-24f)
+  }
+  cylinder(-.365f,.036f,.22f,.13f,.009f,blue)
+  if(attendant){
+   // An original miniature figure marks the outside position; it is not a tracked real worker.
+   val x=-.365f;val z=.22f
+   rod(floatArrayOf(x-.023f,.045f,z),floatArrayOf(x-.018f,.16f,z),.012f,dark)
+   rod(floatArrayOf(x+.023f,.045f,z),floatArrayOf(x+.018f,.16f,z),.012f,dark)
+   box(x,.213f,z,.080f,.119f,.052f,.014f,blue)
+   sphere(x,.306f,z,.057f,.063f,.053f,Material(floatArrayOf(.67f,.47f,.33f),.9f))
+   dome(x,.321f,z,.071f,.040f,.066f,yellow)
+   cylinder(x,.32f,z,.079f,.009f,yellow)
+   rod(floatArrayOf(x-.045f,.25f,z),floatArrayOf(x-.062f,.17f,z+.02f),.010f,blue)
+   rod(floatArrayOf(x+.045f,.25f,z),floatArrayOf(x+.055f,.19f,z+.033f),.010f,blue)
+  }
  }.finish()
  private fun machinery():FloatBuffer=Builder().apply{
   base(this)
