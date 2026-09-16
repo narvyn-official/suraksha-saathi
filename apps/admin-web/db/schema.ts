@@ -62,7 +62,7 @@ export const trainingCentres = sqliteTable("training_centres", {
   owner: text("owner").primaryKey(), name: text("name").notNull(), site: text("site").notNull(), updatedAt: integer("updated_at").notNull(),
 });
 export const teamMembers = sqliteTable("team_members", {
-  owner: text("owner").notNull(), email: text("email").notNull(), userId: text("user_id"), role: text("role").notNull(), active: integer("active").notNull(), updatedAt: integer("updated_at").notNull(),
+  owner: text("owner").notNull(), email: text("email").notNull(), userId: text("user_id"), inviteHash: text("invite_hash"), inviteExpiresAt: integer("invite_expires_at"), role: text("role").notNull(), active: integer("active").notNull(), updatedAt: integer("updated_at").notNull(),
 }, t => [primaryKey({ columns: [t.owner, t.email] }), uniqueIndex("idx_team_user").on(t.owner,t.userId)]);
 export const trainingAssignments = sqliteTable("training_assignments", {
   owner: text("owner").notNull(), id: text("id").notNull(), workerId: text("worker_id").notNull(), moduleId: text("module_id").notNull(), contentVersion: text("content_version").notNull().default("0.4.0"), dueAt: integer("due_at").notNull(), createdAt: integer("created_at").notNull(), createdBy: text("created_by").notNull(), note: text("note").notNull(), cancelledAt: integer("cancelled_at"),
@@ -70,3 +70,5 @@ export const trainingAssignments = sqliteTable("training_assignments", {
 export const auditLog = sqliteTable("audit_log", {
   id: text("id").primaryKey(), owner: text("owner").notNull(), actor: text("actor").notNull(), actorEmail: text("actor_email").notNull(), action: text("action").notNull(), target: text("target").notNull(), detail: text("detail").notNull(), at: integer("at").notNull(),
 }, t => [index("idx_audit_owner_time").on(t.owner,t.at)]);
+
+export * from "./auth-schema";

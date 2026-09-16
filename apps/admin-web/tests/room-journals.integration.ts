@@ -1,8 +1,10 @@
+import { account } from "./auth-client.mjs";
+const identity=await account();
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { roomFixture, roomExport } from "./room-fixtures";
 async function call(path: string, body?: unknown, auth = true) {
-  const result = await fetch(`http://localhost:5173/api/${path}`, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", ...(auth ? { Cookie: "__sites_local_auth=1" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const result = await fetch(`http://localhost:5173/api/${path}`, { method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", ...(auth ? { Cookie: identity.cookie } : {}) }, body: body ? JSON.stringify(body) : undefined });
   return { status: result.status, data: await result.json() as any };
 }
 assert.equal((await call("room-journals", undefined, false)).status, 401);

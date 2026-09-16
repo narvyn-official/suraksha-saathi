@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {account} from './auth-client.mjs';
+const owner=await account(),invitee=await account();
+const base='http://localhost:5173';
+async function call(path:string,body?:unknown,cookie=owner.cookie,origin=base){const r=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',Cookie:cookie,Origin:origin},body:body?JSON.stringify(body):undefined});const text=await r.text();let data:any;try{data=JSON.parse(text)}catch{data={error:text}}return {status:r.status,data,headers:r.headers};}
+assert.equal((await call('/api/admin/session',undefined,'__sites_local_auth=1')).status,401);
+assert.equal((await call('/api/auth/sign-in/email',{email:owner.email,password:'incorrect password'},'')).status,401);
+const invitation=await call('/api/admin/manage',{action:'member',email:invitee.email,role:'trainer',active:true});assert.equal(invitation.status,200);assert(invitation.data.invitation);
+assert.equal((await call('/api/admin/session',{owner:owner.userId},invitee.cookie)).status,403,'matching unverified email cannot join without code');
+assert.equal((await call('/api/admin/session',{invitation:invitation.data.invitation+'wrong'},invitee.cookie)).status,400);
+const joined=await call('/api/admin/session',{invitation:invitation.data.invitation},invitee.cookie);assert.equal(joined.status,200,JSON.stringify(joined.data));
+assert.equal((await call('/api/admin/session',{invitation:invitation.data.invitation},invitee.cookie)).status,400,'code is one-time');
+const joinedCookie=invitee.cookie+'; suraksha_workspace='+owner.userId;
+assert.equal((await call('/api/admin/manage',{action:'settings',name:'Denied',site:''},joinedCookie)).status,403);
+assert.equal((await call('/api/admin/manage',{action:'worker',name:'Auth QA worker',sector:'Mining'},joinedCookie)).status,200);
+assert.equal((await call('/api/admin/manage',{action:'member',email:invitee.email,role:'viewer',active:false})).status,200);
+assert.equal((await call('/api/records',undefined,joinedCookie)).status,403);
+assert.equal((await call('/api/auth/change-password',{currentPassword:owner.password,newPassword:'Updated-'+owner.password,revokeOtherSessions:true},owner.cookie,'https://foreign.example')).status,403);
+const second=await call('/api/auth/sign-in/email',{email:owner.email,password:owner.password},'');assert.equal(second.status,200);
+const secondCookie=second.headers.getSetCookie().filter(c=>!/Max-Age=0(?:;|$)/i.test(c)).map(c=>c.split(';')[0]).join('; ');
+assert.equal((await call('/api/auth/change-password',{currentPassword:owner.password,newPassword:'Updated-'+owner.password,revokeOtherSessions:true})).status,200);
+assert.equal((await call('/api/admin/session',undefined,secondCookie)).status,401,'password change revokes other sessions');
+assert.equal((await call('/api/auth/sign-out',{})).status,200);
+assert.equal((await call('/api/admin/session')).status,401,'revoked cookie cannot be replayed');
+console.log('Independent auth integration passed: signup/signin, forged provider cookie rejected, invitation possession, one-time use, roles, revocation, CSRF, password change, session revocation.');

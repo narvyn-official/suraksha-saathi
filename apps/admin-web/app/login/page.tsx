@@ -1,4 +1,5 @@
 import Login from "@/components/training/Login";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { getAppUser } from "@/lib/auth";
+import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
-export default async function Page() { const user = await getChatGPTUser();return user ? <main className="workspace"><h1>You’re signed in</h1><p>{user.displayName}</p><a className="login-button" href="/">Open training centre</a><p><a href="/signout-with-chatgpt?return_to=/login" target="_top">Sign out</a></p></main> : <Login />; }
+export default async function Page() { if(await getAppUser())redirect('/'); return <Login/>; }

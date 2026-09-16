@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { AdminPanel, type AdminSession } from "@/components/training/AdminPanel";
 import { RoomJournals } from "@/components/training/RoomJournals";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { WorkspaceShell, destinations } from "@/components/training/WorkspaceShell";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -100,7 +100,17 @@ function download(name: string, content: string, type = "application/json") {
 export default function Home() {
   const [session, setSession] = useState<AdminSession | null>(null);
   const writable = session?.current?.role !== "viewer";
-  const [tab, setTab] = useState("insights");
+  const [tab, setActiveTab] = useState("insights");
+  const [workerView,setWorkerView]=useState("register");
+  const setTab = useCallback((id:string) => {
+    if (!destinations.some(d=>d.id===id)) return;
+    setActiveTab(id);
+    if(window.location.hash!==`#${id}`) window.history.pushState(null,"",`#${id}`);
+    requestAnimationFrame(()=>document.getElementById("page-title")?.focus({preventScroll:true}));
+    window.scrollTo({top:0,behavior:"instant"});
+  },[]);
+  useEffect(()=>{const read=()=>{const id=window.location.hash.slice(1);setActiveTab(destinations.some(d=>d.id===id)?id:"insights");};read();window.addEventListener("popstate",read);window.addEventListener("hashchange",read);return()=>{window.removeEventListener("popstate",read);window.removeEventListener("hashchange",read)};},[]);
+  useEffect(()=>{if(session?.current?.role!=="admin" && (tab==="settings"||tab==="team") && session) setTab("insights");},[session,tab,setTab]);
   const [expiryInput, setExpiryInput] = useState("");
   const [clock, setClock] = useState(Date.now());
   useEffect(() => { const timer = setInterval(() => setClock(Date.now()), 30_000); return () => clearInterval(timer); }, []);
@@ -245,30 +255,7 @@ export default function Home() {
   ).length;
   return (
     <>
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-icon">
-            <ShieldCheck />
-          </span>
-          <strong>Suraksha Saathi</strong>
-          <span className="brand-divider">{session?.current?.name ?? "Training centre"}</span>
-        </div>
-        <div className="account-menu"><span className="privacy"><LockKeyhole size={16} /> {session?.current?.role ?? "Signed in"}</span><span className="account-email">{session?.user.email}</span><a href="/signout-with-chatgpt?return_to=/login" target="_top">Sign out</a></div>
-      </header>
-      <main className="workspace">
-        {session && <div className="workspace-switcher"><label>Workspace <select aria-label="Active workspace" value={session.current?.owner ?? ""} disabled={busy} onChange={e=>run(async()=>{await api("admin/session","POST",{owner:e.target.value});window.location.assign("/");})}>{!session.current && <option value="">Select workspace</option>}{session.workspaces.map(w=><option key={w.owner} value={w.owner}>{w.personal ? "My workspace" : w.name ?? "Invited workspace"} · {w.role}</option>)}</select></label><span>{session.current?.site}</span></div>}
-        <div className="page-heading">
-          <div>
-            <p className="eyebrow">WORKER SAFETY · JHARKHAND</p>
-            <h1>{({insights:"Training overview",workers:"Worker management",records:"Training records","room-practice":"Practice journals",credentials:"Pilot credentials",curriculum:"Training curriculum",verify:"Verify a credential",assignments:"Training assignments",team:"Team access",audit:"Workspace activity",settings:"Centre settings"} as Record<string,string>)[tab]}</h1>
-            <p className="muted">
-              Review learning records and verify pilot credentials.
-            </p>
-          </div>
-          <Button variant="outline" disabled={busy} onClick={() => run(load)}>
-            Refresh records
-          </Button>
-        </div>
+      <WorkspaceShell session={session} active={tab} onNavigate={setTab} busy={busy} onRefresh={()=>run(load)} onWorkspace={id=>run(async()=>{await api("admin/session","POST",{owner:id});window.location.assign("/");})}>
         {tab === "insights" && <div className="stats">
           {[
             {
@@ -309,7 +296,7 @@ export default function Home() {
           <div role="alert" className="notice error">
             {error}{" "}
             {error.includes("Sign in") ? (
-              <a href="/signin-with-chatgpt?return_to=/" target="_top">Sign in</a>
+              <a href="/login" target="_top">Sign in</a>
             ) : (
               <Button variant="caution" onClick={() => run(load)}>
                 Retry loading
@@ -329,34 +316,7 @@ export default function Home() {
             attempts. Analytics and worker histories cover this subset.
           </div>
         )}
-        <Tabs orientation="vertical" className="admin-workspace-tabs" value={tab} onValueChange={setTab}>
-          <TabsList className="mb-6 h-auto min-h-12 flex-wrap bg-[#e9edf5]">
-            <TabsTrigger value="insights" className="px-5">
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="workers" className="px-5">
-              Workers
-            </TabsTrigger>
-            <TabsTrigger value="assignments" className="px-5">Assignments</TabsTrigger>
-            <TabsTrigger value="records" className="px-5">
-              Training records
-            </TabsTrigger>
-            <TabsTrigger value="room-practice" className="px-5">
-              Practice journals
-            </TabsTrigger>
-            <TabsTrigger value="credentials" className="px-5">
-              Credentials
-            </TabsTrigger>
-            <TabsTrigger value="curriculum" className="px-5">
-              Curriculum
-            </TabsTrigger>
-            <TabsTrigger value="verify" className="px-5">
-              Verify
-            </TabsTrigger>
-            <TabsTrigger value="audit" className="px-5">Activity</TabsTrigger>
-            {session?.current?.role === "admin" && <><TabsTrigger value="team" className="px-5">Team access</TabsTrigger><TabsTrigger value="settings" className="px-5">Settings</TabsTrigger></>}
-          </TabsList>
-          <TabsContent value="insights">
+          {tab === "insights" && <section aria-label="insights" className="page-content">
             {loading ? (
               <Skeleton className="h-72 w-full" />
             ) : (
@@ -367,18 +327,19 @@ export default function Home() {
                 onReview={setSelected}
               />
             )}
-          </TabsContent>
-          <TabsContent value="workers">
-            {session?.current && <AdminPanel view="workers" session={session} onChange={load}/>}
-            <WorkerDirectory
+          </section>}
+          {tab === "workers" && <section aria-label="workers" className="page-content">
+            <div className="worker-view-switch" role="group" aria-label="Worker view"><Button variant={workerView==='register'?'default':'outline'} onClick={()=>setWorkerView('register')}>Worker register</Button><Button variant={workerView==='history'?'default':'outline'} onClick={()=>setWorkerView('history')}>Learning history</Button></div>
+            {workerView==='register'&&session?.current && <AdminPanel view="workers" session={session} onChange={load}/> }
+            {workerView==='history'&&<WorkerDirectory
               records={records}
               certificates={credentials}
                 now={clock}
               onReview={setSelected}
-            />
-          </TabsContent>
-          <TabsContent value="room-practice"><RoomJournals writable={writable} /></TabsContent>
-          <TabsContent value="records">
+            />}
+          </section>}
+          {tab === "room-practice" && <section aria-label="room-practice" className="page-content"><RoomJournals writable={writable} /></section>}
+          {tab === "records" && <section aria-label="records" className="page-content">
             <div className="dashboard-grid">
               <section className="panel records-panel">
                 <div className="section-heading">
@@ -512,8 +473,8 @@ export default function Home() {
                 </div>
               </section>
             </div>
-          </TabsContent>
-          <TabsContent value="credentials">
+          </section>}
+          {tab === "credentials" && <section aria-label="credentials" className="page-content">
             <section className="panel">
               <h2>Pilot credentials</h2>
               {credentials.length ? (
@@ -583,8 +544,8 @@ export default function Home() {
                 </Empty>
               )}
             </section>
-          </TabsContent>
-          <TabsContent value="curriculum">
+          </section>}
+          {tab === "curriculum" && <section aria-label="curriculum" className="page-content">
             <div className="dashboard-grid">
               {curriculum.modules.map((m, i) => (
                 <section className="panel" key={m.id}>
@@ -618,8 +579,8 @@ export default function Home() {
               Content v{curriculum.version} awaits a competent safety reviewer.
               Santali awaits native review.
             </p>
-          </TabsContent>
-          <TabsContent value="verify">
+          </section>}
+          {tab === "verify" && <section aria-label="verify" className="page-content">
             <section className="panel verify-panel">
               <h2>Verify a pilot credential</h2>
               <p>Paste the signed text from a Suraksha Saathi credential QR.</p>
@@ -668,17 +629,9 @@ export default function Home() {
                 </div>
               )}
             </section>
-          </TabsContent>
-          {session?.current && (["assignments","audit",...(session.current.role === "admin"?["team","settings"]:[])] as ("assignments"|"audit"|"team"|"settings")[]).map(view=><TabsContent key={view} value={view}><AdminPanel view={view} session={session} onChange={load}/></TabsContent>)}
-        </Tabs>
-        <footer className="scope">
-          <ShieldCheck size={18} />
-          <span>
-            Pilot records describe simulation learning. Practical competence and
-            permission to work require separate assessment.
-          </span>
-        </footer>
-      </main>
+          </section>}
+          {session?.current && (["assignments","audit",...(session.current.role === "admin"?["team","settings"]:[])] as ("assignments"|"audit"|"team"|"settings")[]).map(view=>tab===view&&<section key={view} aria-label={view}><AdminPanel view={view} session={session} onChange={load}/></section>)}
+      </WorkspaceShell>
       <Dialog
         open={!!selected}
         onOpenChange={(open) => {

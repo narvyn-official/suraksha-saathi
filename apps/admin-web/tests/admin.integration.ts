@@ -1,3 +1,5 @@
+import { account } from "./auth-client.mjs";
+const identity=await account();
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readdirSync } from 'node:fs';
@@ -7,17 +9,16 @@ import { curriculum, curriculumFor } from '../lib/grading';
 const dir='.wrangler/state/v3/d1/miniflare-D1DatabaseObject';
 const database=new DatabaseSync(`${dir}/${readdirSync(dir).find(f=>f.endsWith('.sqlite')&&f!=='metadata.sqlite')}`);
 database.exec('PRAGMA busy_timeout=5000');
-const root='http://localhost:5173', owner=`qa-${randomUUID()}`, actor='local_seedy', email='seedy@sites.test';
+const root='http://localhost:5173', owner=`qa-${randomUUID()}`, actor=identity.userId, email=identity.email;
 async function call(path:string,body?:unknown,options:{auth?:boolean;space?:string;method?:string;origin?:string}={}){
- const r=await fetch(`${root}/api/${path}`,{method:options.method??(body?'POST':'GET'),headers:{'Content-Type':'application/json',...(options.auth===false?{}:{Cookie:`__sites_local_auth=1; suraksha_workspace=${encodeURIComponent(options.space??owner)}`}),...(options.origin?{Origin:options.origin}:{})},body:body?JSON.stringify(body):undefined});
+ const r=await fetch(`${root}/api/${path}`,{method:options.method??(body?'POST':'GET'),headers:{'Content-Type':'application/json',...(options.auth===false?{}:{Cookie:`${identity.cookie}; suraksha_workspace=${encodeURIComponent(options.space??owner)}`}),...(options.origin?{Origin:options.origin}:{})},body:body?JSON.stringify(body):undefined});
  const text=await r.text();let data:any;try{data=JSON.parse(text)}catch{data={error:text}};return {status:r.status,data,cookie:r.headers.get('set-cookie')};
 }
 function member(role:string,active=1){database.prepare('UPDATE team_members SET role=?,active=? WHERE owner=?').run(role,active,owner);}
 try {
- database.prepare('INSERT INTO team_members(owner,email,user_id,role,active,updated_at) VALUES(?,?,NULL,?,1,?)').run(owner,email,'admin',Date.now());
+ database.prepare('INSERT INTO team_members(owner,email,user_id,role,active,updated_at) VALUES(?,?,?,?,1,?)').run(owner,email,actor,'admin',Date.now());
  assert.equal((await call('admin/session',undefined,{auth:false})).status,401);
- const signIn=await fetch(`${root}/signin-with-chatgpt?return_to=/`,{redirect:'manual'});assert([302,303,307].includes(signIn.status));assert.match(signIn.headers.get('set-cookie')??'',/__sites_local_auth=/);
- const signOut=await fetch(`${root}/signout-with-chatgpt?return_to=/login`,{redirect:'manual'});assert([302,303,307].includes(signOut.status));assert.match(signOut.headers.get('set-cookie')??'',/Max-Age=0/i);
+ const forged=await fetch(`${root}/api/admin/session`,{headers:{Cookie:'__sites_local_auth=1'}});assert.equal(forged.status,401);
  assert.equal((await call('admin/manage',undefined,{auth:false})).status,401);
  const spoof=await fetch(`${root}/api/admin/session`,{headers:{'oai-authenticated-user-id':actor,'oai-authenticated-user-email':email}});assert.equal(spoof.status,401);
  assert.equal((await call('records',undefined,{space:'other-private-space'})).status,403);

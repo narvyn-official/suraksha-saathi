@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v3";
 
 const time = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 const id = z.string().uuid();

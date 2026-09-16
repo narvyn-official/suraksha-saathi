@@ -67,29 +67,61 @@ class MainActivity: Activity() {
     private fun render(){
         val root=column().apply{setBackgroundColor(Palette.canvas)}
         root.setOnApplyWindowInsetsListener{v,i->if(android.os.Build.VERSION.SDK_INT>=30){val b=i.getInsets(WindowInsets.Type.systemBars());v.setPadding(b.left,b.top,b.right,b.bottom)}else{v.setPadding(i.systemWindowInsetLeft,i.systemWindowInsetTop,i.systemWindowInsetRight,i.systemWindowInsetBottom)};i}
-        val header=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(8),dp(16),dp(8))}
+        val header=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(4),dp(16),dp(4));setBackgroundColor(Palette.surface)}
         if(page in listOf("module","lesson","practice","training","verify")) {
             header.addView(action("‹",false,role=ActionRole.NEUTRAL){go(parentPage())}.apply {
-                tag="main-back";textSize=28f;contentDescription=t("Back","वापस");setPadding(0,0,0,0)
+                tag="main-back";textSize=28f;contentDescription=t("Back","वापस");setPadding(0,0,0,0);minHeight=dp(48);minimumHeight=dp(48)
             },LinearLayout.LayoutParams(dp(48),-2))
+        } else {
+            header.addView(ImageView(this).apply{setImageDrawable(appIcon("shield"));importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},LinearLayout.LayoutParams(dp(28),dp(28)))
         }
         header.addView(label("Suraksha Saathi",16f,Palette.ink,true).apply{setPadding(dp(8),0,dp(8),0)},LinearLayout.LayoutParams(0,-2,1f))
-        header.addView(action(if(hi)"हिन्दी ▾" else "English ▾",false,role=ActionRole.NEUTRAL){language()}.apply {
-            textSize=14f;setPadding(dp(10),dp(10),dp(10),dp(10));contentDescription=t("Choose language: English","भाषा चुनें: हिन्दी")
+        header.addView(action(if(hi)"हिन्दी ▾" else "EN ▾",false,role=ActionRole.NEUTRAL){language()}.apply {
+            textSize=13f;minHeight=dp(48);minimumHeight=dp(48);setPadding(dp(10),dp(8),dp(10),dp(8));contentDescription=t("Choose language: English","भाषा चुनें: हिन्दी")
         },LinearLayout.LayoutParams(-2,-2))
+        if(page=="home")header.addView(action("",false,role=ActionRole.NEUTRAL){profileMenu()}.apply {
+            tag="main-profile";contentDescription=t("Your learning profile","आपकी सीखने की प्रोफ़ाइल")
+            setCompoundDrawables(appIcon("user",Palette.ink,22),null,null,null);setPadding(dp(13),dp(12),dp(13),dp(12));minHeight=dp(48);minimumHeight=dp(48)
+        },LinearLayout.LayoutParams(dp(48),dp(48)).apply{marginStart=dp(6)})
         root.add(header)
-        val scroll=ScrollView(this).apply{isFillViewport=true;clipToPadding=false}
-        body=column(20).apply{tag="main-page-$page"};scroll.addView(body);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+        val scroll=ScrollView(this).apply{isFillViewport=true;clipToPadding=false;isVerticalScrollBarEnabled=false;overScrollMode=View.OVER_SCROLL_IF_CONTENT_SCROLLS}
+        body=column(18).apply{tag="main-page-$page"};scroll.addView(body);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         when(page){"home"->home();"module"->module();"lesson"->lesson();"practice"->practiceOptions();"training"->training();"records"->records();"help"->help();"verify"->verifyPage();else->home()}
         body.accessibilityPaneTitle=when(page){"home"->t("Learning home","सीखने का होम");"lesson"->t("Lesson ${lessonIndex+1}","पाठ ${lessonIndex+1}");"practice"->t("Practice options","अभ्यास के विकल्प");"module"->curriculum.module(selected).local("title",hi);"training"->t("Training","प्रशिक्षण");"records"->t("My learning record","मेरा सीखने का रिकॉर्ड");"verify"->t("Verify a record","रिकॉर्ड जाँचें");else->t("Help","मदद")}
-        val nav=LinearLayout(this).apply{setPadding(dp(12),dp(10),dp(12),dp(10));setBackgroundColor(Color.WHITE)}
+        if(page=="lesson")root.add(lessonNavigation())
+        root.addView(View(this).apply{setBackgroundColor(Palette.line)},LinearLayout.LayoutParams(-1,dp(1)))
+        val nav=LinearLayout(this).apply{setPadding(dp(16),dp(6),dp(16),dp(6));setBackgroundColor(Palette.surface);gravity=Gravity.CENTER_VERTICAL}
         listOf(Triple("home","Learn","सीखें"),Triple("records","My record","मेरा रिकॉर्ड"),Triple("help","Help","मदद")).forEach{(dest,en,h)->
-            nav.addView(action(t(en,h),false){go(dest)}.apply{isSelected=page==dest||(dest=="home"&&page in listOf("module","training","lesson","practice"));actionRole(if(isSelected)ActionRole.PRIMARY else ActionRole.NEUTRAL);setPadding(dp(8),dp(10),dp(8),dp(10))},LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(6)})
+            val active=page==dest||(dest=="home"&&page in listOf("module","training","lesson","practice"))||(dest=="records"&&page=="verify")
+            nav.addView(action(t(en,h),false,role=ActionRole.NEUTRAL){go(dest)}.apply {
+                tag="main-nav-$dest";isSelected=active;textSize=12f;minHeight=dp(62);minimumHeight=dp(62)
+                setPadding(dp(4),dp(6),dp(4),dp(6));compoundDrawablePadding=dp(3)
+                setTextColor(if(active)Palette.teal else Palette.muted)
+                background=android.graphics.drawable.RippleDrawable(android.content.res.ColorStateList.valueOf(0x18086f62),shape(if(active)Palette.tealBg else Palette.surface,16),null)
+                setCompoundDrawables(null,appIcon(if(dest=="home")"learn"else dest,if(active)Palette.teal else Palette.muted,22),null,null)
+                contentDescription=t(en,h)+if(active)t(", selected",", चयनित")else ""
+            },LinearLayout.LayoutParams(0,-2,1f).apply{if(dest!="help")marginEnd=dp(8)})
         }
         root.add(nav);setContentView(root);root.requestApplyInsets()
     }
-    private fun title(text: String,sub: String?=null){body.add(label(text,28f,Palette.ink,true).asHeading(),bottom=8);sub?.let{body.add(label(it,16f,Palette.muted),bottom=20)}}
-    private fun chip(text: String,colour: Int=Palette.soft,ink: Int=Palette.blue)=label(text,13f,ink).apply{background=shape(colour,10);setPadding(dp(12),dp(8),dp(12),dp(8))}
+    private fun title(text: String,sub: String?=null){body.add(label(text,26f,Palette.ink,true).asHeading(),bottom=6);sub?.let{body.add(label(it,15f,Palette.muted),bottom=16)}}
+    private fun chip(text: String,colour: Int=Palette.soft,ink: Int=Palette.blue)=label(text,12f,ink).apply{background=shape(colour,8);setPadding(dp(10),dp(6),dp(10),dp(6))}
+    private fun profileMenu(){
+        AlertDialog.Builder(this).setTitle(store.name.ifBlank{t("Your learning profile","आपकी सीखने की प्रोफ़ाइल")})
+            .setItems(arrayOf(t("Edit my profile","मेरी प्रोफ़ाइल बदलें"),t("Learners on this phone","इस फ़ोन के शिक्षार्थी"),t("Admin dashboard","व्यवस्थापक डैशबोर्ड"))){_,i->
+                when(i){0->profile();1->startActivity(Intent(this,WorkerProfilesActivity::class.java));else->startActivity(Intent(this,AdminActivity::class.java))}
+            }.show()
+    }
+    private fun moduleColour(id:String)=when(id){"fire"->Palette.amber;"gas"->Palette.violet;"machinery"->Palette.blue;"emergency"->Palette.danger;else->Palette.teal}
+    private fun pair(first:Button,second:Button){
+        if(resources.configuration.fontScale>=1.5f){body.add(first,bottom=8);body.add(second,bottom=8);return}
+        val row=LinearLayout(this).apply{isBaselineAligned=false;gravity=Gravity.TOP}
+        listOf(first,second).forEachIndexed{index,button->
+            button.textSize=14f;button.minHeight=dp(76);button.minimumHeight=dp(76);button.setPadding(dp(10),dp(10),dp(10),dp(10))
+            row.addView(button,LinearLayout.LayoutParams(0,-2,1f).apply{if(index==0)marginEnd=dp(8)})
+        }
+        body.add(row,bottom=8)
+    }
     private fun language(){
         AlertDialog.Builder(this).setTitle(t("Choose language","भाषा चुनें")).setItems(arrayOf("English","हिन्दी","Santali · review pending")){_,which->
             if(which==2)notice("Santali", "Native-speaker review and recordings are required before Santali lessons can be released. Hindi and English are available.")
@@ -104,43 +136,70 @@ class MainActivity: Activity() {
         AlertDialog.Builder(this).setTitle(t("Your learning profile","आपकी सीखने की प्रोफ़ाइल")).setMessage(t("Stored on this phone. No email or account required.","इस फ़ोन पर सुरक्षित। ईमेल या खाते की ज़रूरत नहीं।")).setView(form).setPositiveButton(t("Save","सहेजें")){_,_->store.name=field.text.toString().trim().take(80);store.sector=sectors[sector.selectedItemPosition];render()}.setNegativeButton(t("Cancel","रद्द करें"),null).show()
     }
     private fun home(){
-        title(t("Learn to stay safe.","सुरक्षित रहना सीखें।"),t("Choose your training.","अपना प्रशिक्षण चुनें।"))
-        val history=store.attempts();val latest=curriculum.modules.associate{m->m.getString("id") to history.firstOrNull{it.optString("moduleId")==m.getString("id")&&it.optString("kind")=="assessment"&&it.optBoolean("finished")}}
+        title(t("Learn to stay safe.","सुरक्षित रहना सीखें।"))
+        val history=store.attempts()
+        val latest=curriculum.modules.associate{m->m.getString("id") to history.firstOrNull{it.optString("moduleId")==m.getString("id")&&it.optString("kind")=="assessment"&&it.optBoolean("finished")}}
         val passed=latest.values.count{it?.optJSONObject("result")?.optBoolean("passed")==true}
-        body.add(label(t("Offline ready · $passed / ${curriculum.modules.size} assessments passed","ऑफ़लाइन तैयार · $passed / ${curriculum.modules.size} मूल्यांकन पास"),14f,Palette.muted),bottom=16)
+        val progress=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL;background=shape(Palette.tealBg,14);setPadding(dp(12),dp(10),dp(12),dp(10))}
+        progress.addView(ImageView(this).apply{setImageDrawable(appIcon("records",Palette.teal,22));importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},LinearLayout.LayoutParams(dp(24),dp(24)))
+        progress.addView(label(t("$passed / ${curriculum.modules.size} assessments passed","$passed / ${curriculum.modules.size} मूल्यांकन पास"),13f,Palette.teal,true).apply{setPadding(dp(10),0,0,0)},LinearLayout.LayoutParams(0,-2,1f))
+        progress.addView(label(t("Offline ready","ऑफ़लाइन तैयार"),11f,Palette.teal))
+        body.add(progress,bottom=12)
         val active=history.firstOrNull{!it.optBoolean("finished")}
-        if(active!=null)body.add(action(t("Continue saved training","सहेजा गया प्रशिक्षण जारी रखें")){session=TrainingSession(active,curriculum.module(active.getString("moduleId")));selected=active.getString("moduleId");go("training")},bottom=16)
-        curriculum.modules.forEachIndexed{i,m->
+        if(active!=null)body.add(action(t("Continue saved training","सहेजा गया प्रशिक्षण जारी रखें")){session=TrainingSession(active,curriculum.module(active.getString("moduleId")));selected=active.getString("moduleId");go("training")}.apply{tag="main-continue"},bottom=10)
+        body.add(action(t("Choose your training","अपना प्रशिक्षण चुनें"),false,role=ActionRole.NEUTRAL){modulePicker()}.apply{
+            tag="main-module-picker";gravity=Gravity.CENTER_VERTICAL or Gravity.START;textSize=14f
+            setCompoundDrawables(null,null,appIcon("down",Palette.muted,20),null)
+        },bottom=10)
+        val m=curriculum.modules.firstOrNull{it.getString("id")==selected}?:curriculum.modules.first()
+        val id=m.getString("id");selected=id
+        val feature=card().apply{tag="main-module-$id"}
+        feature.add(label(m.local("title",hi),21f,Palette.ink,true).asHeading().apply{
+            compoundDrawablePadding=dp(12);setCompoundDrawables(appIcon(id,moduleColour(id),34),null,null,null)
+        },bottom=10)
+        val passedModule=latest[id]?.optJSONObject("result")?.optBoolean("passed")==true
+        val status=if(passedModule)t("Assessment passed","मूल्यांकन पास")else if(id in listOf("fire","gas"))t("Room AR available","रूम AR उपलब्ध")else t("Lessons & practice","पाठ और अभ्यास")
+        feature.add(label(t("${m.getString("duration")} min · ","${m.getString("duration")} मिनट · ")+status,13f,if(passedModule)Palette.success else Palette.muted),bottom=12)
+        feature.add(action(t("Start learning","सीखना शुरू करें")){lessonIndex=0;go("module")}.apply{contentDescription=t("Start learning: ","सीखना शुरू करें: ")+m.local("title",hi)})
+        body.add(feature,bottom=12)
+        body.add(action(t("Review decisions over time","समय के साथ निर्णय दोहराएँ"),false,role=ActionRole.REVIEW){startActivity(Intent(this,RecallActivity::class.java))}.apply{
+            tag="main-review";textSize=14f;setCompoundDrawables(appIcon("learn",Palette.amber,22),null,null,null);compoundDrawablePadding=dp(8)
+        })
+    }
+    /** All modules remain one tap away; the home no longer needs a vertical catalogue. */
+    private fun modulePicker(){
+        val list=column(16);val dialog=AlertDialog.Builder(this).setTitle(t("Choose your training","अपना प्रशिक्षण चुनें"))
+            .setView(ScrollView(this).apply{addView(list)}).setNegativeButton(t("Cancel","रद्द करें"),null).create()
+        curriculum.modules.forEach{m->
             val id=m.getString("id")
-            val row=column(14).apply{tag="main-module-$id";background=shape(Palette.surface,16,Palette.line)}
-            row.add(label(m.local("title",hi),18f,Palette.ink,true).asHeading(),bottom=6)
-            val details=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL}
-            val passedModule=latest[id]?.optJSONObject("result")?.optBoolean("passed")==true
-            val status=if(passedModule)t("Assessment passed","मूल्यांकन पास") else if(id in listOf("fire","gas"))t("Room AR available","रूम AR उपलब्ध")else t("Lessons & practice","पाठ और अभ्यास")
-            details.addView(label(t("${i+1} · ${m.getString("duration")} min","${i+1} · ${m.getString("duration")} मिनट")+"\n"+status,12f,if(passedModule)Palette.success else Palette.muted),LinearLayout.LayoutParams(0,-2,1f))
-            details.addView(action(t("Start learning","सीखना शुरू करें"),false,role=ActionRole.LEARN){selected=id;lessonIndex=0;go("module")}.apply {
-                textSize=14f;minHeight=dp(48);minimumHeight=dp(48);setPadding(dp(10),dp(8),dp(10),dp(8))
-                contentDescription=t("Start learning: ","सीखना शुरू करें: ")+m.local("title",hi)
-            },LinearLayout.LayoutParams(0,-2,1f).apply{marginStart=dp(12)})
-            row.add(details);body.add(row,bottom=10)
+            val item=LinearLayout(this).apply{
+                tag="main-module-$id";gravity=Gravity.CENTER_VERTICAL;setPadding(dp(10),dp(8),dp(10),dp(8))
+                background=shape(if(id==selected)Palette.tealBg else Palette.surface,14,Palette.line)
+            }
+            item.addView(label(m.local("title",hi),15f,Palette.ink,true).asHeading(),LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(8)})
+            item.addView(action(t("Start learning","सीखना शुरू करें"),false,role=ActionRole.LEARN){selected=id;lessonIndex=0;dialog.dismiss();go("module")}.apply{
+                textSize=13f;setPadding(dp(8),dp(8),dp(8),dp(8));contentDescription=t("Start learning: ","सीखना शुरू करें: ")+m.local("title",hi)
+            },LinearLayout.LayoutParams(dp(106),-2))
+            list.add(item,bottom=8)
         }
-        body.add(action(t("Review decisions over time","समय के साथ निर्णय दोहराएँ"),false,role=ActionRole.REVIEW){startActivity(Intent(this,RecallActivity::class.java))},top=6,bottom=12)
-        body.add(action(if(store.name.isBlank())t("Add your name","अपना नाम जोड़ें") else t("Learning as ${store.name}","${store.name} के रूप में सीख रहे हैं"),false,role=ActionRole.NEUTRAL){profile()},bottom=10)
-        body.add(action(t("Learners on this phone","इस फ़ोन के शिक्षार्थी"),false,role=ActionRole.NEUTRAL){startActivity(Intent(this,WorkerProfilesActivity::class.java))})
+        dialog.show()
     }
     private fun module(){
         val m=curriculum.module(selected)
-        body.add(label(t("${m.getString("duration")} MIN · OFFLINE LESSONS","${m.getString("duration")} मिनट · ऑफ़लाइन पाठ"),13f,Palette.muted),bottom=8)
+        body.add(label(t("${m.getString("duration")} MIN · OFFLINE LESSONS","${m.getString("duration")} मिनट · ऑफ़लाइन पाठ"),12f,moduleColour(selected),true),bottom=6)
         title(m.local("title",hi),m.local("subtitle",hi))
         val room=selected in listOf("fire","gas")
-        body.add(action(t("Start training","प्रशिक्षण शुरू करें")){if(room)startRoomMission(false)else openLessons()}.apply{tag="main-start-training"},bottom=8)
-        body.add(label(if(room)t("Practise actions in your room with the phone camera. Screen practice is also available.","फ़ोन के कैमरे से अपने कमरे में क्रियाओं का अभ्यास करें। स्क्रीन पर अभ्यास भी उपलब्ध है।")else t("Learn one step at a time, then practise your decisions.","एक-एक चरण सीखें, फिर निर्णयों का अभ्यास करें।"),14f,Palette.muted),bottom=20)
-        body.add(action(t("Read or listen to lessons","पाठ पढ़ें या सुनें"),false,role=ActionRole.LEARN){openLessons()}.apply{tag="main-lessons"},bottom=10)
-        body.add(action(t("Explore in 3D","3D में देखें"),false,role=ActionRole.CAMERA){startActivity(Intent(this,EquipmentActivity::class.java).putExtra("moduleId",selected))},bottom=20)
-        body.add(label(t("Practise & check understanding","अभ्यास और समझ की जाँच"),17f,Palette.ink,true).asHeading(),bottom=10)
-        body.add(action(t("Guided practice","निर्देशित अभ्यास"),false,role=ActionRole.LEARN){startTraining(true,false)},bottom=10)
-        body.add(action(t("Take an assessment","मूल्यांकन शुरू करें"),false,role=ActionRole.REVIEW){chooseAssessment()},bottom=10)
-        body.add(action(t("More practice options","अभ्यास के और विकल्प"),false,role=ActionRole.NEUTRAL){go("practice")}.apply{tag="main-practice-options"})
+        val primary=column(14).apply{background=shape(Palette.tealBg,18)}
+        primary.add(action(t("Start training","प्रशिक्षण शुरू करें")){if(room)startRoomMission(false)else openLessons()}.apply{tag="main-start-training"})
+        primary.add(label(if(room)t("Camera room practice, with an on-screen option.","कैमरे से कमरे में अभ्यास, स्क्रीन का विकल्प भी।")else t("Learn the steps, then practise your decisions.","चरण सीखें, फिर निर्णयों का अभ्यास करें।"),13f,Palette.teal),top=8)
+        body.add(primary,bottom=14)
+        pair(action(t("Read or listen to lessons","पाठ पढ़ें या सुनें"),false,role=ActionRole.LEARN){openLessons()}.apply{tag="main-lessons"},
+            action(t("Explore in 3D","3D में देखें"),false,role=ActionRole.CAMERA){startActivity(Intent(this,EquipmentActivity::class.java).putExtra("moduleId",selected))})
+        pair(action(t("Guided practice","निर्देशित अभ्यास"),false,role=ActionRole.LEARN){startTraining(true,false)},
+            action(t("Take an assessment","मूल्यांकन शुरू करें"),false,role=ActionRole.REVIEW){chooseAssessment()})
+        body.add(action(t("More practice options","अभ्यास के और विकल्प"),false,role=ActionRole.NEUTRAL){go("practice")}.apply{
+            tag="main-practice-options";textSize=14f;setCompoundDrawables(null,null,appIcon("arrow",Palette.muted,20),null)
+        },top=2)
     }
     private fun startRoomMission(recall:Boolean){
         startActivity(Intent(this,RoomMissionActivity::class.java).putExtra("moduleId",selected).putExtra("guided",!recall).putExtra("camera",true).putExtra("recall",recall))
@@ -163,10 +222,15 @@ class MainActivity: Activity() {
         },bottom=20)
         body.add(card().apply{add(label(item.local("body",hi),18f).apply{tag="main-lesson-content"})},bottom=16)
         body.add(action(t("Listen","सुनें"),false,role=ActionRole.LEARN){speak(item.local("body",hi))}.apply{tag="main-lesson-listen"},bottom=16)
-        body.add(action(if(lessonIndex==lessons.lastIndex)t("Finish reading","पढ़ना पूरा करें")else t("Next lesson","अगला पाठ")){
-            if(lessonIndex==lessons.lastIndex)go("module")else{lessonIndex++;go("lesson")}
-        }.apply{tag="main-lesson-next"},bottom=10)
-        if(lessonIndex>0)body.add(action(t("Previous lesson","पिछला पाठ"),false,role=ActionRole.NEUTRAL){lessonIndex--;go("lesson")}.apply{tag="main-lesson-previous"})
+    }
+    private fun lessonNavigation():LinearLayout {
+        val lessons=curriculum.module(selected).getJSONArray("lessons")
+        val dock=LinearLayout(this).apply{isBaselineAligned=false;setPadding(dp(18),dp(8),dp(18),dp(8));setBackgroundColor(Palette.surface)}
+        if(lessonIndex>0)dock.addView(action(t("Previous","पिछला"),false,role=ActionRole.NEUTRAL){lessonIndex--;go("lesson")}.apply{tag="main-lesson-previous";textSize=14f},LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(8)})
+        dock.addView(action(if(lessonIndex==lessons.length()-1)t("Finish reading","पढ़ना पूरा करें")else t("Next lesson","अगला पाठ")){
+            if(lessonIndex==lessons.length()-1)go("module")else{lessonIndex++;go("lesson")}
+        }.apply{tag="main-lesson-next";textSize=14f},LinearLayout.LayoutParams(0,-2,if(lessonIndex>0)1.5f else 1f))
+        return dock
     }
     private fun practiceOptions(){
         title(t("Choose your practice","अपना अभ्यास चुनें"),curriculum.module(selected).local("title",hi))
@@ -274,7 +338,14 @@ class MainActivity: Activity() {
     }
     private fun help(){
         title(t("Here to help","आपकी मदद के लिए"))
-        listOf(t("1. Choose a lesson and learn the steps.","1. पाठ चुनें और चरण सीखें।"),t("2. Practise with guidance, then try an assessment.","2. निर्देशों के साथ अभ्यास करें, फिर मूल्यांकन करें।"),t("3. Your progress is saved after every answer.","3. हर उत्तर के बाद प्रगति सहेजी जाती है।"),t("4. Export records for your trainer. Completed practice does not authorise hazardous work.","4. प्रशिक्षक के लिए रिकॉर्ड भेजें। अभ्यास पूरा करना खतरनाक काम की अनुमति नहीं है।")).forEach{body.add(card().apply{add(label(it))},bottom=12)}
+        val guide=card()
+        listOf(t("1. Choose a lesson and learn the steps.","1. पाठ चुनें और चरण सीखें।"),t("2. Practise with guidance, then try an assessment.","2. निर्देशों के साथ अभ्यास करें, फिर मूल्यांकन करें।"),t("3. Your progress is saved after every answer.","3. हर उत्तर के बाद प्रगति सहेजी जाती है।"),t("4. Export records for your trainer. Completed practice does not authorise hazardous work.","4. प्रशिक्षक के लिए रिकॉर्ड भेजें। अभ्यास पूरा करना खतरनाक काम की अनुमति नहीं है।")).forEachIndexed{i,text->guide.add(label(text,14f),top=if(i==0)0 else 12)}
+        body.add(guide,bottom=16)
+        body.add(action(t("Learners on this phone","इस फ़ोन के शिक्षार्थी"),false,role=ActionRole.NEUTRAL){startActivity(Intent(this,WorkerProfilesActivity::class.java))},bottom=10)
+        body.add(action(t("Edit my profile","मेरी प्रोफ़ाइल बदलें"),false,role=ActionRole.NEUTRAL){profile()},bottom=10)
+        body.add(action(t("Admin dashboard","व्यवस्थापक डैशबोर्ड"),false,role=ActionRole.NEUTRAL){startActivity(Intent(this,AdminActivity::class.java))}.apply{
+            tag="main-admin-dashboard";setCompoundDrawables(appIcon("admin",Palette.ink,22),null,null,null);compoundDrawablePadding=dp(8)
+        },bottom=10)
         body.add(action(t("Choose language","भाषा चुनें"),false,role=ActionRole.NEUTRAL){language()},top=8,bottom=12)
         body.add(action(t("Check AR support","AR समर्थन जाँचें"),false,role=ActionRole.CAMERA){ArCoreApk.getInstance().checkAvailabilityAsync(this){a->notice(t("AR support","AR समर्थन"),a.name)}},bottom=12)
         body.add(label(t("Version 0.6.0 • Pilot content requires safety review. Santali lessons await native-speaker review. Audio uses installed offline Android voices.","संस्करण 0.6.0 • पायलट सामग्री की सुरक्षा समीक्षा ज़रूरी है। संताली पाठों की स्थानीय वक्ता समीक्षा बाकी है। आवाज़ Android की इंस्टॉल ऑफ़लाइन आवाज़ से आती है।"),14f,Palette.muted))

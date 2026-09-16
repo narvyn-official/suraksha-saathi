@@ -4,7 +4,11 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.matcher.RootMatchers.isDialog
-import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.*
+import androidx.test.espresso.action.ViewActions.scrollTo
+import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.equalTo
+import android.widget.Button
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
@@ -20,6 +24,11 @@ import java.io.File
 class AppFlowTest {
  private fun texts(v:View):List<TextView> = (if(v is TextView)listOf(v)else emptyList())+(if(v is ViewGroup)(0 until v.childCount).flatMap{texts(v.getChildAt(it))}else emptyList())
  private fun tap(s:ActivityScenario<MainActivity>,text:String){s.onActivity{a->val view=texts(a.window.decorView).firstOrNull{it.text.toString()==text}?:error("Missing control: $text");view.performClick()};InstrumentationRegistry.getInstrumentation().waitForIdleSync()}
+ private fun openModule(id:String){
+  onView(withTagValue(equalTo<Any>("main-module-picker"))).perform(scrollTo(),click())
+  onView(allOf(isAssignableFrom(Button::class.java),isDescendantOfA(withTagValue(equalTo<Any>("main-module-$id")))))
+   .inRoot(isDialog()).perform(scrollTo(),click())
+ }
  private fun shot(name:String){val i=InstrumentationRegistry.getInstrumentation();val b=i.uiAutomation.takeScreenshot();File(i.targetContext.getExternalFilesDir(null),name).outputStream().use{b.compress(Bitmap.CompressFormat.PNG,100,it)}}
  @Test fun moduleAssessmentPersistsAcrossRecreation(){
   val context=InstrumentationRegistry.getInstrumentation().targetContext
@@ -28,7 +37,7 @@ class AppFlowTest {
    s.onActivity{it.setShowWhenLocked(true);it.setTurnScreenOn(true);it.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);it.getSystemService(android.app.KeyguardManager::class.java).requestDismissKeyguard(it,null)}
    InstrumentationRegistry.getInstrumentation().waitForIdleSync()
    onView(withText("Learn to stay safe.")).check(matches(isDisplayed()));shot("home.png")
-   tap(s,"Start learning");tap(s,"Take an assessment");onView(withText("On-screen decisions")).inRoot(isDialog()).perform(click());onView(withText("I’m in a safe area")).inRoot(isDialog()).perform(click())
+   openModule("fire");tap(s,"Take an assessment");onView(withText("On-screen decisions")).inRoot(isDialog()).perform(click());onView(withText("I’m in a safe area")).inRoot(isDialog()).perform(click())
    val curriculum=Curriculum(context);val questions=curriculum.module("fire").getJSONArray("questions").objects()
    questions.forEachIndexed{i,q->
     if(i==2)s.recreate()
@@ -50,7 +59,7 @@ class AppFlowTest {
  @Test fun machineryCriticalDecisionStopsAssessment(){
   val c=InstrumentationRegistry.getInstrumentation().targetContext;Store(c).use{it.hi=false}
   ActivityScenario.launch(MainActivity::class.java).use{s->
-   s.onActivity{a->val title=texts(a.window.decorView).first{it.text.toString()=="Machinery & isolation"};texts(title.parent as ViewGroup).first{it.text.toString()=="Start learning"}.performClick()}
+   openModule("machinery")
    tap(s,"Take an assessment");onView(withText("On-screen decisions")).inRoot(isDialog()).perform(click());onView(withText("I’m in a safe area")).inRoot(isDialog()).perform(click())
    val q=Curriculum(c).module("machinery").getJSONArray("questions").getJSONObject(0)
    tap(s,q.getJSONArray("options").objects().first{!it.optBoolean("correct")}.local("text",false))
@@ -77,7 +86,7 @@ class AppFlowTest {
    fun t(en:String,hindi:String)=if(hi)hindi else en
    Store(c).use{it.hi=hi}
    ActivityScenario.launch(MainActivity::class.java).use{s->
-    s.onActivity{a->val title=texts(a.window.decorView).first{it.text.toString()==module.local("title",hi)};texts(title.parent as ViewGroup).first{it.text.toString()==t("Start learning","सीखना शुरू करें")}.performClick()}
+    openModule("ppe")
     shot(if(hi)"ppe-hindi-lesson.png" else "ppe-lesson.png")
     if(guided){tap(s,t("Guided practice","निर्देशित अभ्यास"))}else{tap(s,t("Take an assessment","मूल्यांकन शुरू करें"));onView(withText(t("On-screen decisions","स्क्रीन पर निर्णय"))).inRoot(isDialog()).perform(click())}
     onView(withText(t("I’m in a safe area","मैं सुरक्षित जगह पर हूँ"))).inRoot(isDialog()).perform(click())

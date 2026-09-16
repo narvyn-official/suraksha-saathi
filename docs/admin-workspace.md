@@ -1,37 +1,55 @@
-# Login and administration — 16 September 2026
+# Native training centre and independent accounts — 0.7.0
 
-The dashboard now has a dedicated login surface and a shared training-centre workspace. The Android APK remains version 0.6.0; this increment changes the web application only.
+Suraksha Saathi now includes a native Android training-centre workspace. Open the profile menu → **Admin dashboard**, or Help → **Admin dashboard**. Learning remains available offline without an account. The web dashboard is a companion to the same account service.
 
-## Access
+## Accounts and access
 
-- `/` shows sign-in to anonymous visitors and the dashboard after authentication. `/login` provides account entry, and sign-out uses the platform-owned route.
-- Sign-in uses the supported ChatGPT identity flow. The local preview intentionally uses the starter's development identity; it is not a password-based public login service. Password recovery and account authentication belong to the identity provider.
-- Each signed-in user retains their personal workspace and can accept email-matched invitations to other centres. Accepted membership is bound to the stable authenticated user ID. A unique database index prevents duplicate membership identities in one centre.
-- The workspace-selection cookie is HttpOnly and SameSite=Lax (Secure on HTTPS). It selects a workspace only: every API request checks current membership and role. Revocation takes effect on the next request; an old cookie cannot restore access.
-- Admins manage staff and settings; trainers manage workers, assignments, imports and pilot credentials; viewers can read, verify and export. The owner always retains administration. No invitation email is automatically sent. Invitees must also satisfy the hosting platform's access policy.
+Suraksha email/password accounts replace ChatGPT authentication. Better Auth handles password hashing, server-side sessions, sign-out and password changes. Passwords require 12–128 characters. Sessions expire after seven days; changing a password revokes other sessions. Authentication requests are rate limited in the database. Neither ChatGPT identity headers nor the starter's development cookie authorizes a training API.
 
-## Workflows
+The Android client stores session cookies encrypted with Android Keystore and never stores passwords. It accepts HTTPS origins; debug builds additionally allow only localhost/127.0.0.1 for emulator testing. Redirects cannot send account data to a different service. Changing the configured server clears the local session. The release manifest does not permit cleartext traffic.
 
-1. Sign in, then open Settings to name the centre and site.
-2. Under Team access, save an email and role. Share the dashboard address yourself. The recipient signs in with that email and selects the invited workspace.
-3. Import Android assessments or room practice, or register a worker. An optional existing Android worker ID links a new registration to that phone profile. Without that ID a new register entry is standalone; import Android records before assigning device training. Existing saved identities are not rewritten.
-4. Assign a module to up to 100 selected workers with a due time and optional instructions. Completion requires the latest imported assessment for the assigned curriculum version **started after** assignment to pass. Older passes and practice cannot complete it; a later failure removes completion status. This relies on the phone's reported clock, not trusted device attestation.
-5. Filter assigned, overdue, completed and cancelled work. Export the filtered report as CSV. These statuses concern the centre's training plan, not verified legal compliance. Cancellation preserves the record and reason.
-6. Activity records staff acceptance, settings/profile/access changes, assignment creation/cancellation, imports and credential issuance/revocation. It starts with this increment and does not reconstruct older events. The application exposes no audit edit/delete endpoint.
+Each account owns a centre. Admin / Trainer / Viewer permissions and active membership are checked on every server request. A centre selector cookie does not grant access. Team invitations generate a private, one-time code valid for seven days, displayed only when created. The invited email and code are both required to join; unverified email alone grants no membership. Only a hash of the invitation secret is stored. No email is automatically sent.
 
-Existing assessment review, curriculum, worker analytics, room-practice snapshots, signed QR download/verification and revocation remain available. Screen/camera practice remains separate from certification.
+Email verification and forgotten-password recovery are not configured. Staff must keep their password; the password-change flow requires the current password. Historical records retain their existing owner IDs. Existing ChatGPT-linked records are not automatically reassigned to new accounts: a separately reviewed owner migration is required.
 
-## Installation and bounds
+## In-app workflows
 
-Apply D1 migrations `0003_admin_workspace.sql`, `0004_admin_lookup_indexes.sql` and `0005_assignment_curriculum_version.sql` through the standard local migration command in the dashboard README. Existing personal records keep their owner keys. No private issuer key changes or Android migrations are needed.
+- Native login/signup, session restoration, sign-out, password changes and centre switching/joining.
+- Overview, worker registration/editing with optional Android profile IDs, batch training assignments, cancellation and CSV text report sharing.
+- Assessment review, signed QR issuance with an explicitly selected expiry, sharing, scanning, verification and revocation.
+- Room-practice histories, curriculum and activity log; admin-only staff access and centre settings.
+- Manual authenticated upload of the current local worker's completed assessment records and room-practice journals, after the destination centre is shown.
 
-Management displays the latest 1,000 workers/assignments, 200 staff members and 200 audit entries, with total record counts where provided. Existing assessment/practice views retain their disclosed bounds. Assignments are manually transferred planning records: automatic phone delivery, notifications, organization SSO, email/password accounts and practical assessor sign-off are not implemented.
+The native home uses fixed navigation and a selected module instead of a stacked catalogue. Lessons advance one at a time. Record collections use dedicated lists. Forms can scroll for the keyboard or enlarged text; content is not clipped to imitate a fixed screenshot.
 
-## Verification
+Assignments complete only when the latest imported assessment of the assigned curriculum version, started after the assignment, passes. Older passes, practice and later failed assessments cannot be hidden. The phone's reported clock is not device attestation. Practical competence and permission to work remain separately assessed.
 
-- New API integration checks: local sign-in/out contracts, anonymous rejection, forged identity headers, invited workspace acceptance, cookie flags, guessed/cross-workspace access, all role write restrictions, revocation, personal-workspace recovery, worker registration/editing/Android-ID matching, assignment evidence/overdue/cancellation, audit attribution and cross-origin writes.
-- Existing assessment/credential and room-journal API integrations passed after authorization changes.
-- All 20 existing web unit tests passed; TypeScript checking passed.
-- No browser visual or interaction test was performed. Login and authenticated dashboard routes returned HTTP 200; the production build passed with the existing large-client-chunk warning.
+The browser companion also provides analytical filtering and downloadable CSV files. Android exposes the core workflows natively and shares assignment reports through the system share sheet. Automatic assignment delivery, background synchronization, notifications and practical assessor sign-off remain outside this pilot.
 
-Hosting remains unresolved: the original Sites registration returned an uncertain transport failure, and fresh complete discovery found no Suraksha site. The workflow forbids duplicate creation after that uncertain result. No live login URL or production identity-provider round trip is claimed.
+## Local setup
+
+From the repository root:
+
+```sh
+node scripts/create-app-auth.mjs
+# First setup only if an issuer has not already been configured:
+node scripts/create-pilot-issuer.mjs
+cd apps/admin-web
+npm ci
+npx wrangler d1 migrations apply DB --local --config wrangler.local.json --persist-to .wrangler/state
+npm run dev
+```
+
+The auth setup script preserves existing values and appends a generated secret and local origin to ignored `.dev.vars`; it does not print secrets. Apply migration `0006_independent_accounts.sql` along with all preceding migrations.
+
+For emulator testing, use `adb reverse tcp:5173 tcp:5173`; in native **Connection settings**, enter `http://localhost:5173`. A physical phone needs a reachable HTTPS account server for the admin workspace. Offline learning is independent of that server.
+
+Production runtime configuration requires `BETTER_AUTH_URL` (the exact HTTPS origin), `BETTER_AUTH_SECRET` (at least 32 random characters), the existing `ISSUER_PRIVATE_JWK`, and the D1 binding `DB`. Store private values only in backend secret storage. Never include them in Git, the APK or hosting metadata.
+
+## Bounds and verification
+
+Management returns up to 1,000 workers/assignments and 200 staff/audit entries. Assessment and credential views return up to 500 records; room history retains its existing disclosed bounds. Native sync uses the selected local learner; it does not authenticate that learner's real-world identity.
+
+Automated checks cover independent signup/signin, rejection of provider-cookie spoofing, possession-based invitation acceptance, one-time use, roles, revocation, cross-origin requests, password changes and revoked-session replay. Existing imports, grading, credentials and journal integrations continue to use real account sessions. Native emulator checks cover login, registration, encrypted cookie storage, session recreation, worker creation, sign-out and both-language learner navigation/viewport fit.
+
+Public backend hosting remains unresolved: the original Sites registration had an uncertain transport outcome and complete discovery found no Suraksha site. No live public account endpoint is claimed. Native admin was verified against the local service through emulator port forwarding; physical-phone AR remains unverified.

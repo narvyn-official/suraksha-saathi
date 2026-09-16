@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { access, audit, db, failure, json } from "@/lib/server";
+import { z } from "zod/v3";
+import { access, audit, db, failure, json, digest } from "@/lib/server";
 import { curriculum } from "@/lib/grading";
 import { assignmentStatus } from "@/lib/access";
 const id = z.string().uuid();
@@ -28,14 +28,17 @@ export async function POST(request:Request) {
   try {
     const parsed=command.safeParse(await json(request));if(!parsed.success)throw new Error("Invalid form. Check required fields and limits.");
     const c=parsed.data,a=await access(c.action==='settings'||c.action==='member'?'admin':'write'),now=Date.now(),statements:D1PreparedStatement[]=[];
-    let target='';
+    let target='', invitation:string|undefined;
     if(c.action==='settings') {
       target=a.owner;statements.push(db().prepare("INSERT INTO training_centres(owner,name,site,updated_at) VALUES(?,?,?,?) ON CONFLICT(owner) DO UPDATE SET name=excluded.name,site=excluded.site,updated_at=excluded.updated_at").bind(a.owner,c.name,c.site,now));
     } else if(c.action==='member') {
       const email=c.email.toLowerCase();if(email===a.user.email.toLowerCase())throw new Error("Invalid member change: you cannot change your own access.");
       const prior=await db().prepare("SELECT user_id FROM team_members WHERE owner=? AND email=?").bind(a.owner,email).first<{user_id:string|null}>();
       if(prior?.user_id===a.owner)throw new Error("Forbidden: the workspace owner's access cannot be changed.");
-      target=email;statements.push(db().prepare("INSERT INTO team_members(owner,email,role,active,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(owner,email) DO UPDATE SET role=excluded.role,active=excluded.active,updated_at=excluded.updated_at").bind(a.owner,email,c.role,c.active?1:0,now));
+      const code=c.active&&!prior?.user_id ? crypto.randomUUID().replaceAll("-","")+crypto.randomUUID().replaceAll("-","") : null;
+      const hash=code?await digest(code):null;
+      if(code)invitation=`${a.owner}.${code}`;
+      target=email;statements.push(db().prepare("INSERT INTO team_members(owner,email,role,active,updated_at,invite_hash,invite_expires_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(owner,email) DO UPDATE SET role=excluded.role,active=excluded.active,updated_at=excluded.updated_at,invite_hash=excluded.invite_hash,invite_expires_at=excluded.invite_expires_at").bind(a.owner,email,c.role,c.active?1:0,now,hash,code?now+7*86400000:null));
     } else if(c.action==='worker') {
       if(c.id && c.androidId)throw new Error("Invalid worker ID change. Saved identity cannot be rewritten.");
       target=c.id??c.androidId??crypto.randomUUID();
@@ -57,6 +60,6 @@ export async function POST(request:Request) {
     }
     if(c.action!=='assign') statements.push(audit(a,`admin.${c.action}`,target,c.action==='cancel'?{reason:c.reason}:c.action==='member'?{role:c.role,active:c.active}:{}));
     await db().batch(statements);
-    return Response.json({saved:true,id:target},{headers:{"Cache-Control":"no-store"}});
+    return Response.json({saved:true,id:target,...(invitation?{invitation}:{})},{headers:{"Cache-Control":"no-store"}});
   }catch(e){return failure(e);}
 }

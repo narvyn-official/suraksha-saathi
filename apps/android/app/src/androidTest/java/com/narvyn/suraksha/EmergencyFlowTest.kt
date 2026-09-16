@@ -8,7 +8,11 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.matcher.RootMatchers.isDialog
-import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.matcher.ViewMatchers.*
+import androidx.test.espresso.action.ViewActions.scrollTo
+import org.hamcrest.Matchers.allOf
+import org.hamcrest.Matchers.equalTo
+import android.widget.Button
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
 import org.junit.Test
@@ -28,8 +32,9 @@ class EmergencyFlowTest {
     }
     private fun open(s: ActivityScenario<MainActivity>, hi: Boolean, practice: Boolean) {
         fun t(en: String, hindi: String) = if(hi)hindi else en
-        val module = Curriculum(context).module("emergency")
-        s.onActivity { a -> val title = texts(a.window.decorView).first { it.text.toString()==module.local("title",hi) };texts(title.parent as ViewGroup).first { it.text.toString()==t("Start learning","सीखना शुरू करें") }.performClick() }
+        onView(withTagValue(equalTo<Any>("main-module-picker"))).perform(scrollTo(),click())
+        onView(allOf(isAssignableFrom(Button::class.java),isDescendantOfA(withTagValue(equalTo<Any>("main-module-emergency")))))
+            .inRoot(isDialog()).perform(scrollTo(),click())
         instrumentation.waitForIdleSync()
         if(InstrumentationRegistry.getArguments().getString("emergencyDemo")=="true")Thread.sleep(700)
         shot(if(hi)"emergency-hindi-lesson.png" else "emergency-lesson.png")

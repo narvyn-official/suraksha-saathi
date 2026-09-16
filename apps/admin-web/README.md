@@ -4,15 +4,15 @@ Private trainer workspace for importing Android training exports, reviewing deci
 
 ## Login and admin workspace
 
-See [login, roles, worker management, assignments and audit setup](../../docs/admin-workspace.md). The dashboard now opens on a dedicated sign-in screen, with shared workspaces and Admin / Trainer / Viewer permissions checked server-side. Team invitations are saved in the workspace; no email is sent automatically. Local sign-in remains a development identity; hosted sign-in uses the platform's ChatGPT flow.
+See [login, roles, worker management, assignments and audit setup](../../docs/admin-workspace.md). The dashboard now opens on a dedicated sign-in screen, with shared workspaces and Admin / Trainer / Viewer permissions checked server-side. Team invitations are saved in the workspace; no email is sent automatically. Accounts use independent Suraksha email/password authentication, shared with the native Android admin workspace.
 
-Apply migrations through `0005_assignment_curriculum_version.sql` before running this version. In addition to the existing integration checks, run `npx tsx tests/admin.integration.ts` locally. Its temporary workspace fixtures are removed after the run.
+Apply migrations through `0006_independent_accounts.sql` before running this version. In addition to the existing integration checks, run `npx tsx tests/admin.integration.ts` locally. Its temporary workspace fixtures are removed after the run.
 
 ## Local run
 
 From the repository root, run `node scripts/create-pilot-issuer.mjs` **only on first setup**. It generates a local signing key in ignored `apps/admin-web/.dev.vars` and embeds the matching public trust anchor into both apps. Existing issuer settings are never overwritten. Rebuilding Android is necessary after an intentional issuer change. Never commit or distribute the private key.
 
-Then:
+Run `node scripts/create-app-auth.mjs` from the repository root to configure the independent local account service without printing secrets. Then:
 
 ```sh
 cd apps/admin-web
@@ -21,7 +21,7 @@ npx wrangler d1 migrations apply DB --local --config wrangler.local.json --persi
 npm run dev
 ```
 
-Open the printed localhost address and choose **Sign in**. The starter's development sign-in uses a local-only identity; it is not a production login. Production routes require the Sites-injected identity and are scoped by owner ID. There is no bypass based on a user-supplied owner field.
+Open the printed localhost address and create a Suraksha account. Email/password accounts are independent of ChatGPT. Every API checks the account session and current workspace role; a supplied owner ID cannot grant access. Production requires BETTER_AUTH_URL and BETTER_AUTH_SECRET in backend configuration. See the account recovery and ownership-migration limits in the admin setup guide.
 
 Import the Android JSON export, select **View**, and choose a policy-approved expiry and issue a pilot credential for a passed assessment. Renewal requires a new passed assessment; existing dates cannot be extended. Legacy tokens remain signature-verifiable but display “No expiry recorded” and are excluded from active counts. The QR is signed with ES256. The Android app pins the public issuer key. Offline verification confirms signature and scope, **not** revocation. The dashboard checks its stored current status. Records do not prove the learner's identity or practical competence.
 
@@ -40,7 +40,7 @@ D1 migrations are in `drizzle/`. The private issuer runtime value is `ISSUER_PRI
 
 ## Deployment state
 
-Sites registration failed during this build. Discovery confirmed no Suraksha site was available, and registration was not duplicated. The dashboard is usable locally; no public verification endpoint or automatic phone sync is claimed. Resume hosting after the original registration issue is resolved. Production build and migrations are prepared.
+Sites registration failed during this build. Discovery confirmed no Suraksha site was available, and registration was not duplicated. The dashboard is usable locally; no public verification endpoint or background phone sync is claimed. Resume hosting after the original registration issue is resolved. Production build and migrations are prepared.
 
 ## Pilot limitations
 
@@ -56,4 +56,4 @@ On Android use **My record → Export room practice journals**, then use the das
 
 The authenticated `/api/room-journals` endpoint supports v1/v2 histories, including incomplete attempts and recorded assistance. Imports replay supported actions, preserve immutable snapshots and accept identical reuploads idempotently. Conflicting histories are rejected atomically. Records are owner-scoped and never qualify for credential issuance. The phone exports up to 100 latest journals, reports omissions and bounds the file to 950 KB; the API limits stored history per owner to 2,000 attempts and 10,000 snapshots. These are locally reported simulation events, not hardware-attested performance.
 
-Run `npx tsx tests/room-journals.integration.ts` against the local development server for the room API checks. Production hosting remains unresolved; this feature uses manual transfer.
+Run `npx tsx tests/room-journals.integration.ts` against the local development server for the room API checks. Production hosting remains unresolved; native upload and file transfer both require the account service.

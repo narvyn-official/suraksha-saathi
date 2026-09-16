@@ -1,14 +1,14 @@
 import { env } from "cloudflare:workers";
 import { headers } from "next/headers";
 import { permitted, type Role } from "@/lib/access";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { getAppUser } from "@/lib/auth";
 export function db() {
   if (!env.DB) throw new Error("Training storage is unavailable.");
   return env.DB as D1Database;
 }
-export type Access = { owner: string; role: Role; user: NonNullable<Awaited<ReturnType<typeof getChatGPTUser>>> };
+export type Access = { owner: string; role: Role; user: NonNullable<Awaited<ReturnType<typeof getAppUser>>> };
 export async function access(permission: "read" | "write" | "admin" = "read"): Promise<Access> {
-  const user = await getChatGPTUser();
+  const user = await getAppUser();
   if (!user) throw new Error("Sign in to access training records.");
   const cookie = (await headers()).get("cookie") ?? "";
   const value = cookie.split(";").map(v => v.trim()).find(v => v.startsWith("suraksha_workspace="))?.split("=").slice(1).join("=");

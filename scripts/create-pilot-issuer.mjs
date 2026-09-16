@@ -1,13 +1,14 @@
 import {generateKeyPairSync,createHash} from 'node:crypto';
-import {writeFileSync,existsSync,mkdirSync} from 'node:fs';
+import {writeFileSync,existsSync,readFileSync} from 'node:fs';
 const target=new URL('../apps/admin-web/.dev.vars',import.meta.url);
-if(existsSync(target))throw new Error('Issuer configuration exists. Refusing to rotate keys implicitly.');
+const existing=existsSync(target)?readFileSync(target,'utf8'):'';
+if(/^ISSUER_PRIVATE_JWK=/m.test(existing))throw new Error('Issuer configuration exists. Refusing to rotate keys implicitly.');
 const {publicKey,privateKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
 const spki=publicKey.export({type:'spki',format:'der'}).toString('base64');
 const publicJwk=publicKey.export({format:'jwk'}),privateJwk=privateKey.export({format:'jwk'});
 const kid=createHash('sha256').update(spki).digest('hex').slice(0,16);
 const trust={issuer:'suraksha-pilot',kid,spki,jwk:publicJwk,scope:'pilot-simulation'};
-writeFileSync(target,`ISSUER_PRIVATE_JWK=${JSON.stringify(privateJwk)}\n`,{mode:0o600});
+writeFileSync(target,existing+`\nISSUER_PRIVATE_JWK=${JSON.stringify(privateJwk)}\n`,{mode:0o600});
 writeFileSync(new URL('../content/trusted-issuer.json',import.meta.url),JSON.stringify(trust,null,2)+'\n');
 writeFileSync(new URL('../apps/admin-web/lib/trusted-issuer.json',import.meta.url),JSON.stringify(trust,null,2)+'\n');
 console.log('Pilot issuer generated. Private key stored only in ignored .dev.vars; public trust anchor embedded in both apps.');

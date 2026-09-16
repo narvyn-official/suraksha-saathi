@@ -1,14 +1,16 @@
 # Suraksha Saathi
 
-A **v0.6.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
+A **v0.7.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with a fixed light interface.
 
-**Latest download: [v0.6.0 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.6.0-pilot)**
+**Latest published download: [v0.7.0 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.7.0-pilot)**
 
-- [Download the Android APK — v0.6.0](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/suraksha-saathi-0.6.0-debug.apk) · Android 10+, debug-signed pilot.
-- [Watch the v0.6.0 emulator walkthrough](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/suraksha-saathi-0.6.0-emulator-demo.mp4) · Screen fire/gas and explosion-evacuation practice; not physical AR evidence.
-- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/SHA256SUMS-0.6.0.txt).
+- [Download the Android APK — v0.7.0](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.7.0-pilot/suraksha-saathi-0.7.0-debug.apk) · Android 10+, debug-signed pilot.
+- [Watch the earlier v0.6.0 emulator walkthrough](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/suraksha-saathi-0.6.0-emulator-demo.mp4) · Screen fire/gas and explosion-evacuation practice; not physical AR evidence.
+- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.7.0-pilot/SHA256SUMS-0.7.0.txt).
 
-**In this version:** 0.6.0 expands fire room practice through exit selection, evacuation, assembly and reporting, adds an explosion-risk evacuation branch and gas PPE/buddy checks, introduces paged native lessons and saved room-practice recovery, and connects separate room journals to trainer review. All four camera paths share camera configuration, pacing, thermal recovery and session-release handling. See [implementation, verification and remaining gaps](docs/release-0.6.0.md). **Physical-phone AR still needs verification; this is a pilot prerelease.**
+**In this version (0.7.0):** compact native learner screens, an in-app admin workspace, independent email/password accounts and a redesigned browser companion. Download the APK above or build locally with the command below. **Public account hosting remains pending; native administration requires a configured account server.** See [0.7.0 changes and validation](docs/release-0.7.0.md).
+
+**In the published 0.6.0 version:** 0.6.0 expands fire room practice through exit selection, evacuation, assembly and reporting, adds an explosion-risk evacuation branch and gas PPE/buddy checks, introduces paged native lessons and saved room-practice recovery, and connects separate room journals to trainer review. All four camera paths share camera configuration, pacing, thermal recovery and session-release handling. See [implementation, verification and remaining gaps](docs/release-0.6.0.md). **Physical-phone AR still needs verification; this is a pilot prerelease.**
 
 ## What you can use now
 
@@ -37,7 +39,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/suraksha-saathi-0.6.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
+The debug-signed APK is copied to `artifacts/suraksha-saathi-0.7.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs
@@ -47,7 +49,7 @@ The command creates an ignored private runtime key and matching public trust fil
 
 ## Login and administration
 
-The web dashboard now includes a sign-in screen, shared workspaces, Admin/Trainer/Viewer roles, staff invitations, worker registration/editing, bulk training assignments, overdue tracking, CSV reports and an activity log. See [admin setup and validation](docs/admin-workspace.md). This web update does not change the 0.6.0 APK. Local preview uses a development identity; public hosting remains unresolved.
+The web dashboard now includes a sign-in screen, shared workspaces, Admin/Trainer/Viewer roles, staff invitations, worker registration/editing, bulk training assignments, overdue tracking, CSV reports and an activity log. See [admin setup and validation](docs/admin-workspace.md). The 0.7.0 development APK adds a native training-centre workspace and independent Suraksha accounts. Public hosting remains unresolved.
 
 ## Run the dashboard
 

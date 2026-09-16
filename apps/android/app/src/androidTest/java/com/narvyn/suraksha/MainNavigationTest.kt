@@ -6,18 +6,22 @@ import android.content.Intent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.ScrollView
+import android.graphics.Rect
 import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.matcher.ViewMatchers.*
+import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.equalTo
 import org.junit.Assert.*
 import org.junit.Test
+import org.junit.Assume.assumeTrue
 import org.junit.runner.RunWith
 import java.util.concurrent.atomic.AtomicReference
 
@@ -32,10 +36,17 @@ class MainNavigationTest {
         java.io.File(context.getExternalFilesDir(null),"nav-060-$name-$scale.png").outputStream().use{instrumentation.uiAutomation.takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
     }
     private fun tag(value:String)=withTagValue(equalTo<Any>(value))
-    private fun clickTag(value:String){onView(tag(value)).perform(scrollTo(),click())}
+    private fun clickTag(value:String){if(value in listOf("main-lesson-next","main-lesson-previous"))onView(tag(value)).perform(click())else onView(tag(value)).perform(scrollTo(),click())}
     private fun back(){onView(tag("main-back")).perform(click())}
     private fun openModule(id:String){
-        onView(allOf(isAssignableFrom(Button::class.java),isDescendantOfA(tag("main-module-$id")))).perform(scrollTo(),click())
+        clickTag("main-module-picker")
+        val expected=Curriculum(context).modules.map{"main-module-${it.getString("id")}"}.toSet()
+        onView(isRoot()).inRoot(isDialog()).check { view,error ->
+            if(error!=null)throw error
+            assertEquals("The picker must retain every module",expected,all(requireNotNull(view)).mapNotNull{it.tag as? String}.filter{it in expected}.toSet())
+        }
+        onView(allOf(isAssignableFrom(Button::class.java),isDescendantOfA(tag("main-module-$id"))))
+            .inRoot(isDialog()).perform(scrollTo(),click())
     }
     private fun assertPage(s:ActivityScenario<MainActivity>,page:String){
         s.onActivity { a -> assertNotNull(all(a.window.decorView).singleOrNull{it.tag=="main-page-$page"}) }
@@ -43,10 +54,46 @@ class MainNavigationTest {
     private fun assertReadableControls(a:MainActivity){
         all(a.window.decorView).filterIsInstance<Button>().filter{it.isShown && it.width>0}.forEach { b ->
             assertTrue("Small target: ${b.text}",b.width>=a.dp(48) && b.height>=a.dp(48))
+            if(b.text.isBlank()) {
+                assertFalse("Icon button needs an accessible name",b.contentDescription.isNullOrBlank())
+                b.compoundDrawables.filterNotNull().forEach { icon ->
+                    assertTrue("Clipped icon",icon.bounds.width()<=b.width-b.paddingLeft-b.paddingRight && icon.bounds.height()<=b.height-b.paddingTop-b.paddingBottom)
+                }
+                return@forEach
+            }
             val layout=b.layout ?: return@forEach
             assertTrue("Clipped label: ${b.text}",layout.height<=b.height-b.compoundPaddingTop-b.compoundPaddingBottom+2)
             assertTrue("Ellipsized label: ${b.text}",(0 until layout.lineCount).all{layout.getEllipsisCount(it)==0})
         }
+    }
+
+    /** No routine home swipe on a normal portrait phone; large-font runs keep overflow accessible. */
+    @Test fun normalFontHomeAndPrimaryActionsFitWithoutDownwardScrolling(){
+        assumeTrue("Large fonts intentionally allow accessible scrolling",context.resources.configuration.fontScale<=1.05f)
+        assumeTrue("Viewport contract is for portrait phones",context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT)
+        val oldHi=Store(context).use{it.hi}
+        try { for(hi in listOf(false,true)) {
+            Store(context).use{it.hi=hi}
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                instrumentation.waitForIdleSync()
+                scenario.onActivity { activity ->
+                    val views=all(activity.window.decorView)
+                    val scroll=views.filterIsInstance<ScrollView>().single()
+                    assertEquals("Home must start at its top",0,scroll.scrollY)
+                    assertFalse("Normal home should fit without a downward swipe",scroll.canScrollVertically(1))
+                    val feature=views.single{it.tag=="main-module-fire"}
+                    val start=all(feature).filterIsInstance<Button>().single()
+                    val controls=listOf(start)+listOf("main-module-picker","main-review","main-nav-home","main-nav-records","main-nav-help")
+                        .map{tag->views.single{it.tag==tag}}
+                    for(control in controls) {
+                        val visible=Rect()
+                        assertTrue("Control is not visible: ${control.tag}",control.getLocalVisibleRect(visible))
+                        assertTrue("Control needs scrolling or is clipped: ${control.tag}",visible.width()>=control.width-1 && visible.height()>=control.height-1)
+                    }
+                    assertReadableControls(activity)
+                }
+            }
+        }} finally { Store(context).use{it.hi=oldHi} }
     }
 
     @Test fun lessonsArePacedAndPositionSurvivesRecreationInBothLanguages(){
@@ -57,8 +104,10 @@ class MainNavigationTest {
             Store(context).use{it.hi=hi}
             ActivityScenario.launch(MainActivity::class.java).use { s ->
                 s.onActivity { a ->
-                    assertEquals(modules.size,all(a.window.decorView).count{it.tag?.toString()?.startsWith("main-module-")==true})
-                    assertTrue("Home should be a module list, without repeated equipment previews",all(a.window.decorView).none{it is SceneView})
+                    val moduleTags=modules.map{"main-module-${it.getString("id")}"}.toSet()
+                    assertEquals("Home features one module; the picker contains the catalogue",1,all(a.window.decorView).count{it.tag in moduleTags})
+                    assertNotNull(all(a.window.decorView).singleOrNull{it.tag=="main-module-picker"})
+                    assertTrue("Home should not repeat equipment previews",all(a.window.decorView).none{it is SceneView})
                     assertReadableControls(a)
                 }
                 shot(if(hi)"home-hi"else"home-en")

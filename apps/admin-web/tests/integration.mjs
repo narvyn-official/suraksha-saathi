@@ -1,3 +1,5 @@
+import { account } from "./auth-client.mjs";
+const identity=await account();
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
@@ -9,7 +11,7 @@ async function call(path, body, method = "POST", auth = true) {
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(auth ? { Cookie: "__sites_local_auth=1" } : {}),
+      ...(auth ? { Cookie: identity.cookie } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
