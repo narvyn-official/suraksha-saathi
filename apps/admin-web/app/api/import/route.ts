@@ -1,8 +1,8 @@
-import { db, owner, failure, json, digest } from "@/lib/server";
+import { db, owner, access, audit, failure, json, digest } from "@/lib/server";
 import { validateImport } from "@/lib/grading";
 export async function POST(request: Request) {
   try {
-    const who = await owner();
+    const actor = await access("write"), who = actor.owner;
     const data = validateImport(await json(request));
     const inserts = [];
     let unchanged = 0;
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
           Date.now(),
         ),
     );
+    inserts.push(audit(actor,"assessment.import",data.worker.id,{imported,unchanged}));
     await db().batch(inserts);
     return Response.json({ imported, unchanged });
   } catch (e) {

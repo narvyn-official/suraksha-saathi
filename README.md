@@ -45,6 +45,10 @@ node scripts/create-pilot-issuer.mjs
 
 The command creates an ignored private runtime key and matching public trust files. It refuses to overwrite an existing private key. Never publish `.dev.vars` or signing keystores.
 
+## Login and administration
+
+The web dashboard now includes a sign-in screen, shared workspaces, Admin/Trainer/Viewer roles, staff invitations, worker registration/editing, bulk training assignments, overdue tracking, CSV reports and an activity log. See [admin setup and validation](docs/admin-workspace.md). This web update does not change the 0.6.0 APK. Local preview uses a development identity; public hosting remains unresolved.
+
 ## Run the dashboard
 
 ```sh
@@ -68,6 +72,6 @@ See the [complete requirements tracker](docs/requirements-tracker.md), [source-b
 
 ## Before field release
 
-Reviewed Santali text/audio, safety-content approval, real AR phone testing, richer physical AR actions, practical assessment, secure automatic sync, organisation roles and production distribution are still required. The supplied brief was truncated at “(3) Machinery”; domains 3–5 in the design documents are proposals.
+Reviewed Santali text/audio, safety-content approval, real AR phone testing, richer physical AR actions, practical assessment, secure automatic sync, production identity/access validation and production distribution are still required. The supplied brief was truncated at “(3) Machinery”; domains 3–5 in the design documents are proposals.
 
 See [learning research and six interaction designs](docs/ar-learning-evidence.md), [implemented spaced review](docs/spaced-review.md), and [staged component practice](docs/component-practice.md). The pilot does not claim measured learning gains.

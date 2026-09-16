@@ -22,6 +22,27 @@
       "when": 1789499900296,
       "tag": "0002_room_journals",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789517896900,
+      "tag": "0003_admin_workspace",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789518336791,
+      "tag": "0004_admin_lookup_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789518529289,
+      "tag": "0005_assignment_curriculum_version",
+      "breakpoints": true
     }
   ]
 }

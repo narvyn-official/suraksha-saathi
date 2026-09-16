@@ -2,6 +2,12 @@
 
 Private trainer workspace for importing Android training exports, reviewing decisions, issuing pilot simulation credentials, and checking signatures and revocations.
 
+## Login and admin workspace
+
+See [login, roles, worker management, assignments and audit setup](../../docs/admin-workspace.md). The dashboard now opens on a dedicated sign-in screen, with shared workspaces and Admin / Trainer / Viewer permissions checked server-side. Team invitations are saved in the workspace; no email is sent automatically. Local sign-in remains a development identity; hosted sign-in uses the platform's ChatGPT flow.
+
+Apply migrations through `0005_assignment_curriculum_version.sql` before running this version. In addition to the existing integration checks, run `npx tsx tests/admin.integration.ts` locally. Its temporary workspace fixtures are removed after the run.
+
 ## Local run
 
 From the repository root, run `node scripts/create-pilot-issuer.mjs` **only on first setup**. It generates a local signing key in ignored `apps/admin-web/.dev.vars` and embeds the matching public trust anchor into both apps. Existing issuer settings are never overwritten. Rebuilding Android is necessary after an intentional issuer change. Never commit or distribute the private key.
@@ -38,7 +44,7 @@ Sites registration failed during this build. Discovery confirmed no Suraksha sit
 
 ## Pilot limitations
 
-The dashboard displays up to the latest 500 attempts and credentials per owner. Imports accept 1–100 completed attempts and files up to 1 MB. There are no bulk worker assignments, practical-assessment signing, automatic sync, organisation roles, official certification, key rotation UI or public verification service yet. Imported event histories are consistency checked, not hardware attested.
+The dashboard displays up to the latest 500 attempts and credentials per owner. Imports accept 1–100 completed attempts and files up to 1 MB. Bulk assignments and workspace roles are implemented. Practical-assessment signing, automatic phone delivery/sync, official certification, key rotation UI and public verification hosting remain unavailable. Imported event histories are consistency checked, not hardware attested.
 
 ## Evidence analytics
 

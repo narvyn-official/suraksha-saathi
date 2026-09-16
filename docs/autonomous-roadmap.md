@@ -6,6 +6,10 @@ Updated 16 September 2026. The user has authorized ongoing autonomous developmen
 
 [Expanded missions and validation](release-0.6.0.md) now cover the previously missing fire/gas choices, paged native lessons, saved mission recovery, separate trainer imports and shared camera lifecycle fixes. The next blocker is still physical-phone tracking and both complete camera missions; only an emulator is connected. Reviewed Santali, full official domain scope, machinery room training and governed practical assessment remain open. The baseline below is retained as development history.
 
+## Latest web increment
+
+[Login and administration](admin-workspace.md) now provide supported sign-in, shared-workspace roles, staff invitation/revocation, worker management, version-bound training assignments and audit history. API role/isolation tests and the production build pass. Public hosting, actual production identity round trips, automatic device delivery and practical-assessor authority remain open.
+
 ## Baseline
 
 Public repository: https://github.com/narvyn-official/suraksha-saathi

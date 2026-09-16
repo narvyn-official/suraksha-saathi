@@ -6,6 +6,10 @@ See [current AR engineering work](ar-technology-and-validation.md) and [full pro
 
 **AR status:** physical camera feed confirmed, usable tracking/placement not confirmed. The screen fire timing investigation and current camera limits are recorded in [ar-rendering-and-placement.md](ar-rendering-and-placement.md).
 
+## Web administration update
+
+The [login and admin workspace](admin-workspace.md) adds shared authenticated workspaces, Admin/Trainer/Viewer authorization, worker registration/editing, version-bound bulk assignments, overdue reports and activity history. Local API checks and production build pass; hosted sign-in remains unverified because registration is unresolved.
+
 ## Implemented
 
 - Fire/gas **Remember, then do** rehearsal hides gesture cues, offers seven-second hints saved before display, preserves assistance history and provides a phase-specific rehearsal debrief. English/Hindi and screen fallback are implemented; practice remains non-certifying. See [recall challenge](ar-recall-challenge.md).
@@ -41,7 +45,7 @@ Native Kotlin/ARCore replaces the initially proposed Unity integration for the f
 1. Test real ARCore phones, camera tracking, recovery, thermal performance, and Android 10 hardware. Emulator testing does not verify real AR performance.
 2. Commission and review Santali text/Ol Chiki fonts and native audio. The language selector shows review pending instead of fabricated translations.
 3. Have a competent industrial safety reviewer approve scenarios, thresholds, terms and practical assessment policy. All supplied learning content is pilot draft.
-4. Extend the new labelled-action procedures into validated equipment manipulation/spatial scoring, add facilitator-controlled practical assessment, identity/organisation roles and tamper-resistant sync.
+4. Extend the new labelled-action procedures into validated equipment manipulation/spatial scoring, add facilitator-controlled practical assessment, practical identity verification, hosted access validation and tamper-resistant sync.
 5. Review site-specific emergency contacts, routes and responder roles; the new emergency domain is a general pilot, not first-aid/rescue qualification. The original brief was truncated, so this domain remains a product proposal.
 6. Complete hosting and secure issuer provisioning; support revocation freshness and key rotation. The current dashboard is local.
 7. Complete field evaluation, accessibility testing with target workers, production APK signing/distribution and an end-to-end real-device AR demo.

@@ -1,9 +1,9 @@
-import { db, owner, failure, digest } from "@/lib/server";
+import { db, owner, access, audit, failure, digest } from "@/lib/server";
 import { assertRoomSuccessor, readRoomImport, validateRoomJournal } from "@/lib/room-journals";
 
 export async function POST(request: Request) {
   try {
-    const who = await owner(), data = await readRoomImport(request);
+    const actor = await access("write"), who = actor.owner, data = await readRoomImport(request);
     const statements: D1PreparedStatement[] = [];
     let imported = 0, unchanged = 0;
     for (const record of data.rooms) {
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       imported++;
     }
     // D1 batch is atomic. The insertion trigger rejects stale parents, including racing imports.
-    if (statements.length) await db().batch(statements);
+    if (statements.length) { statements.push(audit(actor,"room.import",data.worker.id,{imported,unchanged}));await db().batch(statements); }
     return Response.json({ imported, unchanged, omittedCount: data.omittedCount ?? 0, certifiable: false });
   } catch (e) { return failure(e); }
 }

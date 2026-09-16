@@ -1,0 +1,1 @@
+ALTER TABLE `training_assignments` ADD `content_version` text DEFAULT '0.4.0' NOT NULL;

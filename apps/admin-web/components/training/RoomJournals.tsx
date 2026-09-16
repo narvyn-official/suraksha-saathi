@@ -17,7 +17,7 @@ async function api<T>(method = "GET", body?: unknown, query = "") {
   if (!response.ok) throw new Error(result.error ?? "Could not load practice journals.");
   return result;
 }
-export function RoomJournals() {
+export function RoomJournals({writable=true}:{writable?:boolean}) {
   const [rows, setRows] = useState<RoomJournalRow[]>([]);
   const [total, setTotal] = useState(0), [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
@@ -50,7 +50,7 @@ export function RoomJournals() {
     <div className="mb-5 rounded-xl bg-violet-50 p-4">
       <label htmlFor="room-journal-import" className="mb-2 block font-medium">Import room practice from Android</label>
       <p className="mb-3 text-sm">On the phone, open My record → Export room practice journals. Incomplete attempts are welcome. Newer snapshots append to the same attempt; saved actions and hints cannot be rewritten. Limits: 100 attempts per file, 512 events per attempt, 1 MB per file.</p>
-      <Input id="room-journal-import" type="file" accept="application/json,.json" disabled={busy} onChange={e => { const file = e.target.files?.[0];e.target.value = "";void importFile(file); }} />
+      <Input id="room-journal-import" type="file" accept="application/json,.json" disabled={busy||!writable} onChange={e => { const file = e.target.files?.[0];e.target.value = "";void importFile(file); }} />
     </div>
     {error && <p role="alert" className="notice error">{error} <Button variant="outline" onClick={() => { setError("");void load().catch(e => setError(e.message)); }}>Retry loading</Button></p>}
     {message && <p role="status" className="notice success">{message}</p>}

@@ -1,9 +1,9 @@
-import { db, owner, failure, json, signingKey } from "@/lib/server";
+import { db, owner, access, audit, failure, json, signingKey } from "@/lib/server";
 import { sign, trust, credentialView } from "@/lib/credentials";
 import { requestedExpiry } from "@/lib/validity";
 export async function POST(request: Request) {
   try {
-    const who = await owner(),
+    const actor = await access("write"), who = actor.owner,
       input = await json(request);
     if (typeof input.attemptId !== "string")
       throw new Error("Invalid attempt.");
@@ -49,12 +49,11 @@ export async function POST(request: Request) {
       },
       signingKey(),
     );
-    await db()
+    await db().batch([db()
       .prepare(
         "INSERT INTO credentials(owner,id,attempt_id,token,issued_at) VALUES(?,?,?,?,?)",
       )
-      .bind(who, id, a.id, token, now)
-      .run();
+      .bind(who, id, a.id, token, now),audit(actor,"credential.issue",id,{attemptId:a.id,expiresAt})]);
     return Response.json(credentialView({ id, token, attempt_id: a.id, issued_at: now, revoked_at: null, reason: null }));
   } catch (e) {
     return failure(e);
@@ -62,7 +61,7 @@ export async function POST(request: Request) {
 }
 export async function PATCH(request: Request) {
   try {
-    const who = await owner(),
+    const actor = await access("write"), who = actor.owner,
       input = await json(request);
     if (
       typeof input.id !== "string" ||
@@ -71,12 +70,12 @@ export async function PATCH(request: Request) {
       input.reason.length > 500
     )
       throw new Error("Invalid revocation reason. Use 5–500 characters.");
-    const change = await db()
+    const changes = await db().batch([db()
       .prepare(
         "UPDATE credentials SET revoked_at=?,reason=? WHERE owner=? AND id=? AND revoked_at IS NULL",
       )
-      .bind(Date.now(), input.reason.trim(), who, input.id)
-      .run();
+      .bind(Date.now(), input.reason.trim(), who, input.id),audit(actor,"credential.revoke",input.id,{reason:input.reason.trim()},true)]);
+    const change=changes[0];
     if (!change.meta.changes) throw new Error("No active credential found.");
     return Response.json({ revoked: true });
   } catch (e) {
