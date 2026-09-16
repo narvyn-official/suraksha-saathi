@@ -16,14 +16,14 @@ class RoomStationPlacementTest {
     @Test fun firstStationAndExistingSeparationRulesRemainAvailable() {
         assertTrue(decision("fire", emptyList(), Station(0f, 0f)).allowed)
         assertEquals(Reason.TOO_CLOSE, decision("gas", listOf(hazard), Station(.5f, 0f)).reason)
-        assertTrue(decision("gas", listOf(hazard), Station(.501f, 0f)).allowed)
+        assertEquals(Reason.FOOTPRINTS_TOO_CLOSE,decision("gas", listOf(hazard), Station(.501f, 0f)).reason)
         assertEquals(Reason.TOO_CLOSE, decision("fire", listOf(equipment, hazard), Station(0f, 1f)).reason)
-        assertTrue(decision("fire", listOf(equipment, hazard), Station(0f, 1.01f)).allowed)
+        assertTrue(decision("fire", listOf(equipment, hazard), Station(0f, 1.10f)).allowed)
         assertEquals(Reason.TOO_CLOSE, decision("fire", listOf(equipment, hazard), Station(-3f, .5f)).reason)
     }
 
     @Test fun gasRearPointCannotBeCalledOutsideEvenBeyondTheOldRadialLimit() {
-        val rear = Station(0f, -1.01f)
+        val rear = Station(0f, -1.10f)
         assertTrue(decision("fire", listOf(equipment, hazard), rear).allowed)
         val result = decision("gas", listOf(equipment, hazard), rear)
         assertFalse(result.allowed)
@@ -36,8 +36,8 @@ class RoomStationPlacementTest {
             decision("gas", listOf(equipment, hazard), Station(1.2f, .2f)).reason)
         assertEquals(Reason.GAS_FOOTPRINT_OVERLAP,
             decision("gas", listOf(equipment, hazard), Station(1.2f, .45f)).reason)
-        assertTrue(decision("gas", listOf(equipment, hazard), Station(1.2f, .451f)).allowed)
-        assertTrue(decision("gas", listOf(equipment, hazard), Station(0f, 1.01f)).allowed)
+        assertTrue(decision("gas", listOf(equipment, hazard), Station(1.5f, .451f)).allowed)
+        assertTrue(decision("gas", listOf(equipment, hazard), Station(0f, 1.10f)).allowed)
     }
 
     @Test fun gasOutsideDecisionUsesHazardYawAndTranslation() {
@@ -54,6 +54,15 @@ class RoomStationPlacementTest {
             assertEquals("footprint yaw=$yaw", Reason.GAS_FOOTPRINT_OVERLAP,
                 decision("gas", existing, world(1.2f, .2f)).reason)
         }
+    }
+
+    @Test fun wholeFootprintsNeedAGapEvenWhenCentresAreSeparated() {
+        assertEquals(Reason.FOOTPRINTS_TOO_CLOSE,decision("fire",listOf(hazard),Station(1.05f,0f)).reason)
+        assertTrue(decision("fire",listOf(hazard),Station(1.23f,0f)).allowed)
+        // A long gas opening rotates with its rendered pose: the point that fitted before no longer fits.
+        assertTrue(decision("gas",listOf(hazard),Station(1.23f,0f,0f)).allowed)
+        assertEquals(Reason.FOOTPRINTS_TOO_CLOSE,decision("gas",listOf(hazard),Station(1.23f,0f,90f)).reason)
+        assertTrue(decision("gas",listOf(hazard),Station(1.75f,0f,90f)).allowed)
     }
 
     @Test fun invalidCoordinatesOrModulesCannotAuthorizePlacement() {

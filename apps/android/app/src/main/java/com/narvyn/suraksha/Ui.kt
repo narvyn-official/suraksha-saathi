@@ -62,7 +62,7 @@ fun Context.action(text: String,primary: Boolean=true,role: ActionRole=if(primar
     actionRole(role)
     minHeight=dp(52);minimumHeight=dp(52);setPadding(dp(16),dp(12),dp(16),dp(12));setOnClickListener{performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);onClick()}
 }
-fun Activity.notice(title: String,message: String) { android.app.AlertDialog.Builder(this).setTitle(title).setMessage(message).setPositiveButton("OK",null).show() }
+fun Activity.notice(title: String,message: String) { android.app.AlertDialog.Builder(this).setTitle(title).setView(paged(column(12).apply{add(label(message,16f))},getSharedPreferences("preferences",Context.MODE_PRIVATE).getBoolean("hi",false))).setPositiveButton("OK",null).show() }
 
 /** Explicit structure for screen-reader heading navigation; bold text alone has no heading semantics. */
 fun TextView.asHeading()=apply { isAccessibilityHeading=true }

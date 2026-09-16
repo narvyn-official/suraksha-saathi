@@ -4,7 +4,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class RoomPlacementAreaTest {
-    @Test fun rangeHeightAndSurfaceCoverageAreAllRequired() {
+    @Test fun rangeHeightAndAnchorPatchCoverageAreAllRequired() {
         assertEquals(RoomPlacementArea.Reason.READY, RoomPlacementArea.evaluate(.6f, .2f, true))
         assertEquals(RoomPlacementArea.Reason.READY, RoomPlacementArea.evaluate(3f, -.2f, true))
         for(distance in listOf(.59f,3.01f,Float.NaN,Float.POSITIVE_INFINITY))
@@ -12,6 +12,17 @@ class RoomPlacementAreaTest {
         for(height in listOf(.201f,-.201f,Float.NaN))
             assertEquals(RoomPlacementArea.Reason.DIFFERENT_LEVEL,RoomPlacementArea.evaluate(1f,height,true))
         assertEquals(RoomPlacementArea.Reason.INCOMPLETE_SURFACE,RoomPlacementArea.evaluate(1f,0f,false))
+    }
+    @Test fun smallMappedPatchCanSupportAnAnchorWithoutClaimingTheFullModelIsMapped(){
+        val patch=RoomPlacementArea.anchorPatch()
+        assertTrue(patch.any{it[0]==0f&&it[2]==0f})
+        fun mapped(p:FloatArray)=kotlin.math.abs(p[0])<=.15f&&kotlin.math.abs(p[2])<=.15f
+        assertTrue(patch.all(::mapped))
+        assertFalse(RoomPlacementArea.outline("fire",0).all(::mapped))
+        assertEquals(RoomPlacementArea.Reason.READY,RoomPlacementArea.evaluate(1f,0f,patch.all(::mapped)))
+        val nearEdge=patch.map{floatArrayOf(it[0]+.13f,it[1],it[2])}.all(::mapped)
+        assertFalse(nearEdge)
+        assertEquals(RoomPlacementArea.Reason.INCOMPLETE_SURFACE,RoomPlacementArea.evaluate(1f,0f,nearEdge))
     }
     @Test fun outlinesCoverTheEquipmentBaseFireAndRearGasOpening() {
         val equipment=RoomPlacementArea.outline("fire",0)

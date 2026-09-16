@@ -11,6 +11,7 @@ class RecallActivity:Activity(){
  private lateinit var store:Store
  private lateinit var curriculum:Curriculum
  private var selected:String?=null
+ private val backNavigation by lazy { AppBackNavigation(this){selected=null;answer=null;render()} }
  private var answer:String?=null
  private var activeForeground=false
  private val hi get()=store.hi
@@ -19,7 +20,8 @@ class RecallActivity:Activity(){
  override fun onResume(){super.onResume();if(!currentWorker())return;activeForeground=true;render()}
  override fun onPause(){activeForeground=false;super.onPause()}
  override fun onSaveInstanceState(out:Bundle){super.onSaveInstanceState(out);out.putString("selected",selected);out.putString("answer",answer);if(::store.isInitialized)out.putString("workerId",store.workerId)}
- override fun onDestroy(){if(::store.isInitialized)store.close();super.onDestroy()}
+ @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(popContentPage())return;if(selected!=null){selected=null;answer=null;render()}else super.onBackPressed()}
+ override fun onDestroy(){backNavigation.close();if(::store.isInitialized)store.close();super.onDestroy()}
  // Check at resume and delayed UI callbacks; this Store remains bound to the opening worker.
  private fun currentWorker():Boolean{
   if(!::store.isInitialized||isFinishing||isDestroyed)return false
@@ -29,13 +31,32 @@ class RecallActivity:Activity(){
  private fun render(){
   if(!currentWorker()||!::curriculum.isInitialized)return
   val items=RecallPlanner.plan(curriculum.json,curriculum.versions,store.attempts(),store.recalls());val now=System.currentTimeMillis();val item=items.firstOrNull{it.key==selected}
+  backNavigation.enabled(item!=null)
   val root=column(20);root.setBackgroundColor(Palette.canvas)
   root.accessibilityPaneTitle=if(item==null)t("Review queue","दोहराव सूची")else if(answer==null)t("Recall a decision","निर्णय याद करें")else t("Review feedback","दोहराव की प्रतिक्रिया")
   root.setOnApplyWindowInsetsListener{v,i->if(android.os.Build.VERSION.SDK_INT>=30){val b=i.getInsets(WindowInsets.Type.systemBars());v.setPadding(dp(20)+b.left,dp(20)+b.top,dp(20)+b.right,dp(20)+b.bottom)}else v.setPadding(dp(20)+i.systemWindowInsetLeft,dp(20)+i.systemWindowInsetTop,dp(20)+i.systemWindowInsetRight,dp(20)+i.systemWindowInsetBottom);i}
-  val body=column();root.addView(ScrollView(this).apply{addView(body)},LinearLayout.LayoutParams(-1,0,1f))
+  val body=column();root.addView(paged(body,hi),LinearLayout.LayoutParams(-1,0,1f))
   body.add(label(t("Remember. Decide. Reflect.","याद करें। निर्णय लें। सोचें।"),26f,Palette.ink,true).asHeading(),bottom=10)
   body.add(label(t("Personal review · your assessment results stay unchanged.","व्यक्तिगत दोहराव · आपके मूल्यांकन परिणाम नहीं बदलते।"),14f,Palette.muted),bottom=20)
   if(item==null){
+   val actionReviews=RoomMissionStore(this,store.workerId).use{RoomPracticePlanner.plan(it.records(),store.workerId)}
+   if(actionReviews.isNotEmpty()){
+    body.add(label(t("Practise the actions again","क्रियाओं का फिर अभ्यास करें"),20f,Palette.ink,true).asHeading(),bottom=10)
+    body.add(label(t("Suggested from your last saved completed practice. Rehearsals do not change certificates.","पिछले सहेजे पूरे अभ्यास से सुझाव। दोहराव प्रमाणपत्र नहीं बदलता।"),14f,Palette.muted),bottom=12)
+    actionReviews.forEach { review ->
+     val card=card(if(review.dueAt<=now)Palette.tealBg else Palette.soft)
+     val name=curriculum.module(review.module).local("title",hi)+(if(review.explosionRisk)t(" · explosion-risk scenario"," · विस्फोट-खतरा दृश्य")else "")
+     card.add(label(name,17f,Palette.ink,true),bottom=8)
+     card.add(label(if(review.camera)t("Camera AR rehearsal","कैमरा AR अभ्यास")else t("Screen rehearsal","स्क्रीन अभ्यास"),14f,Palette.violet),bottom=8)
+     card.add(label(if(review.dueAt<=now)t("Ready for recall practice","याद करके अभ्यास के लिए तैयार")else t("Suggested next practice: ","अगला अभ्यास सुझाव: ")+DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(review.dueAt)),14f,Palette.muted),bottom=8)
+     if(review.focus.isNotEmpty())card.add(label(t("Focus: ","ध्यान दें: ")+review.focus.joinToString(" · "){RoomLearning.forPhase(it,review.explosionRisk).title.local(hi)},15f),bottom=10)
+     card.add(action(t("Rehearse from memory","याद करके दोहराएँ"),false,ActionRole.REVIEW){
+      if(activeForeground&&currentWorker())startActivity(android.content.Intent(this,RoomMissionActivity::class.java)
+       .putExtra("moduleId",review.module).putExtra("camera",review.camera).putExtra("explosionRisk",review.explosionRisk).putExtra("recall",true))
+     }.apply{contentDescription=text.toString()+": "+name+". "+if(review.camera)t("Camera AR rehearsal","कैमरा AR अभ्यास")else t("Screen rehearsal","स्क्रीन अभ्यास")})
+     body.add(card,bottom=14)
+    }
+   }
    val componentRecords=store.componentRecords().filter { (module,record) -> ComponentCatalog.modules.containsKey(module) && record.optInt("catalogVersion")==ComponentCatalog.VERSION }
    if(componentRecords.isNotEmpty()) {
     body.add(label(t("Equipment recognition","उपकरण की पहचान"),20f,Palette.ink,true).asHeading(),bottom=12)

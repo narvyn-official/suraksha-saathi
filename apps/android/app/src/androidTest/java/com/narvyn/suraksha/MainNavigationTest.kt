@@ -35,8 +35,13 @@ class MainNavigationTest {
         val scale=context.resources.configuration.fontScale
         java.io.File(context.getExternalFilesDir(null),"nav-060-$name-$scale.png").outputStream().use{instrumentation.uiAutomation.takeScreenshot().compress(android.graphics.Bitmap.CompressFormat.PNG,100,it)}
     }
+    private fun reveal()=object:androidx.test.espresso.ViewAction{
+        override fun getDescription()="Open the explicit content page containing the control"
+        override fun getConstraints()=isAssignableFrom(View::class.java)
+        override fun perform(c:androidx.test.espresso.UiController,v:View){v.requestRectangleOnScreen(Rect(0,0,v.width,v.height),true);c.loopMainThreadUntilIdle()}
+    }
     private fun tag(value:String)=withTagValue(equalTo<Any>(value))
-    private fun clickTag(value:String){if(value in listOf("main-lesson-next","main-lesson-previous"))onView(tag(value)).perform(click())else onView(tag(value)).perform(scrollTo(),click())}
+    private fun clickTag(value:String){if(value in listOf("main-lesson-next","main-lesson-previous"))onView(tag(value)).perform(click())else onView(tag(value)).perform(reveal(),click())}
     private fun back(){onView(tag("main-back")).perform(click())}
     private fun openModule(id:String){
         clickTag("main-module-picker")
@@ -46,7 +51,7 @@ class MainNavigationTest {
             assertEquals("The picker must retain every module",expected,all(requireNotNull(view)).mapNotNull{it.tag as? String}.filter{it in expected}.toSet())
         }
         onView(allOf(isAssignableFrom(Button::class.java),isDescendantOfA(tag("main-module-$id"))))
-            .inRoot(isDialog()).perform(scrollTo(),click())
+            .inRoot(isDialog()).perform(reveal(),click())
     }
     private fun assertPage(s:ActivityScenario<MainActivity>,page:String){
         s.onActivity { a -> assertNotNull(all(a.window.decorView).singleOrNull{it.tag=="main-page-$page"}) }
@@ -69,7 +74,7 @@ class MainNavigationTest {
 
     /** No routine home swipe on a normal portrait phone; large-font runs keep overflow accessible. */
     @Test fun normalFontHomeAndPrimaryActionsFitWithoutDownwardScrolling(){
-        assumeTrue("Large fonts intentionally allow accessible scrolling",context.resources.configuration.fontScale<=1.05f)
+        assumeTrue("Large fonts use explicit content parts",context.resources.configuration.fontScale<=1.05f)
         assumeTrue("Viewport contract is for portrait phones",context.resources.configuration.orientation==android.content.res.Configuration.ORIENTATION_PORTRAIT)
         val oldHi=Store(context).use{it.hi}
         try { for(hi in listOf(false,true)) {
@@ -78,9 +83,9 @@ class MainNavigationTest {
                 instrumentation.waitForIdleSync()
                 scenario.onActivity { activity ->
                     val views=all(activity.window.decorView)
-                    val scroll=views.filterIsInstance<ScrollView>().single()
-                    assertEquals("Home must start at its top",0,scroll.scrollY)
-                    assertFalse("Normal home should fit without a downward swipe",scroll.canScrollVertically(1))
+                    val panel=views.filterIsInstance<PagedPanel>().single()
+                    assertEquals("Home must be a single screen",1,panel.pageCount)
+                    assertTrue("No swipe scrolling",views.none{it is ScrollView})
                     val feature=views.single{it.tag=="main-module-fire"}
                     val start=all(feature).filterIsInstance<Button>().single()
                     val controls=listOf(start)+listOf("main-module-picker","main-review","main-nav-home","main-nav-records","main-nav-help")
@@ -182,7 +187,7 @@ class MainNavigationTest {
                 }
                 back();assertPage(s,"module")
                 onView(withText(t("My record","मेरा रिकॉर्ड"))).perform(click());assertPage(s,"records")
-                onView(withText(t("Verify a QR record","QR रिकॉर्ड जाँचें"))).perform(scrollTo(),click());assertPage(s,"verify")
+                onView(withText(t("Verify a QR record","QR रिकॉर्ड जाँचें"))).perform(reveal(),click());assertPage(s,"verify")
                 back();assertPage(s,"records")
                 onView(withText(t("Help","मदद"))).perform(click());assertPage(s,"help")
                 onView(withText(t("Learn","सीखें"))).perform(click());assertPage(s,"home")

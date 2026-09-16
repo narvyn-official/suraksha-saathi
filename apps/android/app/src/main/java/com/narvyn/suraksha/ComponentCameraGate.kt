@@ -18,7 +18,7 @@ class ComponentCameraGate {
     }
     @Synchronized fun allows(version: Int, now: Long): Boolean {
         val at = lastReadyAt ?: return false
-        return active && version == revision && now >= at && now - at <= 500L
+        return active && version == revision && now >= at && now - at <= ArFrameGate.MAX_AGE_MS
     }
 }
 
@@ -32,7 +32,7 @@ class ComponentCameraFreshness {
     @Synchronized fun observedAt(imageTimestamp: Long, now: Long): Long? {
         if(imageTimestamp<=0L || now<observedAt || (needsNewImage && imageTimestamp<=timestamp)) return null
         if(imageTimestamp>timestamp) { timestamp=imageTimestamp; observedAt=now; needsNewImage=false }
-        if(imageTimestamp!=timestamp || now-observedAt>500L) return null
+        if(imageTimestamp!=timestamp || now-observedAt>ArFrameGate.MAX_AGE_MS) return null
         return observedAt
     }
 }

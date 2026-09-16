@@ -74,6 +74,16 @@ class CameraWorkspaceTest {
             }
         }
     }
+    @Test fun systemBackLeavesTheCameraWithoutAdvancingSavedFeedback(){
+        org.junit.Assume.assumeTrue(android.os.Build.HARDWARE in listOf("ranchu","goldfish"))
+        seed(true,false)
+        ActivityScenario.launch<ProcedureActivity>(Intent(context,ProcedureActivity::class.java).putExtra("moduleId","fire").putExtra("camera",true)).use{s->
+            click(s,"I am in a safe training area");denyPermission();val before=record().data.toString()
+            instrumentation.uiAutomation.executeShellCommand("input keyevent 4").use{java.io.FileInputStream(it.fileDescriptor).readBytes()};Thread.sleep(600)
+            s.onActivity{a->assertFalse(a.isFinishing);assertFalse(views(a.window.decorView).filterIsInstance<ProcedureSceneView>().single().cameraSelected)}
+            assertEquals(before,record().data.toString())
+        }
+    }
     @Test fun cameraEntryAndSavedFeedbackKeepSceneAndFooterAvailable()=workspace(false)
     @Test fun hindiCameraWorkspaceKeepsFallbackAndContinuationReachable() {
         try { workspace(true) }finally { Store(context).use { it.hi=false } }

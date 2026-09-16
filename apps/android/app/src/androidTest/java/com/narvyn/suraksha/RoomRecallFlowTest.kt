@@ -32,7 +32,7 @@ class RoomRecallFlowTest {
         for(i in 1..steps){Thread.sleep(duration/steps);val f=i.toFloat()/steps;event(MotionEvent.ACTION_MOVE,a.first+(b.first-a.first)*f,a.second+(b.second-a.second)*f)}
         try{beforeUp()}finally{event(MotionEvent.ACTION_UP,b.first,b.second)};ins.waitForIdleSync();Thread.sleep(120)
     }
-    private fun shot(name:String){File(context.getExternalFilesDir(null),name).outputStream().use{ins.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG,100,it)};Thread.sleep(500)}
+    private fun shot(name:String){Thread.sleep(500);File(context.getExternalFilesDir(null),name).outputStream().use{ins.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG,100,it)}}
     private fun start(module:String):ActivityScenario<RoomMissionActivity>{val now=SystemClock.uptimeMillis();val cancel=MotionEvent.obtain(now,now,MotionEvent.ACTION_CANCEL,0f,0f,0);cancel.source=InputDevice.SOURCE_TOUCHSCREEN;ins.uiAutomation.injectInputEvent(cancel,true);cancel.recycle();Store(context).use{it.hi=false};val s=ActivityScenario.launch<RoomMissionActivity>(Intent(context,RoomMissionActivity::class.java).putExtra("moduleId",module).putExtra("camera",false).putExtra("recall",true));Thread.sleep(250)
         var clicked=false
         repeat(40){if(!clicked){val node=ins.uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Start in a clear area")?.firstOrNull();if(node!=null){node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK);clicked=true}else Thread.sleep(100)}}
@@ -90,6 +90,16 @@ class RoomRecallFlowTest {
         point(s,"report-missing-worker").let{gesture(it,it,180)};assertEquals("COMPLETE",phase(s))
         Store(context).use{owner->RoomMissionStore(context,owner.workerId).use{store->val r=store.records().first{it.getString("module")=="fire"};assertEquals("screen",r.getString("mode"));val m=r.getJSONObject("mission");assertTrue(m.getBoolean("completed"));assertFalse(m.getJSONObject("result").getBoolean("certifiable"));assertEquals(2,m.getJSONArray("measurements").length())}}
         assertTrue(coaching(s).recall);assertTrue(coaching(s).cues.isEmpty());s.recreate();assertEquals("COMPLETE",phase(s));assertFalse(cuesShown(s))
+        button(s,"View mission debrief");Thread.sleep(400)
+        repeat(11){button(s,"Next");Thread.sleep(80)}
+        assertTrue(ins.uiAutomation.rootInActiveWindow.findAccessibilityNodeInfosByText("Bring it back from memory").isNotEmpty())
+        button(s,"Try changed conditions");ins.waitForIdleSync();Thread.sleep(500)
+        ins.runOnMainSync{
+            val next=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<RoomMissionActivity>().single()
+            assertTrue(next.intent.getBooleanExtra("explosionRisk",false));assertTrue(next.intent.getBooleanExtra("recall",false));assertFalse(next.intent.getBooleanExtra("camera",true))
+            val m=RoomMissionActivity::class.java.getDeclaredField("mission").apply{isAccessible=true}.get(next)as RoomMission
+            assertEquals("ALARM",m.phase);assertTrue(m.events.isEmpty());next.finish()
+        }
     }}
 
 }

@@ -18,12 +18,13 @@ class ProcedureActivity: Activity() {
     private lateinit var scene: ProcedureSceneView
     private lateinit var header: LinearLayout
     private lateinit var lower: LinearLayout
-    private lateinit var scroll: ScrollView
+    private lateinit var scroll: PagedPanel
     private lateinit var screenBody: LinearLayout
     private lateinit var cameraBody: LinearLayout
     private lateinit var footer: Button
     private var cameraBudget=CameraWorkspaceLayout.budget(0,1f)
     private var immersive=false
+    private val backNavigation by lazy { AppBackNavigation(this){camera=false;scene.useCamera(false);render()} }
     private var centreAim=false
     private var status: TextView?=null
     private var active=false
@@ -55,7 +56,7 @@ class ProcedureActivity: Activity() {
         screenBody=column();header=column();lower=column();scene=ProcedureSceneView(this)
         scene.onStatus={ message -> status?.text=message }
         screenBody.add(header);screenBody.addView(scene,LinearLayout.LayoutParams(-1,-2));screenBody.add(lower,top=12)
-        scroll=ScrollView(this).apply { isFillViewport=true;addView(screenBody) }
+        scroll=paged(screenBody,hi)
         root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         cameraBody=object:LinearLayout(this) {
             override fun onMeasure(w:Int,h:Int) { cameraBudget=CameraWorkspaceLayout.budget(View.MeasureSpec.getSize(h),resources.displayMetrics.density);super.onMeasure(w,h) }
@@ -74,7 +75,8 @@ class ProcedureActivity: Activity() {
         render()
     }
     override fun onPause() { active=false;revision++;if(::scene.isInitialized)scene.pause();super.onPause() }
-    override fun onDestroy() { if(::scene.isInitialized)scene.close();if(::evidence.isInitialized)evidence.close();if(::identity.isInitialized)identity.close();super.onDestroy() }
+    @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(popContentPage())return;if(immersive){camera=false;scene.useCamera(false);render()}else super.onBackPressed()}
+    override fun onDestroy() { backNavigation.close(); if(::scene.isInitialized)scene.close();if(::evidence.isInitialized)evidence.close();if(::identity.isInitialized)identity.close();super.onDestroy() }
     override fun onSaveInstanceState(out: Bundle) { out.putString("workerId",identity.workerId);out.putBoolean("safeArea",safeArea);out.putBoolean("camera",camera);out.putBoolean("descriptions",descriptions);out.putBoolean("spatial",spatial);out.putBoolean("centreAim",centreAim);super.onSaveInstanceState(out) }
     override fun onRequestPermissionsResult(code:Int, permissions:Array<out String>,results:IntArray) {
         super.onRequestPermissionsResult(code,permissions,results)
@@ -100,8 +102,8 @@ class ProcedureActivity: Activity() {
         for(v in listOf(header,scene,lower))(v.parent as? android.view.ViewGroup)?.removeView(v)
         cameraBody.removeAllViews();screenBody.removeAllViews()
         if(value) {
-            val top=object:ScrollView(this) { override fun onMeasure(w:Int,h:Int) { super.onMeasure(w,View.MeasureSpec.makeMeasureSpec(cameraBudget.header,View.MeasureSpec.AT_MOST)) } }.apply { addView(header,FrameLayout.LayoutParams(-1,-2)) }
-            val bottom=object:ScrollView(this) { override fun onMeasure(w:Int,h:Int) { super.onMeasure(w,View.MeasureSpec.makeMeasureSpec(cameraBudget.feedback,View.MeasureSpec.AT_MOST)) } }.apply { addView(lower,FrameLayout.LayoutParams(-1,-2)) }
+            val top=object:PagedPanel(this,hi) { override fun onMeasure(w:Int,h:Int) { super.onMeasure(w,View.MeasureSpec.makeMeasureSpec(cameraBudget.header,View.MeasureSpec.AT_MOST)) } }.apply { setContent(header) }
+            val bottom=object:PagedPanel(this,hi) { override fun onMeasure(w:Int,h:Int) { super.onMeasure(w,View.MeasureSpec.makeMeasureSpec(cameraBudget.feedback,View.MeasureSpec.AT_MOST)) } }.apply { setContent(lower) }
             cameraBody.add(top);cameraBody.addView(scene,LinearLayout.LayoutParams(-1,0,1f));cameraBody.add(bottom,top=6)
         }else { screenBody.add(header);screenBody.addView(scene,LinearLayout.LayoutParams(-1,-2));screenBody.add(lower,top=12) }
         scroll.visibility=if(value)View.GONE else View.VISIBLE;cameraBody.visibility=if(value)View.VISIBLE else View.GONE
@@ -110,7 +112,7 @@ class ProcedureActivity: Activity() {
     private fun cameraOptions() {
         val options=mutableListOf(t("Continue on screen","स्क्रीन पर जारी रखें"),t("Use text actions","लिखित क्रियाएँ उपयोग करें"),t("Reposition the scene","दृश्य की जगह बदलें"),t("Camera permission settings","कैमरा अनुमति सेटिंग"),if(centreAim)t("Use direct target touch","लक्ष्य सीधे छूकर चुनें")else t("Use centre aiming","बीच का निशाना उपयोग करें"),t("Save & return","सहेजें और लौटें"))
         if(!session.feedback && ProcedureSpatial.supported(session.step.id))options.add(if(spatial)t("Use button actions instead","बटन वाली क्रियाएँ उपयोग करें")else t("Use spatial target practice","स्थानिक लक्ष्य अभ्यास उपयोग करें"))
-        android.app.AlertDialog.Builder(this).setTitle(t("AR practice options","AR अभ्यास विकल्प")).setItems(options.toTypedArray()) { _,which ->
+        PageDialogBuilder(this).setTitle(t("AR practice options","AR अभ्यास विकल्प")).setItems(options.toTypedArray()) { _,which ->
             if(!active)return@setItems
             when(which) {
                 0->{camera=false;descriptions=false;render()}
@@ -153,6 +155,7 @@ class ProcedureActivity: Activity() {
         revision++;val currentRevision=revision
         header.removeAllViews();lower.removeAllViews();status=null
         arrangeCamera(camera && safeArea && !session.done && !descriptions)
+        backNavigation.enabled(immersive)
         if(immersive) { renderCamera(currentRevision);return }
         header.add(label(ProcedureCatalog.modules.getValue(session.module).text(hi),25f,Palette.ink,true).asHeading(),bottom=8)
         header.add(label(if(session.guided)t("GUIDED PROCEDURE · DRAFT SIMULATION","निर्देशित प्रक्रिया · प्रारूप सिमुलेशन")else t("INDEPENDENT PROCEDURE · NO HINTS","स्वतंत्र प्रक्रिया · कोई संकेत नहीं"),13f,Palette.blue,true),bottom=8)
@@ -220,6 +223,6 @@ class ProcedureActivity: Activity() {
                 lower.add(label(t("Use the scene controls to carry out the sequence. You may pause or switch to screen mode without losing your saved actions.","क्रम पूरा करने के लिए दृश्य के नियंत्रण उपयोग करें। बिना सहेजी क्रियाएँ खोए आप रुक सकते हैं या स्क्रीन तरीका चुन सकते हैं।"),14f,Palette.muted))
             }
         }
-        scroll.post { scroll.scrollTo(0,0) }
+        scroll.post { scroll.firstPage() }
     }
 }

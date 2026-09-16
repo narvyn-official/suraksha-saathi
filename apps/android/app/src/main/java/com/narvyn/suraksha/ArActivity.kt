@@ -32,7 +32,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private lateinit var overlay: AnswerOverlay
     private lateinit var viewport: FrameLayout
     private lateinit var feedback: LinearLayout
-    private lateinit var scroll: ScrollView
+    private lateinit var scroll: PagedPanel
     private lateinit var feedbackBody: LinearLayout
     private lateinit var controls: LinearLayout
     private lateinit var question: TextView
@@ -41,7 +41,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private var hi=false
     @Volatile private var active=false
     @Volatile private var running=false
-    @Volatile private var ar: Session?=null
+    @Volatile private var ar: NativeArDriver?=null
     @Volatile private var scene=Scene(0,"","fire",emptyList(),emptyList(),1,0,0,false)
     private var missedPlacement: Int?=null
     private var anchor: Anchor?=null // Only accessed on GL thread while running; stopped before UI cleanup.
@@ -65,7 +65,8 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
     private val uv=floats(FloatArray(8))
     private fun t(en: String,hindi: String)=if(hi)hindi else en
 
-    override fun onCreate(state: Bundle?) {
+       @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(!popContentPage())super.onBackPressed()}
+ override fun onCreate(state: Bundle?) {
         super.onCreate(state);store=Store(this);hi=store.hi
         if(state?.getString("workerId")?.let { it!=store.workerId }==true) { finish();return }
         val data=store.attempt(intent.getStringExtra("attemptId") ?: "")
@@ -82,7 +83,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
             i
         }
         val body=column()
-        scroll=ScrollView(this).apply { isFillViewport=true;addView(body) }
+        scroll=paged(body,hi)
         root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         mode=label("",13f,Palette.blue,true);body.add(mode,bottom=8)
         question=label("",20f,Palette.ink,true).asHeading();body.add(question,bottom=8)
@@ -138,7 +139,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
             controls.add(row)
             if(checkSelfPermission(Manifest.permission.CAMERA)!=PackageManager.PERMISSION_GRANTED) controls.add(action(t("Camera permission settings","कैमरा अनुमति सेटिंग"),false,role=ActionRole.NEUTRAL) { if(active && currentWorker())startActivity(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:$packageName"))) },top=8)
         }
-        refreshScene();scroll.post { scroll.scrollTo(0,0) }
+        refreshScene();scroll.post { scroll.firstPage() }
     }
     private fun refreshScene() {
         if(!currentWorker() || !::overlay.isInitialized || !::flow.isInitialized || flow.finished) return
@@ -190,8 +191,8 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
                 if(ArCoreApk.getInstance().requestInstall(this,!installRequested)==ArCoreApk.InstallStatus.INSTALL_REQUESTED) {
                     installRequested=true;status.text=t("Complete AR installation, or continue on screen.","AR स्थापना पूरी करें, या स्क्रीन पर जारी रखें।");return
                 }
-                ar=Session(this)
-                ArCameraSupport.configure(ar!!)
+                ar=NativeArDriver(this)
+
             }
             freshness.requireNewImage();textureRegistered=false;ar!!.resume();running=true;overlay.cameraVisible(true);surface.onResume();cameraPump.start()
         } catch(error: Exception) {
@@ -248,6 +249,7 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
         if(active && currentWorker() && flow.revision==revision && flow.ready(SystemClock.elapsedRealtime()) && overlay.targetsVisible()) pendingChoice.compareAndSet(null,Choice(revision,questionId,optionId))
     }
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        ar?.invalidateTexture()
         textureRegistered=false;equipment.create()
         val textures=IntArray(1);GLES20.glGenTextures(1,textures,0);texture=textures[0];GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
         GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR)
@@ -271,9 +273,9 @@ class ArActivity: Activity(), GLSurfaceView.Renderer {
             val frame=session.update()
             val observedAt=freshness.observedAt(frame.timestamp,SystemClock.elapsedRealtime())
             if(frame.timestamp>0L && observedAt!=null)drawCamera(frame)
-            if(observedAt==null || frame.camera.trackingState!=TrackingState.TRACKING) { unavailable(current,t("Tracking paused. Wait for a fresh, tracked camera image.","ट्रैकिंग रुकी है। नए, ट्रैक किए गए कैमरा दृश्य की प्रतीक्षा करें।"));return }
+            if(observedAt==null || !session.snapshot().ready) { unavailable(current,t("Tracking paused. Wait for a fresh, tracked camera image.","ट्रैकिंग रुकी है। नए, ट्रैक किए गए कैमरा दृश्य की प्रतीक्षा करें।"));return }
             val tap=pendingPlacement.consumeFor(current.revision)
-            if(tap?.eligible(flow.revision,widthPx,heightPx,SystemClock.elapsedRealtime(),active && running && current.canAnswer,frame.camera.trackingState==TrackingState.TRACKING,observedAt!=null)==true && current.revision==flow.revision) {
+            if(tap?.eligible(flow.revision,widthPx,heightPx,SystemClock.elapsedRealtime(),active && running && current.canAnswer,session.snapshot().ready,observedAt!=null)==true && current.revision==flow.revision) {
                 val hit=frame.hitTest(tap.x,tap.y).firstOrNull { val plane=it.trackable as? Plane;plane!=null && plane.type==Plane.Type.HORIZONTAL_UPWARD_FACING && plane.trackingState==TrackingState.TRACKING && plane.isPoseInPolygon(it.hitPose) }
                 if(hit!=null) { val replacement=hit.createAnchor();anchor?.detach();anchor=replacement;missedPlacement=null } else missedPlacement=current.revision
             }

@@ -9,6 +9,7 @@ import android.util.Log
 import com.google.ar.core.CameraConfig
 import com.google.ar.core.CameraConfigFilter
 import com.google.ar.core.Config
+import com.google.ar.core.AugmentedImageDatabase
 import com.google.ar.core.Session
 import com.google.ar.core.exceptions.*
 import java.util.EnumSet
@@ -16,7 +17,7 @@ import java.util.concurrent.Executors
 
 /** Common camera workload policy; these controls do not establish tracking or learning evidence. */
 internal object ArCameraSupport {
-    fun configure(session: Session) {
+    fun configure(session: Session, imageDatabase: AugmentedImageDatabase? = null) {
         val filter = CameraConfigFilter(session)
             .setTargetFps(EnumSet.of(CameraConfig.TargetFps.TARGET_FPS_30))
             .setDepthSensorUsage(EnumSet.of(CameraConfig.DepthSensorUsage.DO_NOT_USE))
@@ -25,7 +26,8 @@ internal object ArCameraSupport {
             ?: error("No supported 30 fps camera configuration")
         session.cameraConfig = camera
         session.configure(Config(session).apply {
-            planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
+            planeFindingMode = if(imageDatabase==null)Config.PlaneFindingMode.HORIZONTAL else Config.PlaneFindingMode.DISABLED
+            if(imageDatabase!=null)augmentedImageDatabase=imageDatabase
             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
             lightEstimationMode = Config.LightEstimationMode.AMBIENT_INTENSITY
             focusMode = Config.FocusMode.FIXED
@@ -104,7 +106,7 @@ internal class ArSessionRelease {
         available = callback; waiters.add(this)
     }
     fun cancelPendingResume() { available = null; waiters.remove(this) }
-    fun retire(session: Session, afterClose: () -> Unit) {
+    fun retire(session: AutoCloseable, afterClose: () -> Unit) {
         check(!closing)
         closing = true; pendingReleases++
         closer.execute {

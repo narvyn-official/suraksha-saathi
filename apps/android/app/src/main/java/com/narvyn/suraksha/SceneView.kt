@@ -20,8 +20,8 @@ class SceneView(context:Context, private val moduleId:String, private val hi:Boo
  override fun onMeasure(w:Int,h:Int){setMeasuredDimension(MeasureSpec.getSize(w),context.dp(if(compact)135 else 210))}
  override fun onDraw(canvas:Canvas){painter.draw(canvas,width.toFloat(),height.toFloat(),moduleId,hi,inspect)}
  override fun onTouchEvent(event:MotionEvent):Boolean{if(!inspect)return false;if(event.action==MotionEvent.ACTION_UP){val index=(event.x/width*3).toInt().coerceIn(0,2);show(index)};return true}
- private fun show(index:Int){AlertDialog.Builder(context).setTitle(if(hi)names[index].second else names[index].first).setMessage(if(hi)details[index].second else details[index].first).setPositiveButton(if(hi)"समझ गया" else "Got it",null).show()}
- override fun performClick():Boolean{super.performClick();if(inspect)AlertDialog.Builder(context).setTitle(if(hi)"उपकरण देखें" else "Inspect equipment").setItems(names.map{if(hi)it.second else it.first}.toTypedArray()){_,i->show(i)}.show();return true}
+ private fun show(index:Int){PageDialogBuilder(context).setTitle(if(hi)names[index].second else names[index].first).setMessage(if(hi)details[index].second else details[index].first).setPositiveButton(if(hi)"समझ गया" else "Got it",null).show()}
+ override fun performClick():Boolean{super.performClick();if(inspect)PageDialogBuilder(context).setTitle(if(hi)"उपकरण देखें" else "Inspect equipment").setItems(names.map{if(hi)it.second else it.first}.toTypedArray()){_,i->show(i)}.show();return true}
 }
 
 class ScenePainter{

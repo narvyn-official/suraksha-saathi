@@ -24,7 +24,8 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
     data class Image(val revision:Int,val at:Long,val placement:Int,val tracked:Boolean,val message:String,
                      val targets:Map<String,ComponentProjection.Point> = emptyMap(),val inverse:FloatArray?=null,val frameWidth:Int=0,val frameHeight:Int=0,val phase:String="",val canPlace:Boolean=false,val retry:Boolean=false,
                      val footprint:List<ComponentProjection.Point> = emptyList(),
-                     val surfaceBoundary:List<ComponentProjection.Point> = emptyList(),val scanProgress:Float=0f,val preview:Boolean=false)
+                     val surfaceBoundary:List<ComponentProjection.Point> = emptyList(),val scanProgress:Float=0f,val preview:Boolean=false,
+                     val placementAim:ComponentProjection.Point?=null,val aimSerial:Long=0,val fullFootprintMapped:Boolean=true)
     private data class Visual(val phase:String="ALARM",val progress:Float=0f,val held:Boolean=false,val showCues:Boolean=true,val explosionRisk:Boolean=false)
     private val surface=GLSurfaceView(host)
     private val overlay=Overlay()
@@ -33,6 +34,8 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
     private val gate=ComponentCameraGate()
     private val freshness=ComponentCameraFreshness()
     private val placement=AtomicBoolean(false)
+    private val scanCursor=ArPlacementCursor()
+    private var lastAimSerial=-1L // GL owner
     private val mailbox=AtomicReference<Image?>(null)
     private val posted=AtomicBoolean(false)
     private val anchors=mutableListOf<Anchor>() // GL owner; detach only after surface pause.
@@ -44,7 +47,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
     @Volatile private var revision=0
     @Volatile private var foreground=false
     @Volatile private var visual=Visual()
-    private var session:Session?=null
+    private var session:NativeArDriver?=null
     private var running=false
     private val power=host.getSystemService(PowerManager::class.java)
     @Volatile private var thermalStatus=PowerManager.THERMAL_STATUS_NONE
@@ -52,15 +55,30 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
     private var healthyAt=0L // GL owner; reset before resuming the surface.
     @Volatile private var lastDiagnostic=""
     private var diagnosticAt=0L
+    private var placementDiagnosticAt=0L
     private var metricsAt=0L;private var metricFrames=0;private var metricTracked=0;private var metricTimestamp=0L;private var maxUpdateMs=0L
     private val stopRequested=AtomicBoolean(false)
     private val frameTicker=object:Runnable{override fun run(){if(foreground&&running){
         val now=SystemClock.elapsedRealtime()
         if(camera && now-thermalReadAt>=1000){thermalReadAt=now;thermalStatus=power.currentThermalStatus
             if(thermalStatus>=PowerManager.THERMAL_STATUS_CRITICAL){stopCamera(coolingMessage());return}}
+        if(camera && image?.tracked==true && session?.snapshot(now)?.ready!=true) {
+            placement.set(false);down=null;gestureTarget=null;screenCursor=null;onCancel()
+            val lost=image!!.copy(tracked=false,canPlace=false,message=t("Tracking interrupted. Hold the scene in view to recover.","ट्रैकिंग बाधित है। दृश्य सामने रखकर फिर खोजें।"))
+            image=lost;onImage(lost);overlay.invalidate()
+        }
         surface.requestRender();postDelayed(this,if(camera&&thermalStatus>=PowerManager.THERMAL_STATUS_SEVERE)50 else 33)
     }}}
-    val canPlace get()=foreground && image?.let{it.canPlace && it.revision==revision && it.frameWidth==width && it.frameHeight==height && SystemClock.elapsedRealtime()-it.at in 0..150}==true
+    val canPlace get()=foreground && image?.let{it.canPlace && scanCursor.isCurrent(it.aimSerial) && it.revision==revision && it.frameWidth==width && it.frameHeight==height && SystemClock.elapsedRealtime()-it.at in 0..150}==true
+    val placementControlLabel get()=when {
+        image?.preview==true->t("Hold steady","स्थिर रखें")
+        image?.surfaceBoundary?.let{it.size>2}==true->t("Choose a surface point","सतह पर बिंदु चुनें")
+        else->t("Scan for a surface","सतह स्कैन करें")
+    }
+    fun recenterPlacement(){
+        if(!camera||image?.placement==3)return
+        placement.set(false);scanCursor.reset();down=null;gestureTarget=null;onCancel();surface.requestRender()
+    }
     private var stoppedReason:String?=null // UI owner; survives focus changes and modal pauses.
     val needsRetry get()=stoppedReason!=null
     fun retryCamera(){
@@ -135,8 +153,8 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
             try {
                 if(session==null) {
                     if(ArCoreApk.getInstance().requestInstall(host,!installRequested)==ArCoreApk.InstallStatus.INSTALL_REQUESTED) {installRequested=true;unavailable(t("Finish AR installation, then return.","AR स्थापना पूरी करके वापस आएँ।"));return}
-                    session=Session(host)
-                    ArCameraSupport.configure(session!!)
+                    session=NativeArDriver(host)
+
                 }
                 freshness.requireNewImage();cameraTextureRegistered=false;session!!.resume()
             }catch(e:Exception) {Log.e("RoomAR","Session start failed: ${e.javaClass.simpleName}");retireSession();unavailable(ArCameraSupport.startupMessage(e,hindi),true);return}
@@ -145,7 +163,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
     }
     fun pause() {sessionRelease.cancelPendingResume();keepScreenOn=false;removeCallbacks(frameTicker);visual=visual.copy(held=false);foreground=false;gate.pause();revision=gate.configure();placement.set(false);image=null;down=null;screenCursor=null;gestureTarget=null
         if(running){surface.onPause();if(camera)try{session?.pause()}catch(_:Exception){};running=false}
-        surfaceReadiness.reset();cameraTextureRegistered=false
+        surfaceReadiness.reset();scanCursor.reset();cameraTextureRegistered=false
     }
     // UI thread after surface.onPause() has stopped the GL owner. No retired AR object is reused.
     private fun retireSession():Boolean {
@@ -163,6 +181,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
     fun close(){pause();closed=true;retireSession()}
     private fun unavailable(message:String,retry:Boolean=false) { if(retry)stoppedReason=message;val state=Image(revision,SystemClock.elapsedRealtime(),if(camera)anchors.size else 3,false,message,retry=retry);image=state;overlay.setBackgroundColor(Palette.canvas);onImage(state);overlay.invalidate() }
     override fun onSurfaceCreated(gl:GL10?,config:EGLConfig?) {
+        session?.invalidateTexture()
         cameraTextureRegistered=false;equipment.prepareProcedure(module);equipment.create();geometry.create()
         val textures=IntArray(1);GLES20.glGenTextures(1,textures,0);texture=textures[0];GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
         for(p in listOf(GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_TEXTURE_MAG_FILTER))GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,p,GLES20.GL_LINEAR)
@@ -171,14 +190,17 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
         val fs=shader(GLES20.GL_FRAGMENT_SHADER,"#extension GL_OES_EGL_image_external : require\nprecision mediump float;uniform samplerExternalOES camera;varying vec2 tex;void main(){gl_FragColor=texture2D(camera,tex);}")
         program=GLES20.glCreateProgram();GLES20.glAttachShader(program,vs);GLES20.glAttachShader(program,fs);GLES20.glLinkProgram(program);GLES20.glDeleteShader(vs);GLES20.glDeleteShader(fs)
     }
-    override fun onSurfaceChanged(gl:GL10?,width:Int,height:Int){w=width;h=height;GLES20.glViewport(0,0,w,h);placement.set(false);revision=gate.configure();val resizedAtRevision=revision;post{if(revision==resizedAtRevision){down=null;gestureTarget=null;screenCursor=null;onCancel()}}}
+    override fun onSurfaceChanged(gl:GL10?,width:Int,height:Int){w=width;h=height;GLES20.glViewport(0,0,w,h);placement.set(false);scanCursor.reset();revision=gate.configure();val resizedAtRevision=revision;post{if(revision==resizedAtRevision){down=null;gestureTarget=null;screenCursor=null;onCancel()}}}
     override fun onDrawFrame(gl:GL10?) {
         GLES20.glClearColor(.94f,.97f,.98f,1f);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
         if(!foreground)return
         val rev=revision;val state=visual;val models=mutableListOf<FloatArray>();var at=SystemClock.elapsedRealtime();val eye:FloatArray
+        val placementAim=scanCursor.snapshot(w,h)
+        if(lastAimSerial!=placementAim.serial){surfaceReadiness.reset();lastAimSerial=placementAim.serial}
         val light=floatArrayOf(1f,1f,1f,1f)
         var placementHit:HitResult?=null;var placementReady=false;var placementMessage:String?=null
         var previewPose:Pose?=null;var showPreview=false;var scanProgress=0f
+        var fullFootprintMapped=false
         var footprintWorld=emptyList<FloatArray>();var surfaceWorld=emptyList<FloatArray>()
         try {
             if(camera) {
@@ -193,8 +215,8 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
                 val receipt=freshness.observedAt(frame.timestamp,at)
                 if(frame.timestamp>0 && receipt!=null)drawCamera(frame)
                 val tracking=frame.camera.trackingState;val reason=frame.camera.trackingFailureReason
-                diagnostic("tracking=$tracking reason=$reason fresh=${receipt!=null} anchors=${anchors.size} thermal=$thermalStatus")
-                if(receipt==null || tracking!=TrackingState.TRACKING) {
+                diagnostic("tracking=$tracking reason=$reason fresh=${receipt!=null} anchors=${anchors.size} thermal=$thermalStatus phase=${state.phase}")
+                if(receipt==null || !ar.snapshot().ready) {
                     placement.set(false);surfaceReadiness.reset()
                     val message=if(receipt==null)t("Waiting for a fresh camera frame. Keep the app open.","नए कैमरा फ़्रेम की प्रतीक्षा है। ऐप खुला रखें।")else trackingHelp(reason)
                     publish(Image(rev,at,anchors.size,false,message))
@@ -203,37 +225,54 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
                     return
                 };at=receipt
                 if(anchors.size<3){
-                    placementHit=frame.hitTest(w/2f,h/2f).firstOrNull{(it.trackable as? Plane)?.let{p->p.type==Plane.Type.HORIZONTAL_UPWARD_FACING && p.trackingState==TrackingState.TRACKING && p.isPoseInPolygon(it.hitPose)}==true}
+                    val floors=ar.trackedFloors()
+                    val centerHits=frame.hitTest(placementAim.x,placementAim.y)
+                    placementHit=centerHits.firstOrNull{(it.trackable as? Plane)?.let{p->p.type==Plane.Type.HORIZONTAL_UPWARD_FACING && p.trackingState==TrackingState.TRACKING && p.isPoseInPolygon(it.hitPose)}==true}
                     val hit=placementHit
                     val plane=hit?.trackable as? Plane
-                    val decision=hit?.let{RoomStationPlacement.evaluate(module,
-                        anchors.mapIndexed{i,a->RoomAnchorPose.station(RoomAnchorPose.model(a.pose,facing[i]))},
-                        RoomStationPlacement.Station(it.hitPose.tx(),it.hitPose.tz()))}
                     if(hit!=null && plane!=null){
                         previewPose=RoomAnchorPose.model(hit.hitPose,RoomAnchorPose.facingOffset(hit.hitPose,frame.camera.pose))
                         footprintWorld=RoomPlacementArea.outline(module,anchors.size).map{previewPose!!.transformPoint(it)}
-                        val polygon=plane.polygon.duplicate();val count=polygon.remaining()/2
+                    }
+                    val decision=previewPose?.let{RoomStationPlacement.evaluate(module,
+                        anchors.mapIndexed{i,a->RoomAnchorPose.station(RoomAnchorPose.model(a.pose,facing[i]))},
+                        RoomAnchorPose.station(it))}
+                    // Show a detected floor even before the crosshair intersects it. Previously a
+                    // user could see no scan feedback until already aiming at a valid hit.
+                    val guidePlane=plane?:floors.maxByOrNull{it.extentX*it.extentZ}
+                    if(guidePlane!=null){
+                        val polygon=guidePlane.polygon.duplicate();val count=polygon.remaining()/2
                         // Bound preview work on large planes while keeping all footprint containment checks.
                         surfaceWorld=(0 until count step maxOf(1,count/64)).map{i->
-                            plane.centerPose.transformPoint(floatArrayOf(polygon.get(i*2),.003f,polygon.get(i*2+1)))}
+                            guidePlane.centerPose.transformPoint(floatArrayOf(polygon.get(i*2),.003f,polygon.get(i*2+1)))}
                     }
-                    val area=if(hit!=null && plane!=null)RoomPlacementArea.evaluate(hit.distance,
-                        anchors.firstOrNull()?.let{hit.hitPose.ty()-it.pose.ty()}?:0f,
-                        footprintWorld.all{plane.isPoseInPolygon(Pose.makeTranslation(it))})else null
+                    fullFootprintMapped=plane!=null && footprintWorld.isNotEmpty() && footprintWorld.all{plane.isPoseInPolygon(Pose.makeTranslation(it))}
+                    val supported=hit!=null && plane!=null && RoomPlacementArea.anchorPatch().all {
+                        plane.isPoseInPolygon(Pose.makeTranslation(hit.hitPose.transformPoint(it)))
+                    }
+                    val area=if(hit!=null)RoomPlacementArea.evaluate(hit.distance,
+                        anchors.firstOrNull()?.let{hit.hitPose.ty()-it.pose.ty()}?:0f,supported)else null
                     val eligible=decision?.allowed==true && area==RoomPlacementArea.Reason.READY && anchors.all{it.trackingState==TrackingState.TRACKING}
                     if(eligible && hit!=null && plane!=null){
                         val local=plane.centerPose.inverse().transformPoint(hit.hitPose.translation)
                         val stability=surfaceReadiness.observe(plane,local[0],local[2],frame.timestamp,SystemClock.elapsedRealtime(),rev)
                         placementReady=stability.ready;scanProgress=stability.progress;showPreview=true
                     }else surfaceReadiness.reset()
+                    if(at-placementDiagnosticAt>=5000){
+                        placementDiagnosticAt=at
+                        Log.i("RoomAR","placement scan floors=${floors.size} hits=${centerHits.size} floorHit=${hit!=null} distance=${hit?.distance} area=$area fullFootprint=$fullFootprintMapped spacing=${decision?.reason} dwell=$scanProgress ready=$placementReady")
+                    }
                     placementMessage=when{
-                        hit==null->t("Scan the floor gently sideways. Use a bright, patterned area; the outline shows a detected surface.","फ़र्श धीरे दाएँ-बाएँ स्कैन करें। उजला, पैटर्न वाला क्षेत्र चुनें; रेखा मिली सतह दिखाती है।")
+                        hit==null&&floors.isEmpty()->t("Tracking ready. Scan sideways over a textured mat or floor edges to find a surface. Avoid glare and reflections.","ट्रैकिंग तैयार है। सतह खोजने के लिए पैटर्न वाली चटाई या फ़र्श के किनारों को दाएँ-बाएँ स्कैन करें। चमक और परछाईं से बचें।")
+                        hit==null->t("Surface detected. Tap inside its teal outline, or aim the crosshair there. Hold steady to preview.","सतह मिली। हरी रेखा के अंदर छुएँ या निशाना वहाँ रखें। पूर्वावलोकन के लिए स्थिर रखें।")
                         area==RoomPlacementArea.Reason.OUT_OF_RANGE->t("Aim at floor 0.6–3 m away. Turn or tilt the phone; do not walk backwards.","0.6–3 मीटर दूर फ़र्श पर निशाना रखें। फ़ोन घुमाएँ या झुकाएँ; पीछे न चलें।")
                         area==RoomPlacementArea.Reason.DIFFERENT_LEVEL->t("Use the same floor level for all three stations.","तीनों स्थल फ़र्श के एक ही स्तर पर रखें।")
-                        area==RoomPlacementArea.Reason.INCOMPLETE_SURFACE->t("Scan a wider patch of floor until the full preview footprint fits the detected surface.","फ़र्श का बड़ा हिस्सा स्कैन करें, ताकि पूर्वावलोकन पूरा मिली सतह पर आए।")
+                        area==RoomPlacementArea.Reason.INCOMPLETE_SURFACE->t("Choose a point farther inside the teal surface outline, then hold steady.","हरी सतह रेखा के और अंदर बिंदु चुनें, फिर स्थिर रखें।")
                         decision?.reason in listOf(RoomStationPlacement.Reason.GAS_WRONG_SIDE,RoomStationPlacement.Reason.GAS_FOOTPRINT_OVERLAP)->t("Keep the green ring entirely on the outside of the barrier, away from the simulated opening.","हरे घेरे को पूरा अवरोध के बाहर रखें, काल्पनिक खुले स्थान से दूर।")
+                        decision?.reason==RoomStationPlacement.Reason.FOOTPRINTS_TOO_CLOSE->t("Leave at least 20 cm between virtual footprints. Choose a farther point; this is a layout gap, not a safe hazard distance.","काल्पनिक रूपरेखाओं में कम से कम 20 सेमी अंतर रखें। दूर बिंदु चुनें; यह केवल व्यवस्था का अंतर है, खतरे की सुरक्षित दूरी नहीं।")
                         !eligible->t("Choose a separate point, farther from the other stations.","दूसरे स्थलों से दूर अलग बिंदु चुनें।")
                         !placementReady->t("Preview only · hold the phone steady briefly to confirm this point.","केवल पूर्वावलोकन · बिंदु की पुष्टि के लिए फ़ोन थोड़ा स्थिर रखें।")
+                        !fullFootprintMapped->t("Point ready · tap Place station. The amber footprint extends beyond the mapped patch; it is layout guidance, not a clearance check.","बिंदु तैयार · स्थल रखें दबाएँ। पीली रूपरेखा मिली सतह से बाहर है; यह केवल व्यवस्था का संकेत है, जगह खाली होने की जाँच नहीं।")
                         else->t("Preview ready · tap Place station to anchor it here.","पूर्वावलोकन तैयार · यहाँ जोड़ने के लिए स्थल रखें दबाएँ।")
                     }
                 }
@@ -241,10 +280,10 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
                 if(placement.getAndSet(false) && anchors.size<3) {
                     val hit=placementHit
                     if(hit!=null) {
-                        if(placementReady) {
+                        if(placementReady && scanCursor.isCurrent(placementAim.serial)) {
                             val next=hit.createAnchor();var accepted=false
-                            gate.withCurrentRevision(rev){if(foreground && revision==rev && SystemClock.elapsedRealtime()-at in 0..150){anchors.add(next);facing.add(RoomAnchorPose.facingOffset(next.pose,frame.camera.pose));accepted=true}}
-                            if(!accepted)next.detach() else {Log.i("RoomAR","anchor placed count=${anchors.size}");placementReady=false;placementHit=null;previewPose=null;showPreview=false;footprintWorld=emptyList();surfaceReadiness.reset()}
+                            gate.withCurrentRevision(rev){scanCursor.withCurrent(placementAim.serial){if(foreground && revision==rev && SystemClock.elapsedRealtime()-at in 0..150){anchors.add(next);facing.add(RoomAnchorPose.facingOffset(next.pose,frame.camera.pose));accepted=true}}}
+                            if(!accepted)next.detach() else {Log.i("RoomAR","anchor placed count=${anchors.size} fullFootprint=$fullFootprintMapped");placementReady=false;placementHit=null;previewPose=null;showPreview=false;footprintWorld=emptyList();surfaceReadiness.reset();scanCursor.reset()}
                         }else {publish(Image(rev,at,anchors.size,false,t("Choose a separate clear training point. Keep the green point away from the simulated hazard.","अलग खाली प्रशिक्षण बिंदु चुनें। हरा बिंदु काल्पनिक खतरे से दूर रखें।")));return}
                     }
                 }
@@ -297,8 +336,8 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
             }
             val needed=RoomMissionChoices.forPhase(state.phase).firstOrNull()?.action?:when(state.phase){"ALARM"->"alarm";"PIN"->"pin";"GAS_CHECK"->"meter";"ATTENDANT"->if(gestureTarget=="meter")"safe" else "meter";"BARRIER"->"barrier-left";"WITHDRAW","REFUSE"->"safe";else->"base"}
             val neededStation=RoomMissionChoices.forPhase(state.phase).firstOrNull{it.action==needed}?.station?:if(needed=="safe")2 else if(needed in listOf("alarm","pin","meter"))0 else 1
-            val orientationHint=if(camera&&state.showCues&&models.size==3&&needed !in targets)t("Turn the phone slowly towards "+(if(neededStation==2)"the exit / outside station." else if(neededStation==0)"the equipment station." else "the virtual hazard."),"फ़ोन धीरे घुमाकर "+(if(neededStation==2)"निकास / बाहरी स्थल खोजें।" else if(neededStation==0)"उपकरण स्थल खोजें।" else "काल्पनिक खतरा खोजें।"))else null
-            publish(Image(rev,at,models.size,true,orientationHint?:if(models.size<3)(placementMessage?:t("Aim at the next clear point.","अगले खाली बिंदु पर निशाना रखें।"))else if(camera)t("Stations anchored · stay in your clear practice area", "स्थल जुड़े हैं · अपने खाली अभ्यास क्षेत्र में रहें")else t("Screen simulation · virtual actions only","स्क्रीन सिमुलेशन · केवल काल्पनिक क्रियाएँ"),targets,inverse,w,h,state.phase,canPlace=placementReady,footprint=footprint,surfaceBoundary=surfaceBoundary,scanProgress=scanProgress,preview=showPreview))
+            val orientationHint=if(camera&&state.phase!="COMPLETE"&&state.showCues&&models.size==3&&needed !in targets)t("Turn the phone slowly towards "+(if(neededStation==2)"the exit / outside station." else if(neededStation==0)"the equipment station." else "the virtual hazard."),"फ़ोन धीरे घुमाकर "+(if(neededStation==2)"निकास / बाहरी स्थल खोजें।" else if(neededStation==0)"उपकरण स्थल खोजें।" else "काल्पनिक खतरा खोजें।"))else null
+            publish(Image(rev,at,models.size,true,orientationHint?:if(models.size<3)(placementMessage?:t("Aim at the next clear point.","अगले खाली बिंदु पर निशाना रखें।"))else if(camera)t("Stations anchored · stay in your clear practice area", "स्थल जुड़े हैं · अपने खाली अभ्यास क्षेत्र में रहें")else t("Screen simulation · virtual actions only","स्क्रीन सिमुलेशन · केवल काल्पनिक क्रियाएँ"),targets,inverse,w,h,state.phase,canPlace=placementReady,footprint=footprint,surfaceBoundary=surfaceBoundary,scanProgress=scanProgress,preview=showPreview,placementAim=ComponentProjection.Point(placementAim.x,placementAim.y),aimSerial=placementAim.serial,fullFootprintMapped=fullFootprintMapped))
         }catch(e:Exception){placement.set(false);Log.e("RoomAR","Frame failed: ${e.javaClass.simpleName}");requestStop(rev,t("AR session interrupted. Tap Retry camera to recover.","AR सत्र बाधित हुआ। कैमरा फिर चलाएँ।"))}
     }
     private fun publish(value:Image){mailbox.set(value);if(posted.compareAndSet(false,true))post{posted.set(false);val next=mailbox.getAndSet(null)?:return@post;if(!foreground||next.revision!=revision)return@post
@@ -339,7 +378,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
         private fun near(id:String,x:Float,y:Float)=image?.targets?.get(id)?.let{kotlin.math.hypot(x-it.x,y-it.y)<=radius()*1.4f}==true
         override fun onDraw(c:Canvas){
             choiceBounds.clear();val state=visual;val img=image;paint.strokeWidth=host.dp(2).toFloat();paint.style=Paint.Style.STROKE
-            val cursor=if(camera)width/2f to height/2f else screenCursor
+            val cursor=if(camera)if(img!=null&&img.placement<3)img.placementAim?.let{it.x to it.y}?: (width/2f to height/2f)else width/2f to height/2f else screenCursor
             cursor?.let{(x,y)->paint.color=if(camera&&img?.canPlace==true)Palette.teal else Color.WHITE;c.drawCircle(x,y,host.dp(10).toFloat(),paint);c.drawLine(x-20,y,x+20,y,paint);c.drawLine(x,y-20,x,y+20,paint);if(visual.phase in listOf("AIM","SWEEP")){paint.color=Palette.teal;val r=host.dp(19).toFloat();c.drawArc(RectF(x-r,y-r,x+r,y+r),-90f,360f*visual.progress,false,paint)}}
             if(camera && img?.tracked==true && img.placement<3){
                 if(img.surfaceBoundary.size>2){
@@ -348,7 +387,8 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
                     paint.color=Palette.teal;paint.style=Paint.Style.STROKE;paint.strokeWidth=host.dp(1).toFloat();c.drawPath(area,paint)
                 }
                 if(img.scanProgress>0f){paint.color=Palette.teal;paint.strokeWidth=host.dp(4).toFloat();val r=host.dp(25).toFloat()
-                    c.drawArc(RectF(width/2f-r,height/2f-r,width/2f+r,height/2f+r),-90f,360f*img.scanProgress,false,paint)}
+                    val target=cursor?: (width/2f to height/2f)
+                    c.drawArc(RectF(target.first-r,target.second-r,target.first+r,target.second+r),-90f,360f*img.scanProgress,false,paint)}
                 if(img.preview){
                     val text=t("PREVIEW · NOT PLACED","पूर्वावलोकन · अभी नहीं रखा")
                     paint.textSize=12f*resources.displayMetrics.scaledDensity;paint.typeface=Typeface.DEFAULT_BOLD;paint.style=Paint.Style.FILL
@@ -361,7 +401,7 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
                 }
             }
             if(camera && img?.tracked==true && img.placement<3 && img.footprint.size>2){
-                paint.color=if(img.canPlace)Palette.teal else Palette.amber;paint.strokeWidth=host.dp(3).toFloat()
+                paint.color=if(img.canPlace&&img.fullFootprintMapped)Palette.teal else Palette.amber;paint.strokeWidth=host.dp(3).toFloat()
                 val path=Path();img.footprint.forEachIndexed{i,p->if(i==0)path.moveTo(p.x,p.y)else path.lineTo(p.x,p.y)};path.close();c.drawPath(path,paint)
             }
             val ids=if(RoomMissionChoices.forPhase(state.phase).isNotEmpty())emptyList()else when(state.phase){"ALARM"->listOf("alarm");"PIN"->listOf("pin");"GAS_CHECK"->listOf("meter");"BARRIER"->listOf("barrier-left","barrier-right");"ATTENDANT"->listOf("meter","safe");"WITHDRAW","REFUSE"->listOf("safe");else->listOf("left","right")}
@@ -400,6 +440,21 @@ class RoomMissionView(private val host:Activity, val module:String, val camera:B
             val length=kotlin.math.hypot(b.x-a.x,b.y-a.y);return length>1f && (dx*(b.x-a.x)+dy*(b.y-a.y))/length>=host.dp(56)
         }
         override fun onTouchEvent(e:MotionEvent):Boolean {
+            val img=image
+            if(camera&&this@RoomMissionView.foreground&&img!=null&&img.placement<3&&img.tracked&&img.revision==revision&&
+                img.frameWidth==width&&img.frameHeight==height&&SystemClock.elapsedRealtime()-img.at in 0..150){
+                when(e.actionMasked){
+                    MotionEvent.ACTION_DOWN->{down=e.x to e.y;downAt=SystemClock.elapsedRealtime()}
+                    MotionEvent.ACTION_UP->{val start=down;down=null
+                        if(start!=null&&img.at>=downAt&&SystemClock.elapsedRealtime()-downAt in 80..800&&
+                            kotlin.math.hypot(e.x-start.first,e.y-start.second)<host.dp(24)&&scanCursor.select(e.x,e.y,width,height)){
+                            placement.set(false);invalidate();performClick()
+                        }
+                    }
+                    MotionEvent.ACTION_CANCEL,MotionEvent.ACTION_POINTER_DOWN->down=null
+                }
+                return true
+            }
             if(!ready){val hadPointer=down!=null;down=null;screenCursor=null;if(hadPointer&&e.actionMasked==MotionEvent.ACTION_UP)onRelease();return true}
             when(e.actionMasked){
                 MotionEvent.ACTION_DOWN->{down=e.x to e.y;screenCursor=down;downAt=SystemClock.elapsedRealtime();gestureSerial++;if(!camera)sampleScreen(gestureSerial);gestureTarget=choiceAt(e.x,e.y)?:when(visual.phase){"ALARM"->"alarm";"PIN"->"pin";"GAS_CHECK"->"meter";"BARRIER"->"barrier-left";"ATTENDANT"->"meter";"WITHDRAW","REFUSE"->"safe";else->null}?.takeIf{near(it,e.x,e.y)};parent.requestDisallowInterceptTouchEvent(true)}

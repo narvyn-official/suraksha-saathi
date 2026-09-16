@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.text.InputFilter
 import android.widget.ArrayAdapter
 import android.widget.EditText
-import android.widget.ScrollView
 import android.widget.Spinner
 import android.view.WindowInsets
 
@@ -15,7 +14,8 @@ class WorkerProfilesActivity:Activity() {
     private lateinit var store:Store
     private val hi get()=store.hi
     private fun t(en:String,hindi:String)=if(hi)hindi else en
-    override fun onCreate(state:Bundle?) {
+       @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(!popContentPage())super.onBackPressed()}
+ override fun onCreate(state:Bundle?) {
         super.onCreate(state);store=Store(this);render()
     }
     private fun render() {
@@ -48,7 +48,7 @@ class WorkerProfilesActivity:Activity() {
         }
         root.add(action(t("Add a learner","नया व्यक्ति जोड़ें")) { createProfile() },top=8,bottom=10)
         root.add(action(t("Back to learning","सीखने पर वापस जाएँ"),false,role=ActionRole.NEUTRAL) { finish() })
-        setContentView(ScrollView(this).apply { isFillViewport=true;addView(root) })
+        setContentView(paged(root,hi))
     }
     private fun sectorLabel(value:String):String {
         val index=Store.SECTORS.indexOf(value).coerceAtLeast(0)
@@ -63,7 +63,7 @@ class WorkerProfilesActivity:Activity() {
         val sector=Spinner(this).apply { adapter=ArrayAdapter(this@WorkerProfilesActivity,android.R.layout.simple_spinner_dropdown_item,Store.SECTORS.map(::sectorLabel));minimumHeight=dp(56);contentDescription=t("Work sector","कार्य क्षेत्र") }
         form.add(sector)
         val dialog=AlertDialog.Builder(this).setTitle(t("Create a local profile","इस फ़ोन पर प्रोफ़ाइल बनाएँ"))
-            .setView(form).setPositiveButton(t("Create and switch","बनाएँ और चुनें"),null)
+            .setView(paged(form,hi)).setPositiveButton(t("Create and switch","बनाएँ और चुनें"),null)
             .setNegativeButton(t("Cancel","रद्द करें"),null).create()
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {

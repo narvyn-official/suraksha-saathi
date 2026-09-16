@@ -34,7 +34,7 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
     private val placeholder = host.label("",17f,Palette.muted,true)
     private val markers = mutableListOf<Button>()
     private val equipment = WorldEquipment()
-    @Volatile private var ar: Session? = null
+    @Volatile private var ar: NativeArDriver? = null
     private var anchor: Anchor? = null // GL thread only while rendering
     private var facing = Pose.IDENTITY
     private var missedPlacement: Int? = null
@@ -152,8 +152,8 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
                 if(ArCoreApk.getInstance().requestInstall(host,!installRequested)==ArCoreApk.InstallStatus.INSTALL_REQUESTED) {
                     installRequested=true; onStatus(t("Finish installing AR services, or use screen practice.","AR सेवाओं की स्थापना पूरी करें, या स्क्रीन अभ्यास करें।")); return
                 }
-                ar=Session(host)
-                ArCameraSupport.configure(ar!!)
+                ar=NativeArDriver(host)
+
             }
             freshness.requireNewImage(); scene=scene.copy(revision=gate.configure()); gate.activate()
             textureRegistered=false; ar!!.resume(); running=true; lines.setBackgroundColor(android.graphics.Color.TRANSPARENT);placeholder.visibility=GONE;surface.onResume();cameraPump.start()
@@ -184,6 +184,7 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
     fun close() { pauseCamera(); closed=true; retireSession() }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        ar?.invalidateTexture()
         textureRegistered=false;equipment.create()
         val ids=IntArray(1); GLES20.glGenTextures(1,ids,0); texture=ids[0]
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,texture)
@@ -209,11 +210,11 @@ class ComponentCameraView(private val host: Activity): FrameLayout(host), GLSurf
             if(frame.timestamp>0L && observedAt!=null)drawCamera(frame)
             if(observedAt==null) { discardPlacement(current.revision); unavailable(current,t("Waiting for a fresh camera image. Hold still, or retry.","नए कैमरा दृश्य की प्रतीक्षा है। स्थिर रहें, या फिर कोशिश करें।")); return }
             if(reset.getAndSet(false)) { anchor?.detach(); anchor=null }
-            if(frame.camera.trackingState!=TrackingState.TRACKING) {
+            if(!session.snapshot().ready) {
                 discardPlacement(current.revision); unavailable(current,t("Tracking paused. Hold still and look at the training surface.","ट्रैकिंग रुकी है। स्थिर रहें और प्रशिक्षण सतह देखें।")); return
             }
             val placed=tap.consumeFor(current.revision)
-            if(placed?.eligible(scene.revision,widthPx,heightPx,SystemClock.elapsedRealtime(),running,frame.camera.trackingState==TrackingState.TRACKING,observedAt!=null)==true && current.revision==scene.revision) {
+            if(placed?.eligible(scene.revision,widthPx,heightPx,SystemClock.elapsedRealtime(),running,session.snapshot().ready,observedAt!=null)==true && current.revision==scene.revision) {
                 val hit=frame.hitTest(placed.x,placed.y).firstOrNull {
                     val plane=it.trackable as? Plane
                     plane!=null && plane.type==Plane.Type.HORIZONTAL_UPWARD_FACING && plane.trackingState==TrackingState.TRACKING && plane.isPoseInPolygon(it.hitPose)

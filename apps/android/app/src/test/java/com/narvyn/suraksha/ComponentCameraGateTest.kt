@@ -16,8 +16,8 @@ class ComponentCameraGateTest {
         val g=ComponentCameraGate(); val v=g.configure()
         g.frame(v,true,100); assertFalse(g.allows(v,100))
         g.activate(); assertFalse(g.allows(v,100))
-        g.frame(v,true,200); assertTrue(g.allows(v,200)); assertTrue(g.allows(v,700))
-        assertFalse(g.allows(v,701)); assertFalse(g.allows(v,199))
+        g.frame(v,true,200); assertTrue(g.allows(v,200)); assertTrue(g.allows(v,350))
+        assertFalse(g.allows(v,351)); assertFalse(g.allows(v,199))
         g.frame(v,false,220); assertFalse(g.allows(v,220))
     }
     @Test fun pauseAndConfigurationRejectStaleFramesAndChoices() {
@@ -31,9 +31,9 @@ class ComponentCameraGateTest {
         val f=ComponentCameraFreshness();val g=ComponentCameraGate();val v=g.configure();g.activate()
         assertNull(f.observedAt(0,100))
         assertEquals(100L,f.observedAt(10,100))
-        val repeated=f.observedAt(10,590)!!;assertEquals(100L,repeated)
-        g.frame(v,true,repeated);assertTrue(g.allows(v,600));assertFalse(g.allows(v,601))
-        assertNull(f.observedAt(10,601));assertNull(f.observedAt(9,602))
+        val repeated=f.observedAt(10,240)!!;assertEquals(100L,repeated)
+        g.frame(v,true,repeated);assertTrue(g.allows(v,250));assertFalse(g.allows(v,251))
+        assertNull(f.observedAt(10,251));assertNull(f.observedAt(9,602))
         assertEquals(603L,f.observedAt(11,603));assertNull(f.observedAt(11,602))
         f.requireNewImage();assertNull(f.observedAt(11,604));assertEquals(605L,f.observedAt(12,605))
         f.requireNewImage();assertNull(f.observedAt(12,2000));assertEquals(2001L,f.observedAt(13,2001))

@@ -39,12 +39,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
 
     private val body = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
     private val controlRow = LinearLayout(activity).apply { orientation=LinearLayout.HORIZONTAL }
-    private val controlScroll = object:android.widget.ScrollView(activity) {
-        override fun onMeasure(w:Int,h:Int) {
-            val cap=CameraWorkspaceLayout.controls(MeasureSpec.getSize(h),resources.displayMetrics.density)
-            super.onMeasure(w,MeasureSpec.makeMeasureSpec(cap,MeasureSpec.AT_MOST))
-        }
-    }
+    private val controlScroll = FrameLayout(activity)
     private var immersive = false
     private var centreAim = false
     @Volatile private var placementMade = false
@@ -68,7 +63,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     @Volatile private var foreground = false
     @Volatile private var cameraMode = false
     @Volatile private var cameraRunning = false
-    @Volatile private var ar: Session? = null
+    @Volatile private var ar: NativeArDriver? = null
     @Volatile private var hi = false
     @Volatile private var snapshot = Snapshot(0, Scene("fire", "", emptyList(), emptySet(), false), false, emptyList(), 1, 0, 0)
     private var rendererRunning = false
@@ -237,8 +232,8 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
                         status(t("Complete AR installation or continue on screen.", "AR स्थापना पूरी करें या स्क्रीन पर जारी रखें।"))
                         return
                     }
-                    ar = Session(activity)
-                    ArCameraSupport.configure(ar!!)
+                    ar = NativeArDriver(activity)
+
                 }
                 freshness.requireNewImage();textureRegistered=false
                 ar!!.resume()
@@ -348,6 +343,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        ar?.invalidateTexture()
         textureRegistered=false
         equipment.create()
         val textures = IntArray(1); GLES20.glGenTextures(1, textures, 0); texture = textures[0]
@@ -380,7 +376,7 @@ class ProcedureSceneView(private val activity: Activity) : FrameLayout(activity)
                 val frame = session.update()
                 val receipt = freshness.observedAt(frame.timestamp, SystemClock.elapsedRealtime())
                 if(frame.timestamp>0L && receipt!=null)drawCamera(frame)
-                if (receipt == null || frame.camera.trackingState != TrackingState.TRACKING) {
+                if (receipt == null || !session.snapshot().ready) {
                     unavailable(current, trackingHelp(frame.camera.trackingFailureReason)); return
                 }
                 observedAt = receipt

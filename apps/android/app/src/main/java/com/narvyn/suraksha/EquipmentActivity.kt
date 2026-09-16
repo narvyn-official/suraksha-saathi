@@ -9,7 +9,6 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.app.AlertDialog
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.view.View
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
@@ -21,6 +20,7 @@ class EquipmentActivity:Activity(){
  @Volatile private var distance=1.75f
  @Volatile private var pitch=0f
  private var describeView: () -> Unit = {}
+    @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(!popContentPage())super.onBackPressed()}
  override fun onCreate(state:Bundle?){super.onCreate(state)
   val module=intent.getStringExtra("moduleId")?.takeIf{it in listOf("fire","gas","machinery","ppe","emergency")}?:"fire"
   val hi=Store(this).use{it.hi};fun t(en:String,hindi:String)=if(hi)hindi else en
@@ -28,7 +28,7 @@ class EquipmentActivity:Activity(){
   val root=column(20);root.setBackgroundColor(Palette.canvas)
   root.setOnApplyWindowInsetsListener{v,i->if(android.os.Build.VERSION.SDK_INT>=30){val b=i.getInsets(android.view.WindowInsets.Type.systemBars());v.setPadding(dp(20)+b.left,dp(20)+b.top,dp(20)+b.right,dp(20)+b.bottom)}else{v.setPadding(dp(20)+i.systemWindowInsetLeft,dp(20)+i.systemWindowInsetTop,dp(20)+i.systemWindowInsetRight,dp(20)+i.systemWindowInsetBottom)};i}
   val body=column()
-  root.addView(ScrollView(this).apply { isFillViewport=true;addView(body) },LinearLayout.LayoutParams(-1,-1))
+  root.addView(paged(body,hi),LinearLayout.LayoutParams(-1,-1))
   root.accessibilityPaneTitle=t("Explore the equipment","उपकरण को देखें")
   body.add(label(t("Explore the equipment","उपकरण को देखें"),25f,Palette.ink,true).asHeading(),bottom=8)
   body.add(label(t("Illustrative equipment · drag to turn and tilt, pinch to zoom. No live sensor readings.","उपकरण का चित्र · घुमाने और झुकाने के लिए खींचें, दो उँगलियों से ज़ूम करें। लाइव सेंसर रीडिंग नहीं।"),14f,Palette.muted),bottom=12)
@@ -63,7 +63,7 @@ class EquipmentActivity:Activity(){
     "emergency"->listOf(t("Reporting radio","सूचना रेडियो") to t("This generic radio cannot transmit. Report from a safe place using the site's approved communication procedure and equipment.","यह सामान्य रेडियो प्रसारण नहीं कर सकता। सुरक्षित जगह से स्थल की स्वीकृत संचार प्रक्रिया और उपकरण से सूचना दें।"),t("First-aid case","प्राथमिक सहायता किट") to t("Locate the trained first aider and approved supplies before work. This closed case is an illustration; it does not teach treatment.","काम से पहले प्रशिक्षित प्राथमिक सहायक और स्वीकृत सामग्री की जगह जानें। यह बंद किट चित्र है; इससे उपचार नहीं सिखाया जाता।"),t("Assembly marker","एकत्र होने की जगह का चिह्न") to t("Follow the assigned safe route and report at the designated assembly point. This model cannot determine a real safe route or locate missing people.","निर्धारित सुरक्षित रास्ते से एकत्र होने की जगह जाएँ और उपस्थिति बताएँ। यह मॉडल असली सुरक्षित रास्ता नहीं बता सकता और लापता लोगों को नहीं ढूँढ सकता।"))
     else->listOf(t("Helmet & suspension","हेलमेट और अंदर की पट्टियाँ") to t("Shell, brim and suspension are separate parts. Check actual equipment for damage and correct fit; this model is not an approval mark.","खोल, किनारा और अंदर की पट्टियाँ अलग पुर्ज़े हैं। असली उपकरण में नुकसान और सही फिट जाँचें; यह स्वीकृति चिह्न नहीं है।"),t("Eye & hearing protection","आँख और सुनने की क्षमता की सुरक्षा") to t("Lenses, frame, side arms and ear cushions show fit surfaces. Required protection depends on the task assessment; this is not a complete PPE kit.","लेंस, फ्रेम, किनारे की डंडियाँ और कान की गद्दियाँ फिट की जगह दिखाते हैं। ज़रूरी सुरक्षा काम के आकलन पर निर्भर है; यह पूरा पीपीई किट नहीं है।"))
    }
-   AlertDialog.Builder(this).setTitle(t("Inspect the illustration","चित्र के पुर्ज़े जानें")).setItems(parts.map{it.first}.toTypedArray()){_,which->AlertDialog.Builder(this).setTitle(parts[which].first).setMessage(parts[which].second).setPositiveButton(t("Close","बंद करें"),null).show()}.setNegativeButton(t("Close","बंद करें"),null).show()
+   PageDialogBuilder(this).setTitle(t("Inspect the illustration","चित्र के पुर्ज़े जानें")).setItems(parts.map{it.first}.toTypedArray()){_,which->PageDialogBuilder(this).setTitle(parts[which].first).setMessage(parts[which].second).setPositiveButton(t("Close","बंद करें"),null).show()}.setNegativeButton(t("Close","बंद करें"),null).show()
   },LinearLayout.LayoutParams(0,-2,1f));body.add(detailControls,bottom=8)
   body.add(action(t("Practice finding parts","पुर्ज़े पहचानने का अभ्यास"),false){startActivity(android.content.Intent(this,ComponentPracticeActivity::class.java).putExtra("moduleId",module))},bottom=8)
   body.add(action(t("Back to lesson","पाठ पर वापस जाएँ")){finish()})

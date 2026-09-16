@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.view.View
 import android.view.WindowInsets
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import java.text.DateFormat
 import java.util.Date
 
@@ -26,11 +25,12 @@ class ComponentPracticeActivity: Activity() {
     private val cameraActions = mutableListOf<Button>()
     private lateinit var header: LinearLayout
     private lateinit var lower: LinearLayout
-    private lateinit var scroll: ScrollView
+    private lateinit var scroll: PagedPanel
     private val hi get() = store.hi
     private fun t(en: String, hindi: String) = if (hi) hindi else en
 
-    override fun onCreate(state: Bundle?) {
+       @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(!popContentPage())super.onBackPressed()}
+ override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         store = Store(this)
         if(state?.getString("workerId")?.let { it!=store.workerId }==true) { finish();return }
@@ -54,8 +54,8 @@ class ComponentPracticeActivity: Activity() {
         body.add(header)
         body.addView(sceneContainer,LinearLayout.LayoutParams(-1,dp(330)))
         body.add(lower,top=12)
-        scroll = ScrollView(this).apply { isFillViewport = true; addView(body) }
-        scroll.setOnScrollChangeListener { _,_,_,_,_ -> if(!cameraSelected) scene.reportVisibility() }
+        scroll = paged(body,hi)
+        scroll.onPageChanged = { if(!cameraSelected) scene.reportVisibility() }
         root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         root.add(action(t("Save & return","सहेजें और लौटें"),false,role=ActionRole.NEUTRAL) { finish() },top=12)
         setContentView(root)
@@ -188,5 +188,5 @@ class ComponentPracticeActivity: Activity() {
         if(cameraSelected) camera?.requestChoice(id) else chooseNow(id,"screen")
     }
     private fun chooseNow(id: String, presentation: String) { if(!mayChange())return; session.choose(id,System.currentTimeMillis(),presentation); saveAndRender() }
-    private fun saveAndRender() { if(!mayChange())return; store.saveComponent(session.data); render(); scroll.post { scroll.scrollTo(0,0) } }
+    private fun saveAndRender() { if(!mayChange())return; store.saveComponent(session.data); render(); scroll.post { scroll.firstPage() } }
 }

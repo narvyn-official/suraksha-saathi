@@ -21,7 +21,10 @@ class MainActivity: Activity() {
     private lateinit var store: Store
     private lateinit var curriculum: Curriculum
     private lateinit var body: LinearLayout
+    private lateinit var pages: PagedPanel
     private var page="home"
+    private val pageHistory=mutableListOf<String>()
+    private val backNavigation by lazy { AppBackNavigation(this){navigateBack()} }
     private var selected="fire"
     private var lessonIndex=0
     private var session: TrainingSession?=null
@@ -42,6 +45,8 @@ class MainActivity: Activity() {
         }
     private var tts: TextToSpeech?=null
     private var speechReady=false
+    private var spokenLearningKey:String?=null
+    private var automaticVoiceError:String?=null
     private val hi get()=store.hi
     private fun t(en: String,hiText: String)=if(hi)hiText else en
 
@@ -49,27 +54,52 @@ class MainActivity: Activity() {
         super.onCreate(savedInstanceState);store=Store(this);curriculum=Curriculum(this)
         pendingExportId=savedInstanceState?.getString("pendingExportId")?.takeIf { runCatching { UUID.fromString(it).toString()==it }.getOrDefault(false) }
         pendingExportWorker=savedInstanceState?.getString("pendingExportWorker")
-        page=savedInstanceState?.getString("page")?:"home";selected=savedInstanceState?.getString("selected")?:"fire"
+        pageHistory.addAll(savedInstanceState?.getStringArrayList("pageHistory").orEmpty());page=savedInstanceState?.getString("page")?:"home";selected=savedInstanceState?.getString("selected")?:"fire"
         lessonIndex=savedInstanceState?.getInt("lessonIndex")?:0
         savedInstanceState?.getString("session")?.let{store.attempt(it)?.let{data->session=TrainingSession(data,curriculum.module(data.getString("moduleId")))}}
         if(page=="training"&&session==null)page="home"
-        tts=TextToSpeech(this){status->speechReady=status==TextToSpeech.SUCCESS}
+        tts=TextToSpeech(this){status->speechReady=status==TextToSpeech.SUCCESS;runOnUiThread{narrateVisibleLearning()}}
         render()
     }
-    override fun onResume(){super.onResume();if(::store.isInitialized && !store.isCurrentProfile()){store.close();store=Store(this);session=null;page="home";lessonIndex=0;exportBytes=null;render()}else if(::store.isInitialized && page=="records") render()}
-    override fun onSaveInstanceState(out: Bundle) {super.onSaveInstanceState(out);out.putString("page",page);out.putString("selected",selected);out.putInt("lessonIndex",lessonIndex);out.putString("session",session?.data?.getString("id"));out.putString("pendingExportId",pendingExportId);out.putString("pendingExportWorker",pendingExportWorker)}
-    override fun onDestroy(){tts?.shutdown();store.close();super.onDestroy()}
+    override fun onResume(){super.onResume();if(::store.isInitialized && !store.isCurrentProfile()){store.close();store=Store(this);session=null;page="home";pageHistory.clear();lessonIndex=0;exportBytes=null;render()}else if(::store.isInitialized && page=="records") render()}
+    override fun onSaveInstanceState(out: Bundle) {super.onSaveInstanceState(out);out.putStringArrayList("pageHistory",ArrayList(pageHistory));out.putString("page",page);out.putString("selected",selected);out.putInt("lessonIndex",lessonIndex);out.putString("session",session?.data?.getString("id"));out.putString("pendingExportId",pendingExportId);out.putString("pendingExportWorker",pendingExportWorker)}
+    override fun onDestroy(){backNavigation.close();tts?.shutdown();store.close();super.onDestroy()}
     override fun onPause(){tts?.stop();super.onPause()}
+    override fun onWindowFocusChanged(focused:Boolean){super.onWindowFocusChanged(focused);if(focused)narrateVisibleLearning()else tts?.stop()}
+    private fun narrateVisibleLearning(){
+        if(!::store.isInitialized||!::curriculum.isInitialized||!speechReady||!hasWindowFocus()||isFinishing||!store.isCurrentProfile()||!getSharedPreferences("room-voice",MODE_PRIVATE).getBoolean("automatic",true))return
+        val pair=when(page){
+            "lesson"->{val item=curriculum.module(selected).getJSONArray("lessons").optJSONObject(lessonIndex)?:return;"lesson:$selected:$lessonIndex:$hi" to (item.local("title",hi)+". "+item.local("body",hi))}
+            "training"->{val s=session?:return;if(s.finished)return;val q=s.current;val feedback=s.data.optBoolean("awaitingContinue");"${s.data.optString("id")}:${s.index}:$feedback:$hi" to if(feedback)if(s.guided)q.local("explanation",hi)else t("Answer saved. Continue when ready.","उत्तर सहेजा गया। तैयार होने पर आगे बढ़ें।")else q.local("prompt",hi)+". "+s.options().joinToString(". "){it.local("text",hi)}}
+            else->return
+        }
+        if(spokenLearningKey==pair.first)return
+        spokenLearningKey=pair.first;speak(pair.second,true)
+    }
     private fun parentPage()=when(page){"training","lesson","practice"->"module";"verify"->"records";else->"home"}
-    @Deprecated("Compatibility") override fun onBackPressed(){if(page!="home")go(parentPage())else super.onBackPressed()}
-    private fun go(to: String){tts?.stop();if(to=="training"){session?.let{if(!it.finished&&it.data.optString("mode")=="arcore"){it.data.put("mode","hybrid");store.save(it)}}};page=to;render()}
+    @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(page!="home")navigateBack()else super.onBackPressed()}
+    private fun navigateBack(){
+        tts?.stop()
+        if(::pages.isInitialized&&pages.previousPage())return
+        if(page=="lesson"&&lessonIndex>0){lessonIndex--;render();return}
+        page=if(pageHistory.isNotEmpty())pageHistory.removeAt(pageHistory.lastIndex)else parentPage()
+        render()
+    }
+    private fun go(to: String){tts?.stop();
+        if(to!=page){
+            if(to=="home")pageHistory.clear()
+            else if(to in pageHistory){while(pageHistory.isNotEmpty()&&pageHistory.last()!=to)pageHistory.removeAt(pageHistory.lastIndex);pageHistory.removeAt(pageHistory.lastIndex)}
+            else pageHistory.add(page)
+        }
+        if(to=="training"){session?.let{if(!it.finished&&it.data.optString("mode")=="arcore"){it.data.put("mode","hybrid");store.save(it)}}};page=to;render()}
 
     private fun render(){
+        backNavigation.enabled(page!="home")
         val root=column().apply{setBackgroundColor(Palette.canvas)}
         root.setOnApplyWindowInsetsListener{v,i->if(android.os.Build.VERSION.SDK_INT>=30){val b=i.getInsets(WindowInsets.Type.systemBars());v.setPadding(b.left,b.top,b.right,b.bottom)}else{v.setPadding(i.systemWindowInsetLeft,i.systemWindowInsetTop,i.systemWindowInsetRight,i.systemWindowInsetBottom)};i}
         val header=LinearLayout(this).apply{gravity=Gravity.CENTER_VERTICAL;setPadding(dp(16),dp(4),dp(16),dp(4));setBackgroundColor(Palette.surface)}
         if(page in listOf("module","lesson","practice","training","verify")) {
-            header.addView(action("‹",false,role=ActionRole.NEUTRAL){go(parentPage())}.apply {
+            header.addView(action("‹",false,role=ActionRole.NEUTRAL){navigateBack()}.apply {
                 tag="main-back";textSize=28f;contentDescription=t("Back","वापस");setPadding(0,0,0,0);minHeight=dp(48);minimumHeight=dp(48)
             },LinearLayout.LayoutParams(dp(48),-2))
         } else {
@@ -84,8 +114,8 @@ class MainActivity: Activity() {
             setCompoundDrawables(appIcon("user",Palette.ink,22),null,null,null);setPadding(dp(13),dp(12),dp(13),dp(12));minHeight=dp(48);minimumHeight=dp(48)
         },LinearLayout.LayoutParams(dp(48),dp(48)).apply{marginStart=dp(6)})
         root.add(header)
-        val scroll=ScrollView(this).apply{isFillViewport=true;clipToPadding=false;isVerticalScrollBarEnabled=false;overScrollMode=View.OVER_SCROLL_IF_CONTENT_SCROLLS}
-        body=column(18).apply{tag="main-page-$page"};scroll.addView(body);root.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
+        body=column(18).apply{tag="main-page-$page"};pages=paged(body,hi).apply{onPageChanged={backNavigation.enabled(page!="home"||hasPrevious)}}
+        root.addView(pages,LinearLayout.LayoutParams(-1,0,1f))
         when(page){"home"->home();"module"->module();"lesson"->lesson();"practice"->practiceOptions();"training"->training();"records"->records();"help"->help();"verify"->verifyPage();else->home()}
         body.accessibilityPaneTitle=when(page){"home"->t("Learning home","सीखने का होम");"lesson"->t("Lesson ${lessonIndex+1}","पाठ ${lessonIndex+1}");"practice"->t("Practice options","अभ्यास के विकल्प");"module"->curriculum.module(selected).local("title",hi);"training"->t("Training","प्रशिक्षण");"records"->t("My learning record","मेरा सीखने का रिकॉर्ड");"verify"->t("Verify a record","रिकॉर्ड जाँचें");else->t("Help","मदद")}
         if(page=="lesson")root.add(lessonNavigation())
@@ -102,12 +132,12 @@ class MainActivity: Activity() {
                 contentDescription=t(en,h)+if(active)t(", selected",", चयनित")else ""
             },LinearLayout.LayoutParams(0,-2,1f).apply{if(dest!="help")marginEnd=dp(8)})
         }
-        root.add(nav);setContentView(root);root.requestApplyInsets()
+        root.add(nav);setContentView(root);root.requestApplyInsets();root.post{narrateVisibleLearning()}
     }
     private fun title(text: String,sub: String?=null){body.add(label(text,26f,Palette.ink,true).asHeading(),bottom=6);sub?.let{body.add(label(it,15f,Palette.muted),bottom=16)}}
     private fun chip(text: String,colour: Int=Palette.soft,ink: Int=Palette.blue)=label(text,12f,ink).apply{background=shape(colour,8);setPadding(dp(10),dp(6),dp(10),dp(6))}
     private fun profileMenu(){
-        AlertDialog.Builder(this).setTitle(store.name.ifBlank{t("Your learning profile","आपकी सीखने की प्रोफ़ाइल")})
+        PageDialogBuilder(this).setTitle(store.name.ifBlank{t("Your learning profile","आपकी सीखने की प्रोफ़ाइल")})
             .setItems(arrayOf(t("Edit my profile","मेरी प्रोफ़ाइल बदलें"),t("Learners on this phone","इस फ़ोन के शिक्षार्थी"),t("Admin dashboard","व्यवस्थापक डैशबोर्ड"))){_,i->
                 when(i){0->profile();1->startActivity(Intent(this,WorkerProfilesActivity::class.java));else->startActivity(Intent(this,AdminActivity::class.java))}
             }.show()
@@ -123,8 +153,9 @@ class MainActivity: Activity() {
         body.add(row,bottom=8)
     }
     private fun language(){
-        AlertDialog.Builder(this).setTitle(t("Choose language","भाषा चुनें")).setItems(arrayOf("English","हिन्दी","Santali · review pending")){_,which->
-            if(which==2)notice("Santali", "Native-speaker review and recordings are required before Santali lessons can be released. Hindi and English are available.")
+        PageDialogBuilder(this).setTitle(t("Choose language","भाषा चुनें")).setItems(arrayOf("English","हिन्दी","Santali · review pending",if(getSharedPreferences("room-voice",MODE_PRIVATE).getBoolean("automatic",true))t("Mute automatic instructions","अपने आप निर्देश बोलना बंद करें")else t("Enable automatic instructions","अपने आप निर्देश बोलना चालू करें"))){_,which->
+            if(which==3){val prefs=getSharedPreferences("room-voice",MODE_PRIVATE);prefs.edit().putBoolean("automatic",!prefs.getBoolean("automatic",true)).apply();tts?.stop();spokenLearningKey=null;render()}
+            else if(which==2)notice("Santali", "Native-speaker review and recordings are required before Santali lessons can be released. Hindi and English are available.")
             else {tts?.stop();store.hi=which==1;render()}
         }.show()
     }
@@ -133,7 +164,7 @@ class MainActivity: Activity() {
         val sectors=listOf("Unspecified","Mining","Steel","Mica","Other")
         val sector=Spinner(this).apply{adapter=ArrayAdapter(this@MainActivity,android.R.layout.simple_spinner_dropdown_item,if(hi)listOf("नहीं चुना","खनन","इस्पात","अभ्रक","अन्य")else sectors);setSelection(sectors.indexOf(store.sector).coerceAtLeast(0));minimumHeight=dp(56)}
         val form=column(16);form.add(field);form.add(label(t("Work sector","काम का क्षेत्र"),14f),top=12);form.add(sector)
-        AlertDialog.Builder(this).setTitle(t("Your learning profile","आपकी सीखने की प्रोफ़ाइल")).setMessage(t("Stored on this phone. No email or account required.","इस फ़ोन पर सुरक्षित। ईमेल या खाते की ज़रूरत नहीं।")).setView(form).setPositiveButton(t("Save","सहेजें")){_,_->store.name=field.text.toString().trim().take(80);store.sector=sectors[sector.selectedItemPosition];render()}.setNegativeButton(t("Cancel","रद्द करें"),null).show()
+        PageDialogBuilder(this).setTitle(t("Your learning profile","आपकी सीखने की प्रोफ़ाइल")).setMessage(t("Stored on this phone. No email or account required.","इस फ़ोन पर सुरक्षित। ईमेल या खाते की ज़रूरत नहीं।")).setView(form).setPositiveButton(t("Save","सहेजें")){_,_->store.name=field.text.toString().trim().take(80);store.sector=sectors[sector.selectedItemPosition];render()}.setNegativeButton(t("Cancel","रद्द करें"),null).show()
     }
     private fun home(){
         title(t("Learn to stay safe.","सुरक्षित रहना सीखें।"))
@@ -168,8 +199,8 @@ class MainActivity: Activity() {
     }
     /** All modules remain one tap away; the home no longer needs a vertical catalogue. */
     private fun modulePicker(){
-        val list=column(16);val dialog=AlertDialog.Builder(this).setTitle(t("Choose your training","अपना प्रशिक्षण चुनें"))
-            .setView(ScrollView(this).apply{addView(list)}).setNegativeButton(t("Cancel","रद्द करें"),null).create()
+        val list=column(16);val dialog=PageDialogBuilder(this).setTitle(t("Choose your training","अपना प्रशिक्षण चुनें"))
+            .setView(paged(list,hi)).setNegativeButton(t("Cancel","रद्द करें"),null).create()
         curriculum.modules.forEach{m->
             val id=m.getString("id")
             val item=LinearLayout(this).apply{
@@ -205,7 +236,7 @@ class MainActivity: Activity() {
         startActivity(Intent(this,RoomMissionActivity::class.java).putExtra("moduleId",selected).putExtra("guided",!recall).putExtra("camera",true).putExtra("recall",recall))
     }
     private fun chooseAssessment(){
-        AlertDialog.Builder(this).setTitle(t("Assessment mode","मूल्यांकन का तरीका")).setItems(arrayOf(t("On-screen decisions","स्क्रीन पर निर्णय"),t("Camera AR","कैमरा AR"))){_,i->startTraining(false,i==1)}.show()
+        PageDialogBuilder(this).setTitle(t("Assessment mode","मूल्यांकन का तरीका")).setItems(arrayOf(t("On-screen decisions","स्क्रीन पर निर्णय"),t("Camera AR","कैमरा AR"))){_,i->startTraining(false,i==1)}.show()
     }
     private fun openLessons(){lessonIndex=0;go("lesson")}
     private fun lesson(){
@@ -252,17 +283,18 @@ class MainActivity: Activity() {
             notice(t("What you’ll learn","आप क्या सीखेंगे"),(0 until objectives.length()).joinToString("\n\n"){objectives.getJSONArray(it).getString(if(hi)1 else 0)})
         })
     }
-    private fun speak(text: String){
+    private fun speak(text: String,automatic:Boolean=false){
+        fun unavailable(title:String,message:String){if(automatic){if(automaticVoiceError!=hi.toString()){automaticVoiceError=hi.toString();Toast.makeText(this,message,Toast.LENGTH_LONG).show()}}else notice(title,message)}
         val engine=tts?:return
         val locale=if(hi)Locale.forLanguageTag("hi-IN") else Locale.ENGLISH
-        if(!speechReady||engine.isLanguageAvailable(locale)<TextToSpeech.LANG_AVAILABLE){notice(t("Voice unavailable","आवाज़ उपलब्ध नहीं"),t("Install an offline voice for this language in Android speech settings. You can continue reading.","Android की आवाज़ सेटिंग में इस भाषा की ऑफ़लाइन आवाज़ इंस्टॉल करें। आप पढ़कर जारी रख सकते हैं।"));return}
+        if(!speechReady||engine.isLanguageAvailable(locale)<TextToSpeech.LANG_AVAILABLE){unavailable(t("Voice unavailable","आवाज़ उपलब्ध नहीं"),t("Install an offline voice for this language in Android speech settings. You can continue reading.","Android की आवाज़ सेटिंग में इस भाषा की ऑफ़लाइन आवाज़ इंस्टॉल करें। आप पढ़कर जारी रख सकते हैं।"));return}
         engine.language=locale
-        val localVoice=engine.voices?.firstOrNull{it.locale.language==locale.language&&!it.isNetworkConnectionRequired}
-        if(localVoice==null){notice(t("Offline voice needed","ऑफ़लाइन आवाज़ चाहिए"),t("No offline voice is installed for this language. Text remains available.","इस भाषा की ऑफ़लाइन आवाज़ इंस्टॉल नहीं है। पाठ उपलब्ध है।"));return}
-        engine.voice=localVoice;engine.setSpeechRate(.9f);engine.speak(text,TextToSpeech.QUEUE_FLUSH,null,"lesson")
+        val localVoice=engine.voices?.firstOrNull{it.locale.language==locale.language&&!it.isNetworkConnectionRequired&&TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED !in it.features.orEmpty()}
+        if(localVoice==null){unavailable(t("Offline voice needed","ऑफ़लाइन आवाज़ चाहिए"),t("No offline voice is installed for this language. Text remains available.","इस भाषा की ऑफ़लाइन आवाज़ इंस्टॉल नहीं है। पाठ उपलब्ध है।"));return}
+        if(engine.setVoice(localVoice)!=TextToSpeech.SUCCESS){unavailable(t("Voice unavailable","आवाज़ उपलब्ध नहीं"),t("The selected offline voice could not load.","चुनी ऑफ़लाइन आवाज़ लोड नहीं हुई।"));return};engine.setSpeechRate(.9f);engine.speak(text,TextToSpeech.QUEUE_FLUSH,null,"lesson")
     }
     private fun startTraining(guided: Boolean,ar: Boolean){
-        AlertDialog.Builder(this).setTitle(t("Check your training area","प्रशिक्षण क्षेत्र जाँचें")).setMessage(t("Use a clear, safe area away from machinery. All hazards and readings are simulated. ${if(guided)"You will get feedback after every choice." else "No hints during assessment. A critical unsafe choice ends the attempt."}","मशीनों से दूर, खुली सुरक्षित जगह में अभ्यास करें। खतरे और रीडिंग काल्पनिक हैं। ${if(guided)"हर विकल्प के बाद प्रतिक्रिया मिलेगी।" else "मूल्यांकन में संकेत नहीं मिलेंगे। गंभीर असुरक्षित निर्णय पर प्रयास समाप्त होगा।"}"))
+        PageDialogBuilder(this).setTitle(t("Check your training area","प्रशिक्षण क्षेत्र जाँचें")).setMessage(t("Use a clear, safe area away from machinery. All hazards and readings are simulated. ${if(guided)"You will get feedback after every choice." else "No hints during assessment. A critical unsafe choice ends the attempt."}","मशीनों से दूर, खुली सुरक्षित जगह में अभ्यास करें। खतरे और रीडिंग काल्पनिक हैं। ${if(guided)"हर विकल्प के बाद प्रतिक्रिया मिलेगी।" else "मूल्यांकन में संकेत नहीं मिलेंगे। गंभीर असुरक्षित निर्णय पर प्रयास समाप्त होगा।"}"))
             .setPositiveButton(t("I’m in a safe area","मैं सुरक्षित जगह पर हूँ")){_,_->
                 if(ar){val availability=ArCoreApk.getInstance().checkAvailability(this);if(availability.isUnsupported){notice(t("AR is unavailable","AR उपलब्ध नहीं"),t("This phone does not support ARCore. Use on-screen practice.","यह फ़ोन ARCore का समर्थन नहीं करता। स्क्रीन पर अभ्यास करें।"));return@setPositiveButton}}
                 session=TrainingSession.create(curriculum.module(selected),store.workerId,curriculum.version,guided,if(ar)"arcore" else "screen");store.save(session!!)
@@ -272,18 +304,17 @@ class MainActivity: Activity() {
     private fun training(){
         val s=session?:return go("home");val m=curriculum.module(s.data.getString("moduleId"))
         if(s.finished){result(s);return}
-        body.add(chip(if(s.guided)t("GUIDED PRACTICE","निर्देशित अभ्यास") else t("ASSESSMENT · NO HINTS","मूल्यांकन · कोई संकेत नहीं")),bottom=16)
-        title(m.local("title",hi),t("Question ${s.index+1} of ${s.questions.size}","सवाल ${s.index+1} / ${s.questions.size}"))
+        body.add(chip(if(s.guided)t("GUIDED PRACTICE","निर्देशित अभ्यास") else t("ASSESSMENT · NO HINTS","मूल्यांकन · कोई संकेत नहीं")),bottom=8)
+        body.add(label(m.local("title",hi),15f,Palette.ink,true),bottom=4)
+        body.add(label(t("Question ${s.index+1} of ${s.questions.size}","सवाल ${s.index+1} / ${s.questions.size}"),13f,Palette.muted),bottom=8)
         body.add(ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal).apply{max=s.questions.size;progress=s.index+1;progressTintList=android.content.res.ColorStateList.valueOf(Palette.blue)},bottom=20)
         val q=s.current
-        body.add(SceneView(this,s.data.getString("moduleId"),hi,s.guided),bottom=16)
-        val scene=card(0xffecf1fc.toInt());scene.add(label(t("TRAINING SCENARIO","प्रशिक्षण परिस्थिति"),13f,Palette.blue),bottom=12)
-        scene.add(label(q.local("prompt",hi),22f,Palette.ink,true));body.add(scene,bottom=20)
+        val scene=card(Palette.soft);scene.add(label(q.local("prompt",hi),18f,Palette.ink,true));body.add(scene,bottom=12)
         if(s.data.optBoolean("awaitingContinue")){
             if(s.guided){val good=s.data.optBoolean("lastCorrect");val feedback=card(if(good)Palette.successBg else Palette.amberBg);feedback.add(label(if(good)t("Safe understanding","सही समझ")else t("Let’s learn from this","इससे सीखें"),20f,if(good)Palette.success else Palette.amber,true),bottom=10);feedback.add(label(q.local("explanation",hi)));body.add(feedback,bottom=16)}else body.add(chip(t("Answer saved","उत्तर सहेजा गया")),bottom=16)
             body.add(action(t("Continue","आगे बढ़ें")){s.advance();store.save(s);render()})
         }else{
-            s.options().forEach{option->body.add(action(option.local("text",hi),false){s.answer(option.getString("id"));store.save(s);render()},bottom=12)}
+            s.options().forEach{option->body.add(action(option.local("text",hi),false,ActionRole.LEARN){s.answer(option.getString("id"));store.save(s);render()},bottom=8)}
             if(s.guided)body.add(action(t("Read the question aloud","सवाल सुनें"),false){speak(q.local("prompt",hi))},top=4)
         }
         body.add(label(t("Saved automatically on this phone.","इस फ़ोन पर अपने आप सहेजा जाता है।"),14f,Palette.muted),top=20)
@@ -382,7 +413,7 @@ class MainActivity: Activity() {
         val matrix=MultiFormatWriter().encode("SURAKSHA:CREDENTIAL:"+c.getString("token"),BarcodeFormat.QR_CODE,500,500)
         val bitmap=Bitmap.createBitmap(500,500,Bitmap.Config.ARGB_8888);for(x in 0 until 500)for(y in 0 until 500)bitmap.setPixel(x,y,if(matrix[x,y])Color.BLACK else Color.WHITE)
         box.add(ImageView(this).apply{setImageBitmap(bitmap);adjustViewBounds=true;contentDescription="Signed pilot credential QR"})
-        AlertDialog.Builder(this).setTitle(t("Pilot credential","पायलट प्रमाणपत्र")).setView(ScrollView(this).apply{addView(box)}).setPositiveButton(t("Done","ठीक है"),null).show()
+        PageDialogBuilder(this).setTitle(t("Pilot credential","पायलट प्रमाणपत्र")).setView(paged(box,hi)).setPositiveButton(t("Done","ठीक है"),null).show()
     }
     private fun createDocument(mime:String,name:String){startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime).putExtra(Intent.EXTRA_TITLE,name),10)}
     @Deprecated("Compatibility") override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){
