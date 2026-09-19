@@ -16,6 +16,19 @@ class CredentialExpiryTest {
         val body=raw.trim().removePrefix("SURAKSHA:CREDENTIAL:").split('.')[1]
         return JSONObject(String(Base64.decode(body,Base64.URL_SAFE or Base64.NO_WRAP),Charsets.UTF_8))
     }
+    @Test fun learnerImporterAcceptsPrefixedAndLegacyNativeAdminPayloads() {
+        val context=instrumentation.targetContext
+        val oldHi=Store(context).use{it.hi};Store(context).use{it.hi=false}
+        val token=asset("demo-credential.txt").trim().removePrefix("SURAKSHA:CREDENTIAL:")
+        try { for(raw in listOf("  SURAKSHA:CREDENTIAL:$token\n",token)) {
+            androidx.test.core.app.ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.onActivity { activity -> MainActivity::class.java.getDeclaredMethod("checkRecord",String::class.java).apply{isAccessible=true}.invoke(activity,raw) }
+                androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.withText("Signature verified offline"))
+                    .inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog())
+                    .check(androidx.test.espresso.assertion.ViewAssertions.matches(androidx.test.espresso.matcher.ViewMatchers.isDisplayed()))
+            }
+        }} finally {Store(context).use{it.hi=oldHi}}
+    }
     @Test fun legacySignatureRemainsVerifiableWithoutAnInventedExpiry() {
         val raw=asset("legacy-no-expiry-credential.txt");val issued=payload(raw).getLong("iat")
         val result=CredentialVerifier.verify(instrumentation.targetContext,raw,issued+1_000_000)

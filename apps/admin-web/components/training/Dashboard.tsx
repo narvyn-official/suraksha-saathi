@@ -133,12 +133,12 @@ export default function Home() {
     try {
     const account = await api<AdminSession>("admin/session");
     setSession(account);
-    if (!account.current) { setRecords([]);setCredentials([]);throw new Error("Select an available workspace to continue."); }
+    if (!account.current) { setRecords([]);setCredentials([]);setSelected(null);setActive(null);setRevoke(null);setVerification(null);setCoverage({returned:0,total:0,truncated:false});return; }
     const d = await api<{attempts:Row[];credentials:Credential[];coverage:{returned:number;total:number;truncated:boolean}}>("records");
     setRecords(d.attempts);
     if (d.coverage) setCoverage(d.coverage);
     setCredentials(d.credentials);setRefreshVersion(v=>v+1);
-    } catch(error) {setRecords([]);setCredentials([]);setSelected(null);setActive(null);setVerification(null);setSession(null);throw error;}
+    } catch(error) {setRecords([]);setCredentials([]);setSelected(null);setActive(null);setRevoke(null);setVerification(null);setSession(null);throw error;}
   }, []);
   useEffect(() => {
     Promise.resolve().then(load)
@@ -256,7 +256,7 @@ export default function Home() {
   return (
     <>
       <WorkspaceShell session={session} active={tab} onNavigate={setTab} busy={busy} onRefresh={()=>run(load)} onWorkspace={id=>run(async()=>{await api("admin/session","POST",{owner:id});window.location.assign("/");})}>
-        {tab === "insights" && <div className="stats">
+        {session?.current && tab === "insights" && <div className="stats">
           {[
             {
               icon: Users,
@@ -292,6 +292,7 @@ export default function Home() {
           ))}
         </div>
         }
+        {session && !session.current && <p className="notice" role="status">You no longer have access to the selected workspace. Choose an available workspace above or use the account menu to join a centre. Your account is still signed in.</p>}
         {error && (
           <div role="alert" className="notice error">
             {error}{" "}
@@ -310,6 +311,7 @@ export default function Home() {
             {message}
           </div>
         )}
+        {session?.current && <>
         {coverage.truncated && (
           <div className="notice">
             Showing the latest {coverage.returned} of {coverage.total} imported
@@ -631,6 +633,7 @@ export default function Home() {
             </section>
           </section>}
           {session?.current && (["assignments","audit",...(session.current.role === "admin"?["team","settings"]:[])] as ("assignments"|"audit"|"team"|"settings")[]).map(view=>tab===view&&<section key={view} aria-label={view}><AdminPanel refreshVersion={refreshVersion} view={view} session={session} onChange={load}/></section>)}
+        </>}
       </WorkspaceShell>
       <Dialog
         open={!!selected}

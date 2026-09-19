@@ -390,9 +390,10 @@ class MainActivity: Activity() {
         val field=EditText(this).apply{hint=t("Or paste the QR text","या QR का पाठ चिपकाएँ");inputType=android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE;minLines=3;setTextColor(Palette.ink);setPadding(dp(16),dp(12),dp(16),dp(12));background=shape(Color.WHITE,12,Palette.line)}
         body.add(field,bottom=12);body.add(action(t("Check record","रिकॉर्ड जाँचें"),false){checkRecord(field.text.toString())})
     }
-    private fun checkRecord(value: String){
+    private fun checkRecord(raw: String){
+        val value=raw.trim()
         try {
-            if(value.startsWith("SURAKSHA:CREDENTIAL:")){val credential=CredentialVerifier.verify(this,value);store.saveCredential(credential);showCredential(credential)
+            if(value.startsWith("SURAKSHA:CREDENTIAL:") || Regex("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+").matches(value)){val credential=CredentialVerifier.verify(this,value);store.saveCredential(credential);showCredential(credential)
             } else if(value.startsWith("SURAKSHA:RECEIPT:")){
                 val p=JSONObject(String(android.util.Base64.decode(value.removePrefix("SURAKSHA:RECEIPT:"),android.util.Base64.URL_SAFE or android.util.Base64.NO_WRAP)))
                 notice(t("Unverified completion receipt","असत्यापित पूर्णता रसीद"),t("This is a device-generated receipt, not an issuer-signed certificate. Module: ${p.getString("moduleId")}\nPractical observation: not assessed.","यह फ़ोन से बनी रसीद है, जारीकर्ता का हस्ताक्षरित प्रमाणपत्र नहीं। पाठ: ${p.getString("moduleId")}\nव्यावहारिक निरीक्षण नहीं हुआ।"))
