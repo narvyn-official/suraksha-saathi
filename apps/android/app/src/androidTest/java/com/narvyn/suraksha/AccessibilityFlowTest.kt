@@ -62,6 +62,7 @@ class AccessibilityFlowTest {
     }
     /** Uses actual service-facing scroll/show/click actions, not View.performClick(). */
     private fun accessibleClick(text: String) {
+        var forward=true
         repeat(45) {
             instrumentation.waitForIdleSync()
             val all=nodes(instrumentation.uiAutomation.rootInActiveWindow)
@@ -78,7 +79,9 @@ class AccessibilityFlowTest {
                     }
                 }
             }
-            all.firstOrNull { it.isScrollable && it.isVisibleToUser }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+            val labels=if(forward)listOf("More","और देखें")else listOf("Earlier","पिछला भाग")
+            val page=all.firstOrNull{it.isVisibleToUser&&it.isEnabled&&it.isClickable&&it.text?.toString() in labels}
+            if(page!=null)page.performAction(AccessibilityNodeInfo.ACTION_CLICK)else forward=!forward
             Thread.sleep(100)
         }
         fail("No reachable, enabled accessibility action: $text")

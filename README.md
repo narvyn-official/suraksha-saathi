@@ -1,6 +1,8 @@
-# Suraksha Saathi
+# SurakshaAr
 
-A **v0.7.1 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with fixed screens and a light interface.
+A **v0.8.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with fixed screens and a light interface.
+
+**Current source: 0.8.0 — SurakshaAr.** The rename keeps the existing Android package, local histories and credential trust compatible. This update adds account recovery support, stronger request limits, concurrent-write protection, reliable workspace refresh and dependency fixes. See [the complete review, verification and remaining gates](docs/surakshaar-review-2026-09-20.md). Build the current APK with the command below; the published downloads listed here are historical 0.7.1 assets.
 
 **Latest published download: [v0.7.1 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.7.1-pilot)**
 
@@ -8,7 +10,7 @@ A **v0.7.1 pilot** for Android safety learning and trainer review, built for Jha
 - [Watch the earlier v0.6.0 emulator walkthrough](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/suraksha-saathi-0.6.0-emulator-demo.mp4) · Screen fire/gas and explosion-evacuation practice; not physical AR evidence.
 - [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.7.1-pilot/SHA256SUMS-0.7.1.txt).
 
-**In this version (0.7.1):** fixed learner/admin screens with explicit page controls and focused popups, automatic English/Hindi instructions, corrected Android Back navigation, detailed fire-type/agent learning and improved AR surface placement with a 20 cm virtual-footprint gap. Samsung phone checks confirm tracking, placement and automatic Hindi speech; earlier fire-evacuation and outside-only gas branches completed on the same phone. See [0.7.1 changes and validation](docs/release-0.7.1.md). **Public account hosting remains pending; native administration requires a configured account server.**
+**Previously published (0.7.1):** fixed learner/admin screens with explicit page controls and focused popups, automatic English/Hindi instructions, corrected Android Back navigation, detailed fire-type/agent learning and improved AR surface placement with a 20 cm virtual-footprint gap. Samsung phone checks confirm tracking, placement and automatic Hindi speech; earlier fire-evacuation and outside-only gas branches completed on the same phone. See [0.7.1 changes and validation](docs/release-0.7.1.md). **Public account hosting remains pending; native administration requires a configured account server.**
 
 **In the published 0.6.0 version:** 0.6.0 expands fire room practice through exit selection, evacuation, assembly and reporting, adds an explosion-risk evacuation branch and gas PPE/buddy checks, introduces paged native lessons and saved room-practice recovery, and connects separate room journals to trainer review. All four camera paths share camera configuration, pacing, thermal recovery and session-release handling. See [implementation, verification and remaining gaps](docs/release-0.6.0.md). The latest physical checks and remaining scope are in the 0.7.1 release report; this remains a pilot prerelease.
 
@@ -39,7 +41,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/suraksha-saathi-0.7.1-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
+The debug-signed APK is copied to `artifacts/surakshaar-0.8.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs

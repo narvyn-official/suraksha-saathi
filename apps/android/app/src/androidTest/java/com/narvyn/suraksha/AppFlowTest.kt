@@ -5,7 +5,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.matcher.RootMatchers.isDialog
 import androidx.test.espresso.matcher.ViewMatchers.*
-import androidx.test.espresso.action.ViewActions.scrollTo
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.equalTo
 import android.widget.Button
@@ -25,9 +24,9 @@ class AppFlowTest {
  private fun texts(v:View):List<TextView> = (if(v is TextView)listOf(v)else emptyList())+(if(v is ViewGroup)(0 until v.childCount).flatMap{texts(v.getChildAt(it))}else emptyList())
  private fun tap(s:ActivityScenario<MainActivity>,text:String){s.onActivity{a->val view=texts(a.window.decorView).firstOrNull{it.text.toString()==text}?:error("Missing control: $text");view.performClick()};InstrumentationRegistry.getInstrumentation().waitForIdleSync()}
  private fun openModule(id:String){
-  onView(withTagValue(equalTo<Any>("main-module-picker"))).perform(scrollTo(),click())
+  onView(withTagValue(equalTo<Any>("main-module-picker"))).perform(revealOnPage(),click())
   onView(allOf(isAssignableFrom(Button::class.java),isDescendantOfA(withTagValue(equalTo<Any>("main-module-$id")))))
-   .inRoot(isDialog()).perform(scrollTo(),click())
+   .inRoot(isDialog()).perform(revealOnPage(),click())
  }
  private fun shot(name:String){val i=InstrumentationRegistry.getInstrumentation();val b=i.uiAutomation.takeScreenshot();File(i.targetContext.getExternalFilesDir(null),name).outputStream().use{b.compress(Bitmap.CompressFormat.PNG,100,it)}}
  @Test fun moduleAssessmentPersistsAcrossRecreation(){

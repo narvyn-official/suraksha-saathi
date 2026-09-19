@@ -1,42 +1,15 @@
-import { db, owner, access, audit, failure, json, digest } from "@/lib/server";
+import { db, access, audit, failure, json, digest } from "@/lib/server";
 import { validateImport } from "@/lib/grading";
 export async function POST(request: Request) {
   try {
     const actor = await access("write"), who = actor.owner;
     const data = validateImport(await json(request));
     const inserts = [];
-    let unchanged = 0;
     for (const a of data.attempts) {
-      const hash = await digest(a);
-      const existing = await db()
-        .prepare("SELECT digest FROM attempts WHERE owner=? AND id=?")
-        .bind(who, a.id)
-        .first<{ digest: string }>();
-      if (existing) {
-        if (existing.digest !== hash)
-          throw new Error(
-            "Record conflict: an existing attempt has different answers.",
-          );
-        unchanged++;
-        continue;
-      }
-      inserts.push(
-        db()
-          .prepare(
-            "INSERT INTO attempts(owner,id,worker_id,worker_name,payload,digest,imported_at) VALUES(?,?,?,?,?,?,?)",
-          )
-          .bind(
-            who,
-            a.id,
-            data.worker.id,
-            data.worker.name,
-            JSON.stringify(a),
-            hash,
-            Date.now(),
-          ),
-      );
+      inserts.push(db().prepare("INSERT INTO attempts(owner,id,worker_id,worker_name,payload,digest,imported_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(owner,id) DO NOTHING")
+        .bind(who,a.id,data.worker.id,data.worker.name,JSON.stringify(a),await digest(a),Date.now()));
+      inserts.push(audit(actor,"assessment.import",a.id,{workerId:data.worker.id},true));
     }
-    const imported = inserts.length;
     inserts.push(
       db()
         .prepare(
@@ -50,10 +23,12 @@ export async function POST(request: Request) {
           Date.now(),
         ),
     );
-    inserts.push(audit(actor,"assessment.import",data.worker.id,{imported,unchanged}));
-    await db().batch(inserts);
+    const results=await db().batch(inserts);
+    const imported=data.attempts.reduce((sum,_,i)=>sum+Number(results[i*2].meta.changes),0);
+    const unchanged=data.attempts.length-imported;
     return Response.json({ imported, unchanged });
   } catch (e) {
+    if(e instanceof Error && e.message.includes("Record conflict:"))return failure(new Error("Record conflict: an existing attempt has different answers."));
     return failure(e);
   }
 }

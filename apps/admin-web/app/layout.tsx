@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Suraksha Saathi · Training centre",
+  title: "SurakshaAr · Training centre",
+  referrer: "no-referrer",
+  robots: {index:false,follow:false},
   description:
     "Review offline safety training and verify pilot simulation credentials.",
   other: {

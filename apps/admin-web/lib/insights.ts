@@ -5,7 +5,10 @@ export type TrainingRow = {
   worker_name: string;
   worker_id: string;
   worker_sector?: string;
-  payload: any;
+  payload: {
+    moduleId:string;kind:string;endedAt:number;contentVersion:string;mode?:string;startedAt?:number;
+    result:{passed:boolean;score:number;total?:number;criticalFailures?:string[]};events:import("./grading").AnswerEvent[];
+  };
 };
 export type CertificateRow = {
   id: string;
@@ -104,17 +107,17 @@ export function insights(
   // Use each learner's latest assessment in each module to avoid repeat-attempt inflation.
   for (const w of list)
     for (const row of Object.values(w.latest)) {
-      const module = curriculumFor(row.payload.contentVersion).modules.find(
+      const trainingModule = curriculumFor(row.payload.contentVersion).modules.find(
         (m) => m.id === row.payload.moduleId,
       );
-      if (!module) continue;
+      if (!trainingModule) continue;
       for (const e of row.payload.events) {
-        const q = module.questions.find((q) => q.id === e.questionId);
+        const q = trainingModule.questions.find((q) => q.id === e.questionId);
         if (!q) continue;
         const item = misses.get(q.id) || {
           id: q.id,
           title: q.prompt[0],
-          module: module.title[0],
+          module: trainingModule.title[0],
           wrong: 0,
           answered: 0,
           critical: q.critical,

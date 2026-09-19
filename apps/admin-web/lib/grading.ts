@@ -1,7 +1,14 @@
+import { z } from "zod";
 import curriculum from "./curriculum.json" with { type: "json" };
 import legacy from "./archive/0.1.0.json" with { type: "json" };
 import v02 from "./archive/0.2.0.json" with { type: "json" };
 import v03 from "./archive/0.3.0.json" with { type: "json" };
+
+const eventSchema = z.object({ type:z.literal("answer"), sequence:z.number().int().safe(), questionId:z.string(), optionId:z.string(), time:z.number().int().safe() }).passthrough();
+export type AnswerEvent = z.infer<typeof eventSchema>;
+const attemptSchema = z.object({ id:z.string(),workerId:z.string(),moduleId:z.string(),contentVersion:z.string(),kind:z.enum(["practice","assessment"]),mode:z.enum(["screen","arcore","hybrid"]),finished:z.literal(true),startedAt:z.number().int().safe(),endedAt:z.number().int().safe(),events:z.array(eventSchema) }).passthrough();
+const exportSchema = z.object({schemaVersion:z.literal(1),worker:z.object({id:z.string(),name:z.string(),sector:z.string().optional()}).passthrough(),attempts:z.array(attemptSchema).min(1).max(100)});
+
 const supported = [curriculum, v03, v02, legacy];
 export { curriculum };
 export function curriculumFor(version: string) {
@@ -14,15 +21,18 @@ export function grade(
   events: unknown,
   version = curriculum.version,
 ) {
-  const module = curriculumFor(version).modules.find((m) => m.id === moduleId);
-  if (!module) throw new Error("Unknown module.");
-  if (!Array.isArray(events) || events.length > module.questions.length)
+  const trainingModule = curriculumFor(version).modules.find((m) => m.id === moduleId);
+  if (!trainingModule) throw new Error("Unknown module.");
+  if (!Array.isArray(events) || events.length > trainingModule.questions.length)
     throw new Error("Invalid answer sequence.");
+  const parsed = z.array(eventSchema).safeParse(events);
+  if (!parsed.success) throw new Error("Invalid answer sequence.");
+  const answers = parsed.data;
   let correct = 0;
   const criticalFailures: string[] = [];
   for (let i = 0; i < events.length; i++) {
-    const e = events[i],
-      q = module.questions[i];
+    const e = answers[i],
+      q = trainingModule.questions[i];
     if (
       !e ||
       e.type !== "answer" ||
@@ -36,12 +46,12 @@ export function grade(
     if (option.correct) correct++;
     else if (q.critical) criticalFailures.push(q.id);
   }
-  const complete = events.length === module.questions.length,
-    score = Math.floor((correct * 100) / module.questions.length);
+  const complete = events.length === trainingModule.questions.length,
+    score = Math.floor((correct * 100) / trainingModule.questions.length);
   return {
     score,
     correct,
-    total: module.questions.length,
+    total: trainingModule.questions.length,
     complete,
     valid: true,
     criticalFailures,
@@ -50,7 +60,10 @@ export function grade(
 }
 const uuid =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-export function validateImport(input: any) {
+export function validateImport(raw: unknown) {
+  const parsed=exportSchema.safeParse(raw);
+  if(!parsed.success)throw new Error("Invalid training export. Expected 1–100 completed attempts.");
+  const input=parsed.data;
   if (
     input?.schemaVersion !== 1 ||
     !uuid.test(input?.worker?.id) ||
@@ -67,7 +80,7 @@ export function validateImport(input: any) {
   if (!["Unspecified", "Mining", "Steel", "Mica", "Other"].includes(sector))
     throw new Error("Invalid work sector.");
   const ids = new Set();
-  const attempts = input.attempts.map((a: any) => {
+  const attempts = input.attempts.map((a) => {
     if (
       !a ||
       !uuid.test(a.id) ||
@@ -87,7 +100,7 @@ export function validateImport(input: any) {
     const result = grade(a.moduleId, a.events, a.contentVersion);
     if (
       a.events.some(
-        (e: any, i: number) =>
+        (e, i) =>
           e.time < a.startedAt ||
           e.time > a.endedAt ||
           (i && e.time < a.events[i - 1].time),
@@ -100,7 +113,7 @@ export function validateImport(input: any) {
     )
       throw new Error("Invalid incomplete attempt.");
     if (a.kind === "assessment" && result.criticalFailures.length) {
-      const first = a.events.findIndex((e: any) =>
+      const first = a.events.findIndex((e) =>
         result.criticalFailures.includes(e.questionId),
       );
       if (first !== a.events.length - 1)

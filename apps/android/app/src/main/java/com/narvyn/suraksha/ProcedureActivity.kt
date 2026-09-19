@@ -75,6 +75,8 @@ class ProcedureActivity: Activity() {
         render()
     }
     override fun onPause() { active=false;revision++;if(::scene.isInitialized)scene.pause();super.onPause() }
+    // API 33+ uses AppBackNavigation and PagedPanel callbacks; retain this fallback for API 29–32.
+    @android.annotation.SuppressLint("GestureBackNavigation")
     @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(popContentPage())return;if(immersive){camera=false;scene.useCamera(false);render()}else super.onBackPressed()}
     override fun onDestroy() { backNavigation.close(); if(::scene.isInitialized)scene.close();if(::evidence.isInitialized)evidence.close();if(::identity.isInitialized)identity.close();super.onDestroy() }
     override fun onSaveInstanceState(out: Bundle) { out.putString("workerId",identity.workerId);out.putBoolean("safeArea",safeArea);out.putBoolean("camera",camera);out.putBoolean("descriptions",descriptions);out.putBoolean("spatial",spatial);out.putBoolean("centreAim",centreAim);super.onSaveInstanceState(out) }

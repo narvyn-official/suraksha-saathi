@@ -12,7 +12,6 @@ import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.matcher.ViewMatchers.withTagValue
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -50,7 +49,7 @@ class CameraFallbackTest {
                 fun t(en: String,hindi: String)=if(hi)hindi else en
                 Store(context).use { it.hi=hi; val fresh=ComponentSession.start("fire",null); fresh.advance(1); it.saveComponent(fresh.data) }
                 ActivityScenario.launch<ComponentPracticeActivity>(Intent(context,ComponentPracticeActivity::class.java).putExtra("moduleId","fire")).use { s ->
-                    onView(withText(t("Use camera AR · fire","कैमरा AR उपयोग करें · आग"))).perform(scrollTo(),click())
+                    onView(withText(t("Use camera AR · fire","कैमरा AR उपयोग करें · आग"))).perform(revealOnPage(),click())
                     denyIfRequested(); s.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED); s.recreate(); instrumentation.waitForIdleSync()
                     s.onActivity { a ->
                         val views=all(a.window.decorView)
@@ -63,14 +62,14 @@ class CameraFallbackTest {
                     }
                     assertEquals(1,state().stage);assertNull(state().answer);assertFalse(state().data.optBoolean("cameraSeen"));assertEquals(0,state().data.getJSONArray("events").length())
                     File(context.getExternalFilesDir(null),if(hi)"camera-hindi-fallback.png" else "camera-permission-fallback.png").outputStream().use { instrumentation.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG,100,it) }
-                    onView(withText(t("Continue on screen","स्क्रीन पर जारी रखें"))).perform(scrollTo(),click())
-                    onView(withTagValue(`is`("component-marker-label" as Any))).perform(scrollTo(),click())
+                    onView(withText(t("Continue on screen","स्क्रीन पर जारी रखें"))).perform(revealOnPage(),click())
+                    onView(withTagValue(`is`("component-marker-label" as Any))).perform(revealOnPage(),click())
                     assertEquals("screen",state().data.getJSONArray("events").getJSONObject(0).getString("presentation"))
-                    onView(withText(t("Try the changed view","बदले दृश्य में कोशिश करें"))).perform(scrollTo(),click())
-                    onView(withText(t("Use camera AR · fire","कैमरा AR उपयोग करें · आग"))).perform(scrollTo(),click())
+                    onView(withText(t("Try the changed view","बदले दृश्य में कोशिश करें"))).perform(revealOnPage(),click())
+                    onView(withText(t("Use camera AR · fire","कैमरा AR उपयोग करें · आग"))).perform(revealOnPage(),click())
                     denyIfRequested(); s.moveToState(androidx.lifecycle.Lifecycle.State.RESUMED)
-                    onView(withText(t("Use text descriptions","लिखित विवरण उपयोग करें"))).perform(scrollTo(),click())
-                    onView(withTagValue(`is`("component-description-label" as Any))).perform(scrollTo(),click())
+                    onView(withText(t("Use text descriptions","लिखित विवरण उपयोग करें"))).perform(revealOnPage(),click())
+                    onView(withTagValue(`is`("component-description-label" as Any))).perform(revealOnPage(),click())
                     s.recreate()
                     assertEquals(2,state().stage);assertTrue(state().descriptions)
                     val events=state().data.getJSONArray("events")

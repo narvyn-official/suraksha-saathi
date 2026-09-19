@@ -20,6 +20,8 @@ class EquipmentActivity:Activity(){
  @Volatile private var distance=1.75f
  @Volatile private var pitch=0f
  private var describeView: () -> Unit = {}
+    // API 33+ uses AppBackNavigation and PagedPanel callbacks; retain this fallback for API 29–32.
+    @android.annotation.SuppressLint("GestureBackNavigation")
     @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(!popContentPage())super.onBackPressed()}
  override fun onCreate(state:Bundle?){super.onCreate(state)
   val module=intent.getStringExtra("moduleId")?.takeIf{it in listOf("fire","gas","machinery","ppe","emergency")}?:"fire"

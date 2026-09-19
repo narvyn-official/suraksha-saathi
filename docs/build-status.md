@@ -1,5 +1,7 @@
 # Implementation status — 16 September 2026
 
+> Historical snapshot. For the current SurakshaAr 0.8.0 implementation and checks, read [the 20 September review](surakshaar-review-2026-09-20.md). The older tracking statements below predate the Samsung evidence recorded in [0.7.1](release-0.7.1.md). Native upload, shared roles, assignments, audit and room-journal review are implemented; production hosting and the full physical-device matrix remain pending.
+
 This document describes v0.6.0 (curriculum 0.4.0). See [the current release report](release-0.6.0.md) for expanded fire/gas missions, shared camera recovery, paged lessons, saved room-practice recovery and separate trainer journal imports. Earlier architecture documents describe the target system; they are not claims that every feature is shipped.
 
 See [current AR engineering work](ar-technology-and-validation.md) and [full problem-statement coverage](ar-problem-statement-coverage.md) for implemented changes and remaining acceptance gates.

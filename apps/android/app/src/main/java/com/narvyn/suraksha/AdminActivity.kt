@@ -47,6 +47,8 @@ class AdminActivity:Activity() {
     private val writable get()=role!="viewer"
     override fun onCreate(saved:Bundle?){super.onCreate(saved);api=AdminClient(this);login();if(api.base.isNotBlank()&&api.hasSession())refresh()}
     override fun onDestroy(){backNavigation.close();generation++;jobs.shutdownNow();super.onDestroy()}
+    // API 33+ uses AppBackNavigation and PagedPanel callbacks; retain this fallback for API 29–32.
+    @android.annotation.SuppressLint("GestureBackNavigation")
     @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){navigateBack()}
     private fun navigateBack(){
         if(popContentPage())return
@@ -79,25 +81,50 @@ class AdminActivity:Activity() {
         jobs.execute{try{val result=work();runOnUiThread{if(!isDestroyed&&token==generation){busy=false;enable(root,true);status.visibility=View.GONE;try{done(result)}catch(e:Exception){info(e.message?:"Could not display the result.",true)}}}}catch(e:Exception){runOnUiThread{if(!isDestroyed&&token==generation){busy=false;enable(root,true);if(e is AdminClient.SignedOut){session=null;login()};info(when(e){is java.io.IOException->t("Cannot reach your centre. Check your connection and server address.","केंद्र से संपर्क नहीं हुआ। कनेक्शन और सर्वर पता जाँचें।");else->e.message?:"Could not complete this action."},true)}}}}
     }
     private fun enable(view:View,value:Boolean){view.isEnabled=value;if(view is android.view.ViewGroup)for(i in 0 until view.childCount)enable(view.getChildAt(i),value)}
-    private fun field(parent:LinearLayout,title:String,value:String="",type:Int=InputType.TYPE_CLASS_TEXT):EditText {val group=column();parent.add(group,top=12);group.add(label(title,14f,Palette.muted,true));return EditText(this).apply{setText(value);textSize=16f;inputType=type;isSingleLine=true;minHeight=dp(48);setPadding(dp(12),dp(8),dp(12),dp(8));background=shape(Palette.surface,12,Palette.line);contentDescription=title;tag="admin-field-$title";group.add(this,top=6)}}
+    private fun field(parent:LinearLayout,title:String,value:String="",type:Int=InputType.TYPE_CLASS_TEXT):EditText {
+        val group=column();parent.add(group,top=12)
+        val caption=label(title,14f,Palette.muted,true);group.add(caption)
+        val input=EditText(this).apply{ id=View.generateViewId();setText(value);textSize=16f;inputType=type;isSingleLine=true;minHeight=dp(48);setPadding(dp(12),dp(8),dp(12),dp(8));background=shape(Palette.surface,12,Palette.line);contentDescription=title;tag="admin-field-$title" }
+        caption.labelFor=input.id;group.add(input,top=6)
+        if(type and InputType.TYPE_MASK_VARIATION==InputType.TYPE_TEXT_VARIATION_PASSWORD){
+            input.setAutofillHints(View.AUTOFILL_HINT_PASSWORD)
+            group.add(action(t("Show password","पासवर्ड दिखाएँ"),role=ActionRole.NEUTRAL){
+                val start=input.selectionStart;val end=input.selectionEnd
+                val hidden=input.transformationMethod is android.text.method.PasswordTransformationMethod
+                input.transformationMethod=if(hidden)null else android.text.method.PasswordTransformationMethod.getInstance()
+                val toggle=group.getChildAt(group.childCount-1) as Button
+                toggle.text=t(if(hidden)"Hide password" else "Show password",if(hidden)"पासवर्ड छिपाएँ" else "पासवर्ड दिखाएँ")
+                input.requestFocus();if(start>=0&&end>=0)input.setSelection(start,end)
+            },top=4)
+        }else if(type and InputType.TYPE_MASK_VARIATION==InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)input.setAutofillHints(View.AUTOFILL_HINT_EMAIL_ADDRESS)
+        return input
+    }
     private fun button(title:String,role:ActionRole=ActionRole.PRIMARY,click:()->Unit){body.add(action(title,role=role, onClick=click),top=12)}
     private fun form(title:String,detail:Boolean=true,setup:(LinearLayout)->Unit){detailOpen=detail;screen(title);val content=column();val scroll=paged(content,hi);body.addView(scroll,LinearLayout.LayoutParams(-1,-1));setup(content)}
     private fun login(){session=null;detailOpen=false;pageHistory.clear();page="login";screen(t("Training centre","प्रशिक्षण केंद्र"),false)
         val content=column();val scroll=paged(content,hi);body.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
         content.add(label(t(if(signup)"Create your account" else "Welcome back",if(signup)"खाता बनाएँ" else "फिर से स्वागत है"),28f,bold=true),top=12)
-        content.add(label(t("Your Suraksha Saathi account","आपका सुरक्षा साथी खाता"),15f,Palette.muted),top=6)
+        content.add(label(t("Your SurakshaAr account","आपका SurakshaAr खाता"),15f,Palette.muted),top=6)
         val name=if(signup)field(content,t("Full name","पूरा नाम"))else null
         val email=field(content,t("Email address","ईमेल"),type=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
         val password=field(content,t("Password","पासवर्ड"),type=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
-        content.add(label(t(if(signup)"Use at least 12 characters." else "Sign in to manage workers and training.",if(signup)"कम से कम 12 अक्षर रखें।" else "कर्मचारी और प्रशिक्षण प्रबंधन के लिए प्रवेश करें।"),14f,Palette.muted),top=8)
+        content.add(label(t(if(signup)"Use at least 15 characters." else "Sign in to manage workers and training.",if(signup)"कम से कम 15 अक्षर रखें।" else "कर्मचारी और प्रशिक्षण प्रबंधन के लिए प्रवेश करें।"),14f,Palette.muted),top=8)
         content.add(action(t(if(signup)"Create account" else "Sign in",if(signup)"खाता बनाएँ" else "साइन इन")){
             if(api.base.isBlank()){server();return@action}
-            if(!android.util.Patterns.EMAIL_ADDRESS.matcher(email.text.toString().trim()).matches()||password.length()<(if(signup)12 else 1)||password.length()>128||signup&&name!!.text.isBlank()){info(t("Check your name, email and password.","नाम, ईमेल और पासवर्ड जाँचें।"),true);return@action}
+            if(!android.util.Patterns.EMAIL_ADDRESS.matcher(email.text.toString().trim()).matches()||password.length()<(if(signup)15 else 1)||password.length()>128||signup&&name!!.text.isBlank()){info(t("Check your name, email and password.","नाम, ईमेल और पासवर्ड जाँचें।"),true);return@action}
             val payload=JSONObject().put("email",email.text.toString().trim()).put("password",password.text.toString()).put("rememberMe",true);if(signup)payload.put("name",name!!.text.toString().trim())
             (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(password.windowToken,0)
             task({api.call("/api/auth/${if(signup)"sign-up" else "sign-in"}/email",payload)}){password.text.clear();refresh()}
         }.apply{tag="admin-login-submit"},top=24)
         content.add(action(t(if(signup)"Already registered? Sign in" else "Create an account",if(signup)"खाता है? साइन इन करें" else "नया खाता बनाएँ"),role=ActionRole.LEARN){signup=!signup;login()},top=10)
+        if(!signup)content.add(action(t("Forgot password?","पासवर्ड भूल गए?"),role=ActionRole.LEARN){
+            if(api.base.isBlank()){server();return@action}
+            val address=email.text.toString().trim()
+            if(!android.util.Patterns.EMAIL_ADDRESS.matcher(address).matches()){email.error=t("Enter your account email first.","पहले खाते का ईमेल दर्ज करें।");return@action}
+            task({api.call("/api/auth/request-password-reset",JSONObject().put("email",address))}){
+                notice(t("Password recovery","पासवर्ड पुनर्प्राप्ति"),t("If this address has an account, check your inbox for a reset link. If it does not arrive, contact your training centre.","यदि इस ईमेल पर खाता है, तो इनबॉक्स में रीसेट लिंक देखें। लिंक न मिलने पर प्रशिक्षण केंद्र से संपर्क करें।"))
+            }
+        },top=10)
         body.add(action(t("Connection settings","कनेक्शन सेटिंग"),role=ActionRole.NEUTRAL){server()},top=8)
         body.add(label(t("Offline lessons remain available without signing in.","बिना साइन इन के ऑफलाइन पाठ उपलब्ध हैं।"),13f,Palette.muted),top=10)
     }

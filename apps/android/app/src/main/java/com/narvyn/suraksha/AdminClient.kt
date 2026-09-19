@@ -45,7 +45,7 @@ class AdminClient(private val context:Context) {
         val encrypted=cipher.doFinal(value.toString().toByteArray(Charsets.UTF_8))
         prefs.edit().putString("cookies",Base64.encodeToString(cipher.iv,Base64.NO_WRAP)+"."+Base64.encodeToString(encrypted,Base64.NO_WRAP)).apply()
     }
-    fun hasSession():Boolean=cookies().keys().asSequence().any{it.endsWith("session_token")}
+    fun hasSession():Boolean { val jar=cookies();val now=System.currentTimeMillis();return jar.keys().asSequence().any{it.endsWith("session_token")&&jar.getJSONObject(it).optLong("expires",0)>now} }
     fun clear(){prefs.edit().remove("cookies").apply()}
     fun call(path:String,body:JSONObject?=null,method:String=if(body==null)"GET" else "POST"):JSONObject {
         require(base.isNotBlank()){ "Connect your training centre server first." }
@@ -65,8 +65,13 @@ class AdminClient(private val context:Context) {
             saveCookies(jar)
             val stream=if(status in 200..299)connection.inputStream else connection.errorStream
             val bytes=stream?.use{input->val out=java.io.ByteArrayOutputStream();val buffer=ByteArray(8192);while(out.size()<=4_000_000){val count=input.read(buffer);if(count<0)break;out.write(buffer,0,count)};out.toByteArray()}?:byteArrayOf();require(bytes.size<=4_000_000){"Response is too large. Refine the records shown."}
-            val data=try{JSONObject(String(bytes,Charsets.UTF_8))}catch(_:Exception){JSONObject()}
+            val data=try{JSONObject(String(bytes,Charsets.UTF_8))}catch(_:Exception){
+                if(status in 200..299)throw IllegalStateException("The service returned an unreadable response. Check your server address and try again.")
+                JSONObject()
+            }
             if(status==401){clear();if(path.startsWith("/api/auth/sign-in"))throw IllegalStateException(data.optString("message","Check your email and password."));throw SignedOut()}
+            if(status==429)throw IllegalStateException("Too many attempts. Wait a minute before trying again.")
+            if(status>=500)throw IllegalStateException("The account service is unavailable. Try again later or contact your training centre.")
             if(status !in 200..299)throw IllegalStateException(data.optString("message",data.optString("error","Could not complete the request ($status).")))
             return data
         } finally {connection.disconnect()}

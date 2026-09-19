@@ -1,5 +1,7 @@
 # Requirements tracker — 0.5 pilot
 
+> Historical snapshot. For the current SurakshaAr 0.8.0 implementation and checks, read [the 20 September review](surakshaar-review-2026-09-20.md). The older tracking statements below predate the Samsung evidence recorded in [0.7.1](release-0.7.1.md). Native upload, shared roles, assignments, audit and room-journal review are implemented; production hosting and the full physical-device matrix remain pending.
+
 This is the implementation contract for continued work, not a declaration that the brief is complete. Read `validation.md` for evidence, `build-status.md` for shipped scope and `autonomous-roadmap.md` for the next development task.
 
 | Requirement / concern | Current state | Remaining acceptance evidence |

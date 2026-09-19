@@ -31,17 +31,9 @@ class ProcedureSpatialFlowTest {
         }
     }
     private fun click(s:ActivityScenario<ProcedureActivity>,text:String) {
-        repeat(60) {
-            var done=false
-            s.onActivity { a -> views(a.window.decorView).filterIsInstance<Button>().firstOrNull { it.text.toString()==text && it.isShown }?.let {
-                it.requestRectangleOnScreen(Rect(0,0,it.width,it.height),true)
-                val r=Rect();if(it.isEnabled && it.getGlobalVisibleRect(r) && r.height()>=it.height) { it.performClick();done=true }
-            } }
-            instrumentation.waitForIdleSync();if(done) { Thread.sleep(120);return };Thread.sleep(80)
-        };s.onActivity { a ->
-            var v:View?=views(a.window.decorView).filterIsInstance<Button>().firstOrNull { it.text.toString()==text }
-            while(v!=null) { val r=Rect();v.getGlobalVisibleRect(r);android.util.Log.i("SpatialLayout", "${v.javaClass.simpleName} top=${v.top} h=${v.height} measured=${v.measuredHeight} scroll=${v.scrollY} visible=$r");v=v.parent as? View }
-        };screenshot("workspace-unreachable");fail("Missing action: $text")
+        androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.withText(text))
+            .perform(revealOnPage(),androidx.test.espresso.action.ViewActions.click())
+        instrumentation.waitForIdleSync()
     }
     /** Read rendered target positions, then exercise real touch delivery; never invoke the learning callback. */
     private fun target(s:ActivityScenario<ProcedureActivity>,index:Int):Pair<View,ComponentProjection.Point> {

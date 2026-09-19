@@ -20,7 +20,9 @@ class RecallActivity:Activity(){
  override fun onResume(){super.onResume();if(!currentWorker())return;activeForeground=true;render()}
  override fun onPause(){activeForeground=false;super.onPause()}
  override fun onSaveInstanceState(out:Bundle){super.onSaveInstanceState(out);out.putString("selected",selected);out.putString("answer",answer);if(::store.isInitialized)out.putString("workerId",store.workerId)}
- @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(popContentPage())return;if(selected!=null){selected=null;answer=null;render()}else super.onBackPressed()}
+ // API 33+ uses AppBackNavigation and PagedPanel callbacks; retain this fallback for API 29–32.
+    @android.annotation.SuppressLint("GestureBackNavigation")
+    @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(popContentPage())return;if(selected!=null){selected=null;answer=null;render()}else super.onBackPressed()}
  override fun onDestroy(){backNavigation.close();if(::store.isInitialized)store.close();super.onDestroy()}
  // Check at resume and delayed UI callbacks; this Store remains bound to the opening worker.
  private fun currentWorker():Boolean{

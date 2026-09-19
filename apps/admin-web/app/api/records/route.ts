@@ -14,18 +14,18 @@ export async function GET() {
         "SELECT id,attempt_id,token,issued_at,revoked_at,reason FROM credentials WHERE owner=? ORDER BY issued_at DESC LIMIT 500",
       )
       .bind(who)
-      .all();
+      .all<{id:string;attempt_id:string;token:string;issued_at:number;revoked_at:number|null;reason:string|null}>();
     const total = await db()
       .prepare("SELECT COUNT(*) AS n FROM attempts WHERE owner=?")
       .bind(who)
       .first<{ n: number }>();
     return Response.json(
       {
-        attempts: records.results.map((r: any) => ({
+        attempts: records.results.map((r) => ({
           ...r,
-          payload: JSON.parse(r.payload),
+          payload: JSON.parse(String(r.payload)),
         })),
-        credentials: certificates.results.map((row: any) => credentialView(row)),
+        credentials: certificates.results.map(row => credentialView(row)),
         coverage: {
           returned: records.results.length,
           total: total?.n ?? 0,

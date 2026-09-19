@@ -32,7 +32,7 @@ export async function sign(payload: object, jwk: JsonWebKey) {
   );
   return `${header}.${body}.${b64(new Uint8Array(signature))}`;
 }
-export async function verify(raw: string, now = Date.now()) {
+export async function verify(raw: unknown, now = Date.now()) {
   if (typeof raw !== "string" || raw.length > 6000)
     throw new Error("Invalid credential text.");
   const token = raw.trim().replace(/^SURAKSHA:CREDENTIAL:/, "");

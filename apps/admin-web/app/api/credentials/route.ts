@@ -1,4 +1,4 @@
-import { db, owner, access, audit, failure, json, signingKey } from "@/lib/server";
+import { db, access, audit, failure, json, signingKey } from "@/lib/server";
 import { sign, trust, credentialView } from "@/lib/credentials";
 import { requestedExpiry } from "@/lib/validity";
 export async function POST(request: Request) {
@@ -51,10 +51,14 @@ export async function POST(request: Request) {
     );
     await db().batch([db()
       .prepare(
-        "INSERT INTO credentials(owner,id,attempt_id,token,issued_at) VALUES(?,?,?,?,?)",
+        "INSERT INTO credentials(owner,id,attempt_id,token,issued_at) VALUES(?,?,?,?,?) ON CONFLICT(owner,attempt_id) DO NOTHING",
       )
-      .bind(who, id, a.id, token, now),audit(actor,"credential.issue",id,{attemptId:a.id,expiresAt})]);
-    return Response.json(credentialView({ id, token, attempt_id: a.id, issued_at: now, revoked_at: null, reason: null }));
+      .bind(who, id, a.id, token, now),audit(actor,"credential.issue",id,{attemptId:a.id,expiresAt},true)]);
+    const actual=await db().prepare("SELECT id,attempt_id,token,issued_at,revoked_at,reason FROM credentials WHERE owner=? AND attempt_id=?").bind(who,a.id).first<{id:string;attempt_id:string;token:string;issued_at:number;revoked_at:number|null;reason:string|null}>();
+    if(!actual)throw new Error("Credential could not be read. Retry the request.");
+    const saved=credentialView(actual);
+    if(saved.expiresAt!==expiresAt)throw new Error("Invalid renewal: this assessment already has a credential. Renewal requires a new passed assessment.");
+    return Response.json(saved);
   } catch (e) {
     return failure(e);
   }

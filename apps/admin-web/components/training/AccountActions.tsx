@@ -1,6 +1,17 @@
 "use client";
-import {useState} from 'react';
+import {useRef,useState} from 'react';
 import {Button} from '@/components/ui/button';
-import {Input} from '@/components/ui/input';
-export async function signOut(){const r=await fetch('/api/auth/sign-out',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(!r.ok)throw new Error('Could not sign out. Try again.');window.location.assign('/login');}
-export function AccountActions(){const [error,setError]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');return <form className="admin-form" onSubmit={async e=>{e.preventDefault();const form=e.currentTarget,values=new FormData(form);setBusy(true);setError('');setMessage('');try{const r=await fetch('/api/auth/change-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({currentPassword:values.get('current'),newPassword:values.get('new'),revokeOtherSessions:true})});const d:any=await r.json();if(!r.ok)throw new Error(d.message??'Could not update password.');form.reset();setMessage('Password updated. Other sessions were signed out.');}catch(e){setError(e instanceof Error?e.message:'Could not update password.')}finally{setBusy(false)}}}><h3>Account security</h3><label>Current password<Input name="current" type="password" autoComplete="current-password" required/></label><label>New password<Input name="new" type="password" autoComplete="new-password" minLength={12} maxLength={128} required/></label>{error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}<Button disabled={busy} type="submit">Update password</Button><Button type="button" variant="outline" disabled={busy} onClick={()=>void signOut().catch(e=>setError(e.message))}>Sign out</Button></form>}
+import {PasswordInput} from './PasswordInput';
+import {requestJson} from '@/lib/client-api';
+export async function signOut(){await requestJson('/api/auth/sign-out','POST',{});window.location.assign('/login');}
+export function AccountActions(){
+ const [error,setError]=useState(''),[busy,setBusy]=useState(false),[message,setMessage]=useState('');const pending=useRef(false);
+ return <form className="admin-form" aria-busy={busy} onSubmit={async e=>{e.preventDefault();if(pending.current)return;pending.current=true;
+ const form=e.currentTarget,values=new FormData(form);setBusy(true);setError('');setMessage('');
+ try{await requestJson('/api/auth/change-password','POST',{currentPassword:values.get('current'),newPassword:values.get('new'),revokeOtherSessions:true});form.reset();setMessage('Password updated. Other sessions were signed out.');}
+ catch(e){setError(e instanceof Error?e.message:'Could not update password.');}finally{pending.current=false;setBusy(false)}}}>
+ <h3>Account security</h3><div><label htmlFor="current-password">Current password</label><PasswordInput id="current-password" name="current" autoComplete="current-password" required disabled={busy}/></div>
+ <div><label htmlFor="new-password">New password</label><PasswordInput id="new-password" name="new" autoComplete="new-password" minLength={15} maxLength={128} required disabled={busy}/></div><p className="muted">Use at least 15 characters. Other sessions will be signed out.</p>
+ {error&&<p role="alert">{error}</p>}{message&&<p role="status">{message}</p>}<Button disabled={busy} type="submit">{busy?'Updating…':'Update password'}</Button>
+ <Button type="button" variant="outline" disabled={busy} onClick={async()=>{if(pending.current)return;pending.current=true;setBusy(true);try{await signOut()}catch(e){setError(e instanceof Error?e.message:'Could not sign out.')}finally{pending.current=false;setBusy(false)}}}>Sign out</Button></form>;
+}

@@ -29,7 +29,9 @@ class ComponentPracticeActivity: Activity() {
     private val hi get() = store.hi
     private fun t(en: String, hindi: String) = if (hi) hindi else en
 
-       @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(!popContentPage())super.onBackPressed()}
+       // API 33+ uses AppBackNavigation and PagedPanel callbacks; retain this fallback for API 29–32.
+    @android.annotation.SuppressLint("GestureBackNavigation")
+    @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(!popContentPage())super.onBackPressed()}
  override fun onCreate(state: Bundle?) {
         super.onCreate(state)
         store = Store(this)

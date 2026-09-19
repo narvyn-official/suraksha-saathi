@@ -1,5 +1,8 @@
 package com.narvyn.suraksha
 
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
@@ -38,7 +41,7 @@ class AdminFlowTest {
                 s.recreate();waitFor(s,"Plan training")
                 tap(s,"Workers");waitFor(s,"Add worker");tap(s,"Add worker");field(s,"Name","Native QA worker");tap(s,"Save worker");waitFor(s,"Add worker");shot("workers")
                 assertTrue(client.call("/api/admin/manage").getJSONArray("workers").objects().any{it.optString("name")=="Native QA worker"})
-                tap(s,"More");waitFor(s,"Account & security");tap(s,"Account & security");waitFor(s,"Sign out");tap(s,"Sign out");waitFor(s,"Sign in")
+                s.onActivity{a->all(a.window.decorView).first{it.tag=="admin-nav-more"}.performClick()};instrument.waitForIdleSync();onView(withText("Account & security")).perform(revealOnPage(),click());waitFor(s,"Sign out");tap(s,"Sign out");waitFor(s,"Sign in")
                 try{client.call("/api/admin/session");fail("Signed-out cookie must not authorize")}catch(_:AdminClient.SignedOut){}
             }
         } finally {prefs.edit().clear().apply();val edit=prefs.edit();for((key,value)in previous)if(value is String)edit.putString(key,value);edit.commit();Store(context).use{it.hi=oldHi}}

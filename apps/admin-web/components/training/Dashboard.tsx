@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { DialogContent } from "./WorkspaceDialog";
+import { useEffect, useState, useCallback, useRef } from "react";
 import {
   ShieldCheck,
   Upload,
@@ -10,7 +11,6 @@ import {
   GraduationCap,
   Users,
   BadgeCheck,
-  LockKeyhole,
   Download,
   Search,
   CheckCircle2,
@@ -31,7 +31,6 @@ import {
 } from "@/components/ui/table";
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
@@ -66,7 +65,7 @@ type Row = {
   worker_name: string;
   worker_id: string;
   worker_sector?: string;
-  payload: any;
+  payload: import("@/lib/insights").TrainingRow["payload"];
 };
 type Credential = {
   id: string;
@@ -77,16 +76,9 @@ type Credential = {
   revoked_at: number | null;
   reason: string | null;
 };
-async function api(path: string, method = "GET", body?: unknown) {
-  const r = await fetch(`/api/${path}`, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  const d: any = await r.json();
-  if (!r.ok) throw new Error(d.error || "Request failed");
-  return d;
-}
+import { requestJson } from "@/lib/client-api";
+const api = <T,>(path:string,method="GET",body?:unknown) => requestJson<T>(`/api/${path}`,method,body);
+type Verification = { iat:number;expiresAt?:number|null;revocationStatus:string;moduleId:string;score:number;reason?:string;message?:string };
 const title = (id: string) =>
   curriculum.modules.find((m) => m.id === id)?.title[0] ?? id;
 function download(name: string, content: string, type = "application/json") {
@@ -98,9 +90,11 @@ function download(name: string, content: string, type = "application/json") {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export default function Home() {
+  const [refreshVersion,setRefreshVersion]=useState(0);
   const [session, setSession] = useState<AdminSession | null>(null);
-  const writable = session?.current?.role !== "viewer";
-  const [tab, setActiveTab] = useState("insights");
+  const writable = session?.current != null && session.current.role !== "viewer";
+  const [requestedTab, setActiveTab] = useState("insights");
+  const tab=session?.current?.role!=="admin"&&["settings","team"].includes(requestedTab)?"insights":requestedTab;
   const [workerView,setWorkerView]=useState("register");
   const setTab = useCallback((id:string) => {
     if (!destinations.some(d=>d.id===id)) return;
@@ -110,9 +104,9 @@ export default function Home() {
     window.scrollTo({top:0,behavior:"instant"});
   },[]);
   useEffect(()=>{const read=()=>{const id=window.location.hash.slice(1);setActiveTab(destinations.some(d=>d.id===id)?id:"insights");};read();window.addEventListener("popstate",read);window.addEventListener("hashchange",read);return()=>{window.removeEventListener("popstate",read);window.removeEventListener("hashchange",read)};},[]);
-  useEffect(()=>{if(session?.current?.role!=="admin" && (tab==="settings"||tab==="team") && session) setTab("insights");},[session,tab,setTab]);
+  useEffect(()=>{document.title=`${destinations.find(d=>d.id===tab)?.title??"Training centre"} · SurakshaAr`;},[tab]);
   const [expiryInput, setExpiryInput] = useState("");
-  const [clock, setClock] = useState(Date.now());
+  const [clock, setClock] = useState(()=>Date.now());
   useEffect(() => { const timer = setInterval(() => setClock(Date.now()), 30_000); return () => clearInterval(timer); }, []);
   const [records, setRecords] = useState<Row[]>([]),
     [credentials, setCredentials] = useState<Credential[]>([]),
@@ -123,33 +117,36 @@ export default function Home() {
     [filter, setFilter] = useState(""),
     [selected, setSelected] = useState<Row | null>(null),
     [active, setActive] = useState<Credential | null>(null),
-    [qr, setQr] = useState(""),
+    [qrImage, setQrImage] = useState<{token:string;url:string}|null>(null),
     [token, setToken] = useState(""),
-    [verification, setVerification] = useState<any>(null),
+    [verification, setVerification] = useState<Verification | null>(null),
     [revoke, setRevoke] = useState<Credential | null>(null),
     [reason, setReason] = useState("");
+  const selectRecord=(row:Row)=>{setExpiryInput("");setSelected(row);};
+  const qr=active?.token===qrImage?.token?qrImage?.url??"":"";
   const [coverage, setCoverage] = useState({
     returned: 0,
     total: 0,
     truncated: false,
   });
   const load = useCallback(async () => {
-    const account = await api("admin/session");
+    try {
+    const account = await api<AdminSession>("admin/session");
     setSession(account);
     if (!account.current) { setRecords([]);setCredentials([]);throw new Error("Select an available workspace to continue."); }
-    const d = await api("records");
+    const d = await api<{attempts:Row[];credentials:Credential[];coverage:{returned:number;total:number;truncated:boolean}}>("records");
     setRecords(d.attempts);
     if (d.coverage) setCoverage(d.coverage);
-    setCredentials(d.credentials);
+    setCredentials(d.credentials);setRefreshVersion(v=>v+1);
+    } catch(error) {setRecords([]);setCredentials([]);setSelected(null);setActive(null);setVerification(null);setSession(null);throw error;}
   }, []);
   useEffect(() => {
-    load()
+    Promise.resolve().then(load)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, [load]);
   useEffect(() => {
     let alive = true;
-    setQr("");
     if (active)
       QRCode.toDataURL(`SURAKSHA:CREDENTIAL:${active.token}`, {
         width: 360,
@@ -157,7 +154,7 @@ export default function Home() {
         errorCorrectionLevel: "M",
       })
         .then((url) => {
-          if (alive) setQr(url);
+          if (alive) setQrImage({token:active.token,url});
         })
         .catch(() =>
           setError(
@@ -172,12 +169,12 @@ export default function Home() {
     setTab("verify");
     setToken(value);
     setVerification(null);
-    const result = await api("verify", "POST", { token: value });
+    const result = await api<Verification>("verify", "POST", { token: value });
     setVerification(result);
     return result;
-  }, []);
+  }, [setTab]);
   useEffect(() => {
-    const context = (document as any).modelContext;
+    const context = (document as Document & { modelContext?: {registerTool:(definition:unknown,options:{signal:AbortSignal})=>unknown} }).modelContext;
     if (!context?.registerTool) return;
     const lifecycle = new AbortController();
     Promise.resolve(
@@ -194,7 +191,7 @@ export default function Home() {
             additionalProperties: false,
           },
           annotations: { readOnlyHint: true, untrustedContentHint: true },
-          execute: async (input: any) => {
+          execute: async (input: {token?:unknown}) => {
             if (typeof input?.token !== "string" || input.token.length > 6000)
               throw new Error("Invalid credential text");
             return verifyToken(input.token);
@@ -205,7 +202,9 @@ export default function Home() {
     ).catch(() => {});
     return () => lifecycle.abort();
   }, [verifyToken]);
+  const actionPending = useRef(false);
   async function run(fn: () => Promise<void>) {
+    if(actionPending.current)return;actionPending.current=true;
     setBusy(true);
     setError("");
     setMessage("");
@@ -214,6 +213,7 @@ export default function Home() {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      actionPending.current=false;
       setBusy(false);
     }
   }
@@ -222,7 +222,7 @@ export default function Home() {
     await run(async () => {
       if (file.size > 1000000)
         throw new Error("Choose a JSON export smaller than 1 MB.");
-      const result = await api("import", "POST", JSON.parse(await file.text()));
+      const result = await api<{imported:number;unchanged:number}>("import", "POST", JSON.parse(await file.text()));
       await load();
       setMessage(
         `${result.imported} attempt(s) imported. ${result.unchanged} already saved.`,
@@ -234,8 +234,8 @@ export default function Home() {
       const existing = credentials.find((c) => c.attempt_id === row.id);
       if (existing) { setActive(existing); setSelected(null); return; }
       const expiresAt = new Date(expiryInput).getTime();
-      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error("Choose a future expiry approved by your site's training policy.");
-      const result = await api("credentials", "POST", { attemptId: row.id, expiresAt });
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error("Choose a future expiry approved by your site’s training policy.");
+      const result = await api<Credential>("credentials", "POST", { attemptId: row.id, expiresAt });
       await load();
       setActive(result);
       setExpiryInput("");
@@ -243,7 +243,7 @@ export default function Home() {
       setMessage("Pilot simulation credential issued.");
     });
   }
-  useEffect(() => { setExpiryInput(""); }, [selected?.id]);
+
   const verificationStatus = verification ? credentialStatus(validity(verification, clock), verification.revocationStatus === "revoked" ? 0 : null, verification.revocationStatus !== "unknown") : "";
   const matches = records.filter((r) =>
     `${r.worker_name} ${r.worker_id} ${title(r.payload.moduleId)}`
@@ -324,21 +324,21 @@ export default function Home() {
                 records={records}
                 certificates={credentials}
                 now={clock}
-                onReview={setSelected}
+                onReview={selectRecord}
               />
             )}
           </section>}
           {tab === "workers" && <section aria-label="workers" className="page-content">
             <div className="worker-view-switch" role="group" aria-label="Worker view"><Button variant={workerView==='register'?'default':'outline'} onClick={()=>setWorkerView('register')}>Worker register</Button><Button variant={workerView==='history'?'default':'outline'} onClick={()=>setWorkerView('history')}>Learning history</Button></div>
-            {workerView==='register'&&session?.current && <AdminPanel view="workers" session={session} onChange={load}/> }
+            {workerView==='register'&&session?.current && <AdminPanel refreshVersion={refreshVersion} view="workers" session={session} onChange={load}/> }
             {workerView==='history'&&<WorkerDirectory
               records={records}
               certificates={credentials}
                 now={clock}
-              onReview={setSelected}
+              onReview={selectRecord}
             />}
           </section>}
-          {tab === "room-practice" && <section aria-label="room-practice" className="page-content"><RoomJournals writable={writable} /></section>}
+          {tab === "room-practice" && <section aria-label="room-practice" className="page-content"><RoomJournals refreshVersion={refreshVersion} writable={writable} /></section>}
           {tab === "records" && <section aria-label="records" className="page-content">
             <div className="dashboard-grid">
               <section className="panel records-panel">
@@ -407,7 +407,7 @@ export default function Home() {
                           <TableCell className="text-right">
                             <Button
                               variant="ghost"
-                              onClick={() => setSelected(r)}
+                              onClick={() => selectRecord(r)}
                             >
                               View
                             </Button>
@@ -547,7 +547,7 @@ export default function Home() {
           </section>}
           {tab === "curriculum" && <section aria-label="curriculum" className="page-content">
             <div className="dashboard-grid">
-              {curriculum.modules.map((m, i) => (
+              {curriculum.modules.map((m) => (
                 <section className="panel" key={m.id}>
                   <span className="feature-icon">
                     {m.id === "fire" ? (
@@ -583,7 +583,7 @@ export default function Home() {
           {tab === "verify" && <section aria-label="verify" className="page-content">
             <section className="panel verify-panel">
               <h2>Verify a pilot credential</h2>
-              <p>Paste the signed text from a Suraksha Saathi credential QR.</p>
+              <p>Paste the signed text from a SurakshaAr credential QR.</p>
               <label htmlFor="credential" className="field-label">
                 Credential text
               </label>
@@ -630,7 +630,7 @@ export default function Home() {
               )}
             </section>
           </section>}
-          {session?.current && (["assignments","audit",...(session.current.role === "admin"?["team","settings"]:[])] as ("assignments"|"audit"|"team"|"settings")[]).map(view=>tab===view&&<section key={view} aria-label={view}><AdminPanel view={view} session={session} onChange={load}/></section>)}
+          {session?.current && (["assignments","audit",...(session.current.role === "admin"?["team","settings"]:[])] as ("assignments"|"audit"|"team"|"settings")[]).map(view=>tab===view&&<section key={view} aria-label={view}><AdminPanel refreshVersion={refreshVersion} view={view} session={session} onChange={load}/></section>)}
       </WorkspaceShell>
       <Dialog
         open={!!selected}
@@ -660,7 +660,7 @@ export default function Home() {
                   Practical observation: not assessed
                 </span>
               </div>
-              {selected.payload.events.map((e: any, i: number) => {
+              {selected.payload.events.map((e, i: number) => {
                 const q = curriculumFor(selected.payload.contentVersion)!
                   .modules.find((m) => m.id === selected.payload.moduleId)!
                   .questions.find((q) => q.id === e.questionId)!;
@@ -690,7 +690,7 @@ export default function Home() {
                       <>
                         <label htmlFor="credential-expiry" className="field-label">Expiry date and time · your local time</label>
                         <Input id="credential-expiry" type="datetime-local" value={expiryInput} onChange={(e) => setExpiryInput(e.target.value)} required aria-describedby="expiry-policy" />
-                        <p id="expiry-policy" className="fine">Use the date approved in your site's training policy. No statutory validity period is assumed.</p>
+                        <p id="expiry-policy" className="fine">Use the date approved in your site’s training policy. No statutory validity period is assumed.</p>
                       </>
                     )}
                     <Button disabled={busy || (!credentials.some((c) => c.attempt_id === selected.id) && !expiryInput)} onClick={() => issue(selected)}>
@@ -721,13 +721,15 @@ export default function Home() {
           </DialogHeader>
           {active && <p role="status">{statusLabel(recordStatus(active, clock))}<br />{active.expiresAt == null ? "No expiry recorded" : `Expires ${new Date(active.expiresAt).toLocaleString()}`}</p>}
           {qr ? (
-            <img
+            <>{/* Generated QR data URL: image optimization must not change encoded modules. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
               className="credential-qr"
               src={qr}
               width={300}
               height={300}
               alt="Signed pilot credential QR"
-            />
+            /></>
           ) : (
             <Skeleton className="mx-auto h-64 w-64" />
           )}

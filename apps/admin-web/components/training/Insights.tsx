@@ -47,12 +47,12 @@ import { curriculum } from "@/lib/grading";
 export function TrainingInsights({
   records,
   certificates,
-  now = Date.now(),
+  now,
   onReview,
 }: {
   records: TrainingRow[];
   certificates: CertificateRow[];
-  now?: number;
+  now: number;
   onReview: (row: TrainingRow) => void;
 }) {
   const data = useMemo(
@@ -163,7 +163,7 @@ export function TrainingInsights({
               <EmptyHeader>
                 <EmptyTitle>Import training to see coverage</EmptyTitle>
                 <EmptyDescription>
-                  The chart uses your workers' saved decisions.
+                  The chart uses your workers’ saved decisions.
                 </EmptyDescription>
               </EmptyHeader>
             </Empty>
@@ -246,12 +246,12 @@ export function TrainingInsights({
 export function WorkerDirectory({
   records,
   certificates,
-  now = Date.now(),
+  now,
   onReview,
 }: {
   records: TrainingRow[];
   certificates: CertificateRow[];
-  now?: number;
+  now: number;
   onReview: (row: TrainingRow) => void;
 }) {
   const data = useMemo(

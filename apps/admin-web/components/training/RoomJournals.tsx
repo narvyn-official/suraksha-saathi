@@ -1,9 +1,11 @@
 "use client";
+import { DialogContent } from "./WorkspaceDialog";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { requestJson } from "@/lib/client-api";
 import type { RoomJournal, RoomJournalRow } from "@/lib/room-journals";
 
 type Snapshot = { digest: string; captured_at: number; payload: RoomJournal };
@@ -12,12 +14,9 @@ type Listing = { rooms: RoomJournalRow[]; coverage: { total: number } };
 type Imported = { imported: number; unchanged: number; omittedCount: number };
 type History = { snapshots: Snapshot[]; total: number };
 async function api<T>(method = "GET", body?: unknown, query = "") {
-  const response = await fetch(`/api/room-journals${query}`, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
-  const result = await response.json() as T & { error?: string };
-  if (!response.ok) throw new Error(result.error ?? "Could not load practice journals.");
-  return result;
+  return requestJson<T>(`/api/room-journals${query}`,method,body);
 }
-export function RoomJournals({writable=true}:{writable?:boolean}) {
+export function RoomJournals({writable=true,refreshVersion=0}:{writable?:boolean;refreshVersion?:number}) {
   const [rows, setRows] = useState<RoomJournalRow[]>([]);
   const [total, setTotal] = useState(0), [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
@@ -26,17 +25,18 @@ export function RoomJournals({writable=true}:{writable?:boolean}) {
   const [snapshot, setSnapshot] = useState<RoomJournal | null>(null);
   const [history, setHistory] = useState<Snapshot[]>([]), [historyTotal, setHistoryTotal] = useState(0);
   const [historyError, setHistoryError] = useState("");
-  const request = useRef(0);
-  const load = useCallback(async () => { const data = await api<Listing>();setRows(data.rooms);setTotal(data.coverage.total); }, []);
-  useEffect(() => { let alive = true;api<Listing>().then(data => { if (alive) { setRows(data.rooms);setTotal(data.coverage.total); } }).catch(e => { if (alive) setError(e.message); }).finally(() => { if (alive) setLoading(false); });return () => { alive = false; }; }, []);
+  const request = useRef(0), pending = useRef(false);
+  const load = useCallback(async () => { const data = await api<Listing>();setRows(data.rooms);setTotal(data.coverage.total);setError(""); }, []);
+  useEffect(() => { let alive = true;api<Listing>().then(data => { if (alive) { setRows(data.rooms);setTotal(data.coverage.total);setError(""); } }).catch(e => { if (alive) {setRows([]);setSelected(null);setError(e.message);} }).finally(() => { if (alive) setLoading(false); });return () => { alive = false; }; }, [refreshVersion]);
   async function importFile(file?: File) {
-    if (!file) return;
+    if (!file || pending.current || !writable) return;
+    pending.current=true;
     setBusy(true);setError("");setMessage("");
     try {
       if (file.size > 1_000_000) throw new Error("Choose a room-practice JSON export smaller than 1 MB.");
       const result = await api<Imported>("POST", JSON.parse(await file.text()));await load();
       setMessage(`${result.imported} new snapshot(s) saved; ${result.unchanged} already present.${result.omittedCount ? ` The phone excluded ${result.omittedCount} older journal(s) from this bounded export.` : ""} These records cannot issue certificates.`);
-    } catch (e) { setError(e instanceof Error ? e.message : "Import failed."); } finally { setBusy(false); }
+    } catch (e) { setError(e instanceof Error ? e.message : "Import failed."); } finally { pending.current=false;setBusy(false); }
   }
   async function review(row: RoomJournalRow) {
     const serial = ++request.current;setSelected(row);setSnapshot(row.payload);setHistory([]);setHistoryTotal(0);setHistoryError("");

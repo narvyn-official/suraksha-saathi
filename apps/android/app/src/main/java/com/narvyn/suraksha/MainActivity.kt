@@ -77,6 +77,8 @@ class MainActivity: Activity() {
         spokenLearningKey=pair.first;speak(pair.second,true)
     }
     private fun parentPage()=when(page){"training","lesson","practice"->"module";"verify"->"records";else->"home"}
+    // API 33+ uses AppBackNavigation and PagedPanel callbacks; retain this fallback for API 29–32.
+    @android.annotation.SuppressLint("GestureBackNavigation")
     @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(page!="home")navigateBack()else super.onBackPressed()}
     private fun navigateBack(){
         tts?.stop()
@@ -105,7 +107,7 @@ class MainActivity: Activity() {
         } else {
             header.addView(ImageView(this).apply{setImageDrawable(appIcon("shield"));importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO},LinearLayout.LayoutParams(dp(28),dp(28)))
         }
-        header.addView(label("Suraksha Saathi",16f,Palette.ink,true).apply{setPadding(dp(8),0,dp(8),0)},LinearLayout.LayoutParams(0,-2,1f))
+        header.addView(label(getString(R.string.app_name),16f,Palette.ink,true).apply{setPadding(dp(8),0,dp(8),0)},LinearLayout.LayoutParams(0,-2,1f))
         header.addView(action(if(hi)"हिन्दी ▾" else "EN ▾",false,role=ActionRole.NEUTRAL){language()}.apply {
             textSize=13f;minHeight=dp(48);minimumHeight=dp(48);setPadding(dp(10),dp(8),dp(10),dp(8));contentDescription=t("Choose language: English","भाषा चुनें: हिन्दी")
         },LinearLayout.LayoutParams(-2,-2))

@@ -173,6 +173,8 @@ class RoomMissionActivity:Activity() {
             if(!safe&&active&&!isFinishing&&!isDestroyed)briefing()
         },::speakLearning,next,{learningVoice?.stop()},autoSpeak)
     }
+    // API 33+ uses AppBackNavigation and PagedPanel callbacks; retain this fallback for API 29–32.
+    @android.annotation.SuppressLint("GestureBackNavigation")
     @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){leavePractice()}
     private fun leavePractice(){
         if(popContentPage())return

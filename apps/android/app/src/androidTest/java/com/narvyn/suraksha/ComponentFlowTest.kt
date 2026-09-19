@@ -8,7 +8,6 @@ import android.widget.TextView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.scrollTo
 import androidx.test.espresso.matcher.ViewMatchers.withTagValue
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -69,15 +68,15 @@ class ComponentFlowTest {
                 waitForMarkers(s); verifyModelAndWaitForComposition(s); shot("parts-$module-example.png")
                 while(!state(module).done) {
                     val current = state(module)
-                    if (current.stage == 0) onView(withText("Try without labels")).perform(scrollTo(),click())
+                    if (current.stage == 0) onView(withText("Try without labels")).perform(revealOnPage(),click())
                     else if (current.answer == null) {
                         waitForMarkers(s)
                         if (current.index==0 && current.stage==2) {
                             s.recreate();waitForMarkers(s);verifyModelAndWaitForComposition(s);shot("parts-$module-turned.png")
                         }
                         if (InstrumentationRegistry.getArguments().getString("componentDemo")=="true") Thread.sleep(900)
-                        onView(withTagValue(`is`("component-marker-${current.target.id}" as Any))).perform(scrollTo(),click())
-                    } else onView(withText(if(current.stage==1)"Try the changed view" else "Continue")).perform(scrollTo(),click())
+                        onView(withTagValue(`is`("component-marker-${current.target.id}" as Any))).perform(revealOnPage(),click())
+                    } else onView(withText(if(current.stage==1)"Try the changed view" else "Continue")).perform(revealOnPage(),click())
                 }
                 val completed = state(module)
                 assertEquals(6,completed.data.getInt("visualCorrect")); assertEquals(0,completed.data.getInt("descriptionCorrect"))
@@ -98,15 +97,15 @@ class ComponentFlowTest {
         Store(context).use { it.hi=true; it.saveComponent(ComponentSession.start(module,null).data) }
         try {
             ActivityScenario.launch<ComponentPracticeActivity>(Intent(context,ComponentPracticeActivity::class.java).putExtra("moduleId",module)).use { s ->
-                onView(withText("लिखित विवरण उपयोग करें")).perform(scrollTo(),click())
-                onView(withText("बिना नाम के कोशिश करें")).perform(scrollTo(),click())
-                onView(withText("मुझे निश्चित नहीं है")).perform(scrollTo(),click())
+                onView(withText("लिखित विवरण उपयोग करें")).perform(revealOnPage(),click())
+                onView(withText("बिना नाम के कोशिश करें")).perform(revealOnPage(),click())
+                onView(withText("मुझे निश्चित नहीं है")).perform(revealOnPage(),click())
                 s.recreate(); assertEquals("_unsure",state(module).answer)
-                onView(withText("मदद के साथ कोशिश करें")).perform(scrollTo(),click())
+                onView(withText("मदद के साथ कोशिश करें")).perform(revealOnPage(),click())
                 assertTrue(state(module).helped)
-                onView(withTagValue(`is`("component-description-helmet" as Any))).perform(scrollTo(),click())
+                onView(withTagValue(`is`("component-description-helmet" as Any))).perform(revealOnPage(),click())
                 assertEquals(0,state(module).data.getInt("descriptionCorrect"))
-                onView(withText("बदले क्रम में कोशिश करें")).perform(scrollTo(),click())
+                onView(withText("बदले क्रम में कोशिश करें")).perform(revealOnPage(),click())
                 s.recreate();assertEquals(2,state(module).stage);assertTrue(state(module).descriptions)
                 shot("parts-hindi-descriptions.png")
             }

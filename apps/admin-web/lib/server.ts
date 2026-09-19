@@ -40,22 +40,10 @@ export function failure(error: unknown) {
         ? message
         : "Could not complete the request. Please try again.",
     },
-    { status: message.startsWith("Sign in") ? 401 : message.startsWith("Forbidden") ? 403 : 400 },
+    { headers: {"Cache-Control":"no-store"}, status: message.startsWith("Sign in") ? 401 : message.startsWith("Forbidden") ? 403 : 400 },
   );
 }
-export async function json(request: Request) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== new URL(request.url).origin)
-    throw new Error("Invalid request origin.");
-  const text = await request.text();
-  if (text.length > 1000000)
-    throw new Error("File is too large. Maximum 1 MB.");
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error("Invalid JSON file.");
-  }
-}
+export { readJson as json } from "./http";
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value !== null && typeof value === "object")

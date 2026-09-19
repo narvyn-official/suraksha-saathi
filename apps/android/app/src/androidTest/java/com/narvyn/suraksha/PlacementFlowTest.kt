@@ -25,6 +25,7 @@ class PlacementFlowTest {
     private fun views(v: View): List<View> = listOf(v)+(if(v is ViewGroup)(0 until v.childCount).flatMap { views(v.getChildAt(it)) }else emptyList())
     private fun nodes(n: AccessibilityNodeInfo?): List<AccessibilityNodeInfo> = if(n==null)emptyList()else listOf(n)+(0 until n.childCount).flatMap { nodes(n.getChild(it)) }
     private fun click(label: String) {
+        var forward=true
         repeat(40) {
             val all=nodes(instrumentation.uiAutomation.rootInActiveWindow)
             val n=all.firstOrNull { it.contentDescription?.toString()==label || it.text?.toString()==label }
@@ -33,7 +34,9 @@ class PlacementFlowTest {
                 assertTrue(n.performAction(AccessibilityNodeInfo.ACTION_CLICK));instrumentation.waitForIdleSync();Thread.sleep(150);return
             }
             if(n!=null)n.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.id)
-            else all.firstOrNull { it.isVisibleToUser && it.isScrollable }?.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD)
+            val labels=if(forward)listOf("More","और देखें")else listOf("Earlier","पिछला भाग")
+            val paging=all.firstOrNull{it.isVisibleToUser&&it.isClickable&&it.isEnabled&&it.text?.toString() in labels}
+            if(paging!=null)paging.performAction(AccessibilityNodeInfo.ACTION_CLICK)else forward=!forward
             Thread.sleep(100)
         }
         fail("Unreachable native action: $label")

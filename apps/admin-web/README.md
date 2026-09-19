@@ -1,4 +1,4 @@
-# Suraksha Saathi trainer dashboard
+# SurakshaAr trainer dashboard
 
 Private trainer workspace for importing Android training exports, reviewing decisions, issuing pilot simulation credentials, and checking signatures and revocations.
 
@@ -6,7 +6,7 @@ Private trainer workspace for importing Android training exports, reviewing deci
 
 See [login, roles, worker management, assignments and audit setup](../../docs/admin-workspace.md). The dashboard now opens on a dedicated sign-in screen, with shared workspaces and Admin / Trainer / Viewer permissions checked server-side. Team invitations are saved in the workspace; no email is sent automatically. Accounts use independent Suraksha email/password authentication, shared with the native Android admin workspace.
 
-Apply migrations through `0006_independent_accounts.sql` before running this version. In addition to the existing integration checks, run `npx tsx tests/admin.integration.ts` locally. Its temporary workspace fixtures are removed after the run.
+Apply migrations through `0007_assessment_import_guard.sql` before running this version. In addition to the existing integration checks, run `npx tsx tests/admin.integration.ts` locally. Its temporary workspace fixtures are removed after the run.
 
 ## Local run
 
@@ -28,9 +28,8 @@ Import the Android JSON export, select **View**, and choose a policy-approved ex
 ## Checks
 
 ```sh
-npm test
-npx tsc --noEmit
-npm run build
+npm run check
+npm audit --audit-level=high
 node tests/integration.mjs
 ```
 
@@ -57,3 +56,17 @@ On Android use **My record → Export room practice journals**, then use the das
 The authenticated `/api/room-journals` endpoint supports v1/v2 histories, including incomplete attempts and recorded assistance. Imports replay supported actions, preserve immutable snapshots and accept identical reuploads idempotently. Conflicting histories are rejected atomically. Records are owner-scoped and never qualify for credential issuance. The phone exports up to 100 latest journals, reports omissions and bounds the file to 950 KB; the API limits stored history per owner to 2,000 attempts and 10,000 snapshots. These are locally reported simulation events, not hardware-attested performance.
 
 Run `npx tsx tests/room-journals.integration.ts` against the local development server for the room API checks. Production hosting remains unresolved; native upload and file transfer both require the account service.
+
+## SurakshaAr 0.8.0 recovery setup
+
+New accounts and changed/reset passwords require 15–128 characters. Existing passwords continue to work until changed. The web and native Android account flows share the same account service. Web forms support password reveal and session-only sign-in by default for shared devices.
+
+Configure `BETTER_AUTH_URL` as the canonical HTTPS account origin, plus backend secrets `RECOVERY_MAIL_URL` (an operator-owned HTTPS delivery endpoint) and `RECOVERY_MAIL_KEY` (at least 32 characters). The gateway receives `POST` JSON `{to, subject, text}` with `Authorization: Bearer <key>` and must return 2xx only after accepting delivery. Redirects and delivery failures are rejected. Provision provider credentials inside the gateway’s approved secret store, never in this repository or the browser. This change does not provision a mail provider or send real email.
+
+Reset links expire after 15 minutes and carry their token in the URL fragment. A successful reset consumes the token, invalidates other outstanding links and revokes the user’s sessions. Known and unknown emails receive the same response. If delivery is not configured, recovery fails closed with a service-unavailable response. Production delivery, spam controls and domain authentication require operator validation before release.
+
+For isolated local QA, the account origin and gateway may both use loopback HTTP. Set `RECOVERY_MAIL_URL=http://127.0.0.1:5188/send` and a disposable random key in ignored `.dev.vars`, then run `node tests/local-mail-server.mjs` alongside `npm run dev` and `npx tsx tests/reliability.integration.ts`. The stub accepts only `@example.test` recipients, stores messages in memory and never sends external email. Remove the temporary recovery settings after testing. Integration suites share rate limits: run them sequentially, with their retry handling enabled.
+
+`npm start` serves the built worker on port 5173, matching local account configuration; `PORT=5174 npm start` changes the preview port. The launcher explicitly reads the ignored project `.dev.vars` without copying secrets into `dist`. Stop the development server first. Apply migration 0007 before running the new API; retain backups before any production migration. Database triggers prevent conflicting assessment imports even under concurrent requests; credential uniqueness and audit changes are tested against local D1.
+
+The GitHub validation workflow checks the web build/types/lint/unit tests and Android build/lint/JVM tests. Full local account/room/reliability integration and the emulator fixture matrix are additional checks; they require configured local services and are not silently represented as CI coverage.

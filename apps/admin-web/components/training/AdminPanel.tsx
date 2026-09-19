@@ -1,10 +1,11 @@
 "use client";
+import { DialogContent } from "./WorkspaceDialog";
 import { AccountActions } from "./AccountActions";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { curriculum } from "@/lib/grading";
 import type { Role } from "@/lib/access";
@@ -12,10 +13,11 @@ type Worker={id:string;name:string;sector:string};
 type Assignment={id:string;worker_name:string;worker_id:string;module_id:string;content_version:string;due_at:number;created_at:number;status:string;completed_at:number|null;note:string};
 type Data={workers:Worker[];assignments:Assignment[];team:{email:string;role:Role;active:number;user_id:string|null}[];audit:{id:string;actor_email:string;action:string;target:string;at:number;detail:Record<string,unknown>}[];counts:{workers:number;assignments:number;audit:number}};
 export type AdminSession={user:{userId:string;email:string;displayName:string};current:{owner:string;name:string;site:string;role:Role}|null;workspaces:{owner:string;role:Role;name:string|null;personal?:boolean}[]};
-async function api(body?:unknown):Promise<any>{const r=await fetch('/api/admin/manage',{method:body?'POST':'GET',headers:body?{'Content-Type':'application/json'}:undefined,body:body?JSON.stringify(body):undefined});const data:any=await r.json();if(!r.ok)throw new Error(data.error);return data;}
+import { requestJson } from "@/lib/client-api";
+async function api(body?:unknown):Promise<Data & {invitation?:string}> { return requestJson('/api/admin/manage',body?'POST':'GET',body); }
 const moduleName=(id:string)=>curriculum.modules.find(m=>m.id===id)?.title[0]??id;
 function csvCell(v:unknown){const s=String(v??'');return '"'+(/^[=+@\-\t\r]/.test(s)?"'":"")+s.replaceAll('"','""')+'"';}
-export function AdminPanel({view,session,onChange}:{view:'workers'|'assignments'|'team'|'audit'|'settings';session:AdminSession;onChange:()=>Promise<void>}) {
+export function AdminPanel({view,session,onChange,refreshVersion=0}:{refreshVersion?:number;view:'workers'|'assignments'|'team'|'audit'|'settings';session:AdminSession;onChange:()=>Promise<void>}) {
  const [data,setData]=useState<Data|null>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[query,setQuery]=useState(''),[status,setStatus]=useState('all');
  const [editing,setEditing]=useState<Worker|null>(null),[workerOpen,setWorkerOpen]=useState(false),[workerName,setWorkerName]=useState(''),[sector,setSector]=useState('Unspecified'),[androidId,setAndroidId]=useState('');
  const [selected,setSelected]=useState<string[]>([]),[moduleId,setModule]=useState('fire'),[due,setDue]=useState(''),[note,setNote]=useState('');
@@ -23,10 +25,11 @@ export function AdminPanel({view,session,onChange}:{view:'workers'|'assignments'
  const [invitation,setInvitation]=useState('');
  const [assignOpen,setAssignOpen]=useState(false);
  const [cancel,setCancel]=useState<Assignment|null>(null),[reason,setReason]=useState('');
- const writable=session.current?.role!=='viewer';
- async function load(){setData(await api());}
- useEffect(()=>{let active=true;api().then(d=>{if(active)setData(d)}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[session.current?.owner]);
- async function save(body:unknown,done?:()=>void){setBusy(true);setError('');setMessage('');try{const result=await api(body);if(result.invitation)setInvitation(result.invitation);await load();await onChange();setMessage('Changes saved.');done?.();}catch(e){setError(e instanceof Error?e.message:'Could not save.')}finally{setBusy(false)}}
+ const pending=useRef(false);
+ const writable=session.current!=null&&session.current.role!=='viewer';
+ async function load(){setData(await api());setError('');}
+ useEffect(()=>{let active=true;api().then(d=>{if(active){setData(d);setError('')}}).catch(e=>{if(active){setData(null);setError(e.message)}});return()=>{active=false}},[session.current?.owner,refreshVersion]);
+ async function save(body:unknown,done?:()=>void){if(pending.current)return;pending.current=true;setBusy(true);setError('');setMessage('');try{const result=await api(body);if(result.invitation)setInvitation(result.invitation);await load();await onChange();setMessage('Changes saved.');done?.();}catch(e){setError(e instanceof Error?e.message:'Could not save.')}finally{pending.current=false;setBusy(false)}}
  function worker(w?:Worker){setEditing(w??null);setAndroidId('');setWorkerName(w?.name??'');setSector(w?.sector??'Unspecified');setWorkerOpen(true);}
  const matches=(w:Worker)=>`${w.name} ${w.id} ${w.sector}`.toLowerCase().includes(query.toLowerCase());
  const assignments=data?.assignments.filter(a=>(status==='all'||a.status===status)&&`${a.worker_name} ${a.worker_id} ${moduleName(a.module_id)}`.toLowerCase().includes(query.toLowerCase()))??[];
