@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {account} from './auth-client.mjs';
-const owner=await account(),invitee=await account();
+const owner=await account({approved:true}),invitee=await account();
 const base='http://localhost:5173';
 async function call(path:string,body?:unknown,cookie=owner.cookie,origin=base){const r=await fetch(base+path,{method:body?'POST':'GET',headers:{'Content-Type':'application/json',Cookie:cookie,Origin:origin},body:body?JSON.stringify(body):undefined});const text=await r.text();let data:any;try{data=JSON.parse(text)}catch{data={error:text}}return {status:r.status,data,headers:r.headers};}
 assert.equal((await call('/api/admin/session',undefined,'__sites_local_auth=1')).status,401);

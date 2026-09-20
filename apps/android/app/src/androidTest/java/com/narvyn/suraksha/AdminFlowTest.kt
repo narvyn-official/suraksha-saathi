@@ -36,12 +36,14 @@ class AdminFlowTest {
             client.call("/api/auth/sign-up/email",JSONObject().put("email",email).put("name","Android QA centre").put("password",password));client.clear()
             ActivityScenario.launch(AdminActivity::class.java).use{s->
                 waitFor(s,"Sign in");shot("login")
-                field(s,"Email address",email);field(s,"Password",password);tap(s,"Sign in");waitFor(s,"Plan training");shot("overview")
+                field(s,"Email address",email);field(s,"Password",password);tap(s,"Sign in");waitFor(s,"Request centre approval");shot("approval-required")
                 assertFalse(prefs.getString("cookies","")!!.contains("session_token"));assertFalse(prefs.all.values.any{it.toString().contains(password)})
-                s.recreate();waitFor(s,"Plan training")
-                tap(s,"Workers");waitFor(s,"Add worker");tap(s,"Add worker");field(s,"Name","Native QA worker");tap(s,"Save worker");waitFor(s,"Add worker");shot("workers")
-                assertTrue(client.call("/api/admin/manage").getJSONArray("workers").objects().any{it.optString("name")=="Native QA worker"})
-                s.onActivity{a->all(a.window.decorView).first{it.tag=="admin-nav-more"}.performClick()};instrument.waitForIdleSync();onView(withText("Account & security")).perform(revealOnPage(),click());waitFor(s,"Sign out");tap(s,"Sign out");waitFor(s,"Sign in")
+                s.recreate();waitFor(s,"Request centre approval")
+                tap(s,"Request centre approval");field(s,"Centre name","Android QA centre");field(s,"Site or organisation","Synthetic Android site");tap(s,"Submit application");waitFor(s,"Refresh access");shot("approval-pending")
+                assertTrue(client.call("/api/admin/session").isNull("current"))
+                assertEquals("pending",client.call("/api/admin/session").getJSONObject("application").getString("status"))
+                s.recreate();waitFor(s,"Refresh access")
+                tap(s,"Account & security");waitFor(s,"Sign out");tap(s,"Sign out");waitFor(s,"Sign in")
                 try{client.call("/api/admin/session");fail("Signed-out cookie must not authorize")}catch(_:AdminClient.SignedOut){}
             }
         } finally {prefs.edit().clear().apply();val edit=prefs.edit();for((key,value)in previous)if(value is String)edit.putString(key,value);edit.commit();Store(context).use{it.hi=oldHi}}

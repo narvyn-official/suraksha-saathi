@@ -83,7 +83,7 @@ class MainActivity: Activity() {
     private fun navigateBack(){
         tts?.stop()
         if(::pages.isInitialized&&pages.previousPage())return
-        if(page=="lesson"&&lessonIndex>0){lessonIndex--;render();return}
+        if(page=="lesson"&&lessonIndex>0){lessonIndex--;saveLessonPosition(lessonIndex);render();return}
         page=if(pageHistory.isNotEmpty())pageHistory.removeAt(pageHistory.lastIndex)else parentPage()
         render()
     }
@@ -221,6 +221,8 @@ class MainActivity: Activity() {
         val m=curriculum.module(selected)
         body.add(label(t("${m.getString("duration")} MIN · OFFLINE LESSONS","${m.getString("duration")} मिनट · ऑफ़लाइन पाठ"),12f,moduleColour(selected),true),bottom=6)
         title(m.local("title",hi),m.local("subtitle",hi))
+        val previous=store.attempts().firstOrNull{it.optString("moduleId")==selected&&it.optString("kind")=="assessment"&&it.optBoolean("finished")}
+        body.add(label(if(previous==null)t("Learning path: lessons → guided practice → assessment → independent review.","सीखने का क्रम: पाठ → निर्देशित अभ्यास → मूल्यांकन → स्वतंत्र समीक्षा।")else if(!previous.getJSONObject("result").optBoolean("passed"))t("Recommended next: revisit explanations and practise before reassessment.","अगला सुझाव: दोबारा मूल्यांकन से पहले व्याख्या पढ़ें और अभ्यास करें।")else t("Assessment passed. Keep practising recall; certification requires an independent review.","मूल्यांकन पास। याद करके अभ्यास करते रहें; प्रमाणपत्र के लिए स्वतंत्र समीक्षा आवश्यक है।"),14f,Palette.muted),bottom=12)
         val room=selected in listOf("fire","gas")
         val primary=column(14).apply{background=shape(Palette.tealBg,18)}
         primary.add(action(t("Start training","प्रशिक्षण शुरू करें")){if(room)startRoomMission(false)else openLessons()}.apply{tag="main-start-training"})
@@ -240,7 +242,9 @@ class MainActivity: Activity() {
     private fun chooseAssessment(){
         PageDialogBuilder(this).setTitle(t("Assessment mode","मूल्यांकन का तरीका")).setItems(arrayOf(t("On-screen decisions","स्क्रीन पर निर्णय"),t("Camera AR","कैमरा AR"))){_,i->startTraining(false,i==1)}.show()
     }
-    private fun openLessons(){lessonIndex=0;go("lesson")}
+    private fun lessonKey()="${store.workerId}:${curriculum.version}:$selected"
+    private fun openLessons(){lessonIndex=getSharedPreferences("lesson-bookmarks",MODE_PRIVATE).getInt(lessonKey(),0).coerceAtLeast(0);go("lesson")}
+    private fun saveLessonPosition(index:Int){getSharedPreferences("lesson-bookmarks",MODE_PRIVATE).edit().putInt(lessonKey(),index).apply()}
     private fun lesson(){
         val m=curriculum.module(selected);val lessons=m.getJSONArray("lessons").objects()
         if(lessons.isEmpty()){body.add(label(t("No lessons are available for this module.","इस मॉड्यूल के पाठ उपलब्ध नहीं हैं।")));body.add(action(t("Back to module","मॉड्यूल पर वापस जाएँ")){go("module")},top=16);return}
@@ -254,14 +258,15 @@ class MainActivity: Activity() {
             contentDescription=t("Lesson ${lessonIndex+1} of ${lessons.size}","पाठ ${lessonIndex+1} / ${lessons.size}")
         },bottom=20)
         body.add(card().apply{add(label(item.local("body",hi),18f).apply{tag="main-lesson-content"})},bottom=16)
+        body.add(label(t("Your reading position is saved for this learner. Reading is not an assessment result.","इस शिक्षार्थी की पढ़ने की जगह सहेजी जाती है। पढ़ना मूल्यांकन परिणाम नहीं है।"),13f,Palette.muted),bottom=8)
         body.add(action(t("Listen","सुनें"),false,role=ActionRole.LEARN){speak(item.local("body",hi))}.apply{tag="main-lesson-listen"},bottom=16)
     }
     private fun lessonNavigation():LinearLayout {
         val lessons=curriculum.module(selected).getJSONArray("lessons")
         val dock=LinearLayout(this).apply{isBaselineAligned=false;setPadding(dp(18),dp(8),dp(18),dp(8));setBackgroundColor(Palette.surface)}
-        if(lessonIndex>0)dock.addView(action(t("Previous","पिछला"),false,role=ActionRole.NEUTRAL){lessonIndex--;go("lesson")}.apply{tag="main-lesson-previous";textSize=14f},LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(8)})
+        if(lessonIndex>0)dock.addView(action(t("Previous","पिछला"),false,role=ActionRole.NEUTRAL){lessonIndex--;saveLessonPosition(lessonIndex);go("lesson")}.apply{tag="main-lesson-previous";textSize=14f},LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(8)})
         dock.addView(action(if(lessonIndex==lessons.length()-1)t("Finish reading","पढ़ना पूरा करें")else t("Next lesson","अगला पाठ")){
-            if(lessonIndex==lessons.length()-1)go("module")else{lessonIndex++;go("lesson")}
+            if(lessonIndex==lessons.length()-1){saveLessonPosition(0);go("module")}else{lessonIndex++;saveLessonPosition(lessonIndex);go("lesson")}
         }.apply{tag="main-lesson-next";textSize=14f},LinearLayout.LayoutParams(0,-2,if(lessonIndex>0)1.5f else 1f))
         return dock
     }

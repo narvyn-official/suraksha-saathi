@@ -1,3 +1,4 @@
+import { freshUser } from "@/lib/auth";
 import { z } from "zod/v3";
 import { access, audit, db, failure, json, digest } from "@/lib/server";
 import { curriculum } from "@/lib/grading";
@@ -5,7 +6,7 @@ import { assignmentStatus } from "@/lib/access";
 const id = z.string().uuid();
 const command = z.discriminatedUnion("action", [
   z.object({action:z.literal("settings"),name:z.string().trim().min(2).max(100),site:z.string().trim().max(150)}).strict(),
-  z.object({action:z.literal("member"),email:z.string().trim().email().max(254),role:z.enum(["admin","trainer","viewer"]),active:z.boolean()}).strict(),
+  z.object({action:z.literal("member"),email:z.string().trim().email().max(254),role:z.enum(["admin","trainer","viewer","certifier"]),active:z.boolean()}).strict(),
   z.object({action:z.literal("worker"),id:id.optional(),androidId:id.optional(),name:z.string().trim().min(1).max(80),sector:z.enum(["Unspecified","Mining","Steel","Mica","Other"])}).strict(),
   z.object({action:z.literal("assign"),workerIds:z.array(id).min(1).max(100),moduleId:z.string().max(32),dueAt:z.number().int().positive().max(8640000000000000),note:z.string().trim().max(500)}).strict(),
   z.object({action:z.literal("cancel"),id,reason:z.string().trim().min(5).max(500)}).strict(),
@@ -32,6 +33,7 @@ export async function POST(request:Request) {
     if(c.action==='settings') {
       target=a.owner;statements.push(db().prepare("INSERT INTO training_centres(owner,name,site,updated_at) VALUES(?,?,?,?) ON CONFLICT(owner) DO UPDATE SET name=excluded.name,site=excluded.site,updated_at=excluded.updated_at").bind(a.owner,c.name,c.site,now));
     } else if(c.action==='member') {
+      await freshUser();
       const email=c.email.toLowerCase();if(email===a.user.email.toLowerCase())throw new Error("Invalid member change: you cannot change your own access.");
       const prior=await db().prepare("SELECT user_id FROM team_members WHERE owner=? AND email=?").bind(a.owner,email).first<{user_id:string|null}>();
       if(prior?.user_id===a.owner)throw new Error("Forbidden: the workspace owner's access cannot be changed.");

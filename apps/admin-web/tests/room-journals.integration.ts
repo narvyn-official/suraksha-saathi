@@ -1,5 +1,5 @@
 import { account } from "./auth-client.mjs";
-const identity=await account();
+const identity=await account({approved:true});
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { roomFixture, roomExport } from "./room-fixtures";
@@ -26,7 +26,7 @@ assert.equal((await call("room-journals", ownerExport)).status, 400);
 const forged = structuredClone(complete);forged.id = randomUUID();(forged.mission.result as any).certifiable = true;
 assert.equal((await call("room-journals", exportOf([forged]))).status, 400);
 assert.equal((await call("room-journals", { ...exportOf([complete]), padding: "x".repeat(1_000_001) })).status, 400);
-assert.equal((await call("credentials", { attemptId: initial.id, expiresAt: Date.now() + 86400000 })).status, 400, "Room journals cannot issue credentials");
+assert.equal((await call("credentials", { action:"request", note:"Room journals are not assessments", attemptId: initial.id, expiresAt: Date.now() + 86400000 })).status, 400, "Room journals cannot issue credentials");
 assert.equal((await call("import", exportOf([complete]))).status, 400, "Assessment importer must reject room journals");
 assert.equal((await call("room-journals", exportOf([newGas]))).status, 200);
 for (const module of ["fire", "gas"] as const) { const legacy = roomFixture(1, module);legacy.id = randomUUID();legacy.mode = "screen";delete legacy.coaching;assert.equal((await call("room-journals", exportOf([legacy]))).status, 200); }

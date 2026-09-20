@@ -24,3 +24,13 @@ export async function getAppUser() {
  const result=await auth().api.getSession({headers:await headers()});
  return result ? {userId:result.user.id,email:result.user.email,displayName:result.user.name} : null;
 }
+
+export async function freshUser() {
+ const session=await auth().api.getSession({headers:await headers()});
+ if(!session)throw new Error("Sign in to continue.");
+ if(Date.now()-new Date(session.session.createdAt).getTime()>15*60*1000)throw new Error("Forbidden: sign out and sign in again before this sensitive action (15-minute limit).");
+ return {userId:session.user.id,email:session.user.email,displayName:session.user.name};
+}
+export function isOperator(userId:string) {
+ return ((env as unknown as Record<string,string>).PLATFORM_OPERATOR_IDS??'').split(',').map(v=>v.trim()).filter(Boolean).includes(userId);
+}

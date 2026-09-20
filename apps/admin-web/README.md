@@ -1,12 +1,12 @@
 # SurakshaAr trainer dashboard
 
-Private trainer workspace for importing Android training exports, reviewing decisions, issuing pilot simulation credentials, and checking signatures and revocations.
+Private trainer workspace for importing Android training exports, reviewing decisions, requesting and independently approving pilot simulation credentials, and checking signatures and revocations.
 
 ## Login and admin workspace
 
-See [login, roles, worker management, assignments and audit setup](../../docs/admin-workspace.md). The dashboard now opens on a dedicated sign-in screen, with shared workspaces and Admin / Trainer / Viewer permissions checked server-side. Team invitations are saved in the workspace; no email is sent automatically. Accounts use independent Suraksha email/password authentication, shared with the native Android admin workspace.
+See [login, roles, worker management, assignments and audit setup](../../docs/admin-workspace.md). The dashboard now opens on a dedicated sign-in screen, with shared workspaces and Admin / Trainer / Viewer / Certifier permissions checked server-side. Team invitations are saved in the workspace; no email is sent automatically. Accounts use independent Suraksha email/password authentication, shared with the native Android admin workspace.
 
-Apply migrations through `0007_assessment_import_guard.sql` before running this version. In addition to the existing integration checks, run `npx tsx tests/admin.integration.ts` locally. Its temporary workspace fixtures are removed after the run.
+Apply migrations through `0008_governance.sql` before running this version. In addition to the existing integration checks, run `npx tsx tests/admin.integration.ts` locally. Its temporary workspace fixtures are removed after the run.
 
 ## Local run
 
@@ -23,7 +23,7 @@ npm run dev
 
 Open the printed localhost address and create a Suraksha account. Email/password accounts are independent of ChatGPT. Every API checks the account session and current workspace role; a supplied owner ID cannot grant access. Production requires BETTER_AUTH_URL and BETTER_AUTH_SECRET in backend configuration. See the account recovery and ownership-migration limits in the admin setup guide.
 
-Import the Android JSON export, select **View**, and choose a policy-approved expiry and issue a pilot credential for a passed assessment. Renewal requires a new passed assessment; existing dates cannot be extended. Legacy tokens remain signature-verifiable but display “No expiry recorded” and are excluded from active counts. The QR is signed with ES256. The Android app pins the public issuer key. Offline verification confirms signature and scope, **not** revocation. The dashboard checks its stored current status. Records do not prove the learner's identity or practical competence.
+Follow [operator and centre approval setup](../../docs/government-demo-0.9.0.md) first. Import the Android JSON export, select **View**, and submit the latest current-curriculum passed assessment with a training note and requested expiry. A different certifier reviews the answers and approves or rejects; only approval issues a signed pilot credential. Renewal requires a new passed assessment; existing dates cannot be extended. Legacy tokens remain signature-verifiable but display “No expiry recorded” and are excluded from active counts. The QR is signed with ES256. The Android app pins the public issuer key. Offline verification confirms signature and scope, **not** revocation. The dashboard checks its stored current status. Records do not prove the learner's identity or practical competence.
 
 ## Checks
 
@@ -67,6 +67,6 @@ Reset links expire after 15 minutes and carry their token in the URL fragment. A
 
 For isolated local QA, the account origin and gateway may both use loopback HTTP. Set `RECOVERY_MAIL_URL=http://127.0.0.1:5188/send` and a disposable random key in ignored `.dev.vars`, then run `node tests/local-mail-server.mjs` alongside `npm run dev` and `npx tsx tests/reliability.integration.ts`. The stub accepts only `@example.test` recipients, stores messages in memory and never sends external email. Remove the temporary recovery settings after testing. Integration suites share rate limits: run them sequentially, with their retry handling enabled.
 
-`npm start` serves the built worker on port 5173, matching local account configuration; `PORT=5174 npm start` changes the preview port. The launcher explicitly reads the ignored project `.dev.vars` without copying secrets into `dist`. Stop the development server first. Apply migration 0007 before running the new API; retain backups before any production migration. Database triggers prevent conflicting assessment imports even under concurrent requests; credential uniqueness and audit changes are tested against local D1.
+`npm start` serves the built worker on port 5173, matching local account configuration; `PORT=5174 npm start` changes the preview port. The launcher explicitly reads the ignored project `.dev.vars` without copying secrets into `dist`. Stop the development server first. Apply migration 0008 before running the new API; retain backups before any production migration. Database triggers prevent conflicting assessment imports even under concurrent requests; credential uniqueness and audit changes are tested against local D1.
 
 The GitHub validation workflow checks the web build/types/lint/unit tests and Android build/lint/JVM tests. Full local account/room/reliability integration and the emulator fixture matrix are additional checks; they require configured local services and are not silently represented as CI coverage.

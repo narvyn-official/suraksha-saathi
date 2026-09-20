@@ -1,8 +1,14 @@
 import { db, owner, failure } from "@/lib/server";
 import { credentialView } from "@/lib/credentials";
-export async function GET() {
+export async function GET(request:Request) {
   try {
     const who = await owner();
+    const attemptId=new URL(request.url).searchParams.get('attemptId');
+    if(attemptId){
+      if(!/^[0-9a-f-]{36}$/i.test(attemptId))throw new Error('Invalid assessment reference.');
+      const row=await db().prepare("SELECT a.id,a.worker_id,COALESCE(w.name,a.worker_name) AS worker_name,COALESCE(w.sector,'Unspecified') AS worker_sector,a.payload FROM attempts a LEFT JOIN workers w ON w.owner=a.owner AND w.id=a.worker_id WHERE a.owner=? AND a.id=?").bind(who,attemptId).first();
+      if(!row)throw new Error('No assessment found.');return Response.json({...row,payload:JSON.parse(String(row.payload))},{headers:{'Cache-Control':'no-store'}});
+    }
     const records = await db()
       .prepare(
         "SELECT a.id,a.worker_id,COALESCE(w.name,a.worker_name) AS worker_name,COALESCE(w.sector,'Unspecified') AS worker_sector,a.payload,a.imported_at FROM attempts a LEFT JOIN workers w ON w.owner=a.owner AND w.id=a.worker_id WHERE a.owner=? ORDER BY a.imported_at DESC,a.id DESC LIMIT 500",

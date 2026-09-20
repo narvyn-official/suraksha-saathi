@@ -1,21 +1,28 @@
-import { account } from "./auth-client.mjs";
-const identity=await account();
+import { account, certifierFor } from "./auth-client.mjs";
+const identity=await account({approved:true});
+const certifier=await certifierFor(identity);
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 const curriculum = JSON.parse(
   readFileSync(new URL("../lib/curriculum.json", import.meta.url)),
 );
-async function call(path, body, method = "POST", auth = true) {
+async function call(path, body, method = "POST", auth = true, cookie = identity.cookie) {
   const r = await fetch("http://localhost:5173/api/" + path, {
     method,
     headers: {
       "Content-Type": "application/json",
-      ...(auth ? { Cookie: identity.cookie } : {}),
+      ...(auth ? { Cookie: cookie } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
   return { status: r.status, data: await r.json() };
+}
+// Run the full request/review contract with two independent authenticated accounts.
+async function issue(body) {
+ const request=await call('credentials',{action:'request',note:'Synthetic evidence reviewed for regression testing',...body});
+ if(request.status!==202)return request;
+ return call('credentials',{action:'approve',requestId:request.data.request.id,reason:'Independent synthetic assessment review completed'},'POST',true,certifier.cookie);
 }
 assert.equal((await call("records", undefined, "GET", false)).status, 401);
 const testExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // Test fixture only.
@@ -62,16 +69,16 @@ assert.equal(
 );
 assert.equal(rows.find((r) => r.id === attempts[0].id).worker_sector, "Mining");
 for (const invalidExpiry of [undefined, null, "invalid", testExpiry + .5, 0, now - 1, 8_640_000_000_000_001]) {
-  assert.equal((await call("credentials", { attemptId: attempts[0].id, expiresAt: invalidExpiry })).status, 400);
+  assert.equal((await issue({ attemptId: attempts[0].id, expiresAt: invalidExpiry })).status, 400);
 }
-const machinery = await call("credentials", { attemptId: attempts[2].id, expiresAt: testExpiry });
+const machinery = await issue({ attemptId: attempts[2].id, expiresAt: testExpiry });
 assert.equal(machinery.status, 200);
 assert.equal(
   (await call("verify", { token: machinery.data.token })).data.moduleId,
   "machinery",
 );
 const ppeAttempt = attempts.find((a) => a.moduleId === "ppe");
-const ppeCertificate = await call("credentials", { attemptId: ppeAttempt.id, expiresAt: testExpiry });
+const ppeCertificate = await issue({ attemptId: ppeAttempt.id, expiresAt: testExpiry });
 assert.equal(ppeCertificate.status, 200);
 assert.equal(
   (await call("verify", { token: ppeCertificate.data.token })).data.moduleId,
@@ -79,7 +86,7 @@ assert.equal(
 );
 const emergencyAttempt = attempts.find((a) => a.moduleId === "emergency");
 assert.ok(emergencyAttempt, "Emergency assessment fixture is required");
-const emergencyCertificate = await call("credentials", {
+const emergencyCertificate = await issue({
   attemptId: emergencyAttempt.id,
   expiresAt: testExpiry,
 });
@@ -97,7 +104,7 @@ assert.equal(verifiedEmergency.data.status, "active");
 const v03 = structuredClone(batch);
 v03.attempts = v03.attempts
   .filter((a) => ["fire", "gas", "machinery", "ppe"].includes(a.moduleId))
-  .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.3.0" }));
+  .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.3.0", endedAt: now - 1000, startedAt: now-10000, events:a.events.map(e=>({...e,time:e.time-10000})) }));
 const importedV03 = await call("import", v03);
 assert.equal(importedV03.status, 200, JSON.stringify(importedV03));
 assert.equal(importedV03.data.imported, 4);
@@ -109,7 +116,7 @@ assert.equal((await call("import", falseEmergencyVersion)).status, 400);
 const previous = structuredClone(batch);
 previous.attempts = previous.attempts
   .filter((a) => ["fire", "gas", "machinery"].includes(a.moduleId))
-  .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.2.0" }));
+  .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.2.0", endedAt: now - 1000, startedAt: now-10000, events:a.events.map(e=>({...e,time:e.time-10000})) }));
 const importedV02 = await call("import", previous);
 assert.equal(importedV02.status, 200, JSON.stringify(importedV02));
 assert.equal(importedV02.data.imported, 3);
@@ -121,7 +128,7 @@ assert.equal((await call("import", falseVersion)).status, 400);
 const old = structuredClone(batch);
 old.attempts = old.attempts
   .filter((a) => ["fire", "gas"].includes(a.moduleId))
-  .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.1.0" }));
+  .map((a) => ({ ...a, id: randomUUID(), contentVersion: "0.1.0", endedAt: now - 1000, startedAt: now-10000, events:a.events.map(e=>({...e,time:e.time-10000})) }));
 assert.equal((await call("import", old)).status, 200);
 const unsupported = structuredClone(batch);
 unsupported.attempts = [
@@ -151,7 +158,7 @@ failed.attempts = [
 ];
 assert.equal((await call("import", failed)).status, 200);
 assert.equal(
-  (await call("credentials", { attemptId: failed.attempts[0].id, expiresAt: testExpiry })).status,
+  (await issue({ attemptId: failed.attempts[0].id, expiresAt: testExpiry })).status,
   400,
 );
 const emergencyModule = curriculum.modules.find((m) => m.id === "emergency");
@@ -184,7 +191,7 @@ assert.equal(
   JSON.stringify(importedFailedEmergency),
 );
 assert.equal(
-  (await call("credentials", { attemptId: failedEmergency.attempts[0].id, expiresAt: testExpiry }))
+  (await issue({ attemptId: failedEmergency.attempts[0].id, expiresAt: testExpiry }))
     .status,
   400,
 );
@@ -195,14 +202,14 @@ const invalid = structuredClone(batch);
 invalid.attempts[0].id = randomUUID();
 invalid.attempts[0].events[0].optionId = "invented";
 assert.equal((await call("import", invalid)).status, 400);
-const cert = await call("credentials", { attemptId: attempts[0].id, expiresAt: testExpiry });
+const cert = await issue({ attemptId: attempts[0].id, expiresAt: testExpiry });
 assert.equal(cert.status, 200, JSON.stringify(cert));
 assert.equal(cert.data.expiresAt, testExpiry);
 assert.equal(cert.data.expiryStatus, "within-validity");
-assert.equal((await call("credentials", { attemptId: attempts[0].id, expiresAt: testExpiry + 1000 })).status, 400);
+assert.equal((await issue({ attemptId: attempts[0].id, expiresAt: testExpiry + 1000 })).status, 400);
 assert.equal(
-  (await call("credentials", { attemptId: attempts[0].id, expiresAt: testExpiry })).data.id,
-  cert.data.id,
+  (await issue({ attemptId: attempts[0].id, expiresAt: testExpiry })).status,
+  400, // Renewal requires a fresh assessment; no direct signing retry path.
 );
 assert.equal(
   (await call("verify", { token: cert.data.token })).data.status,
@@ -227,7 +234,7 @@ assert.equal(
   (await call("verify", { token: cert.data.token })).data.status,
   "revoked",
 );
-const active = await call("credentials", { attemptId: attempts[1].id, expiresAt: testExpiry });
+const active = await issue({ attemptId: attempts[1].id, expiresAt: testExpiry });
 assert.equal(active.status, 200);
 mkdirSync(new URL("../../../artifacts", import.meta.url), { recursive: true });
 writeFileSync(

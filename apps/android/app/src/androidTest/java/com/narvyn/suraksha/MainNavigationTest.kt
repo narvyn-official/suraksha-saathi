@@ -143,6 +143,27 @@ class MainNavigationTest {
         assertEquals("Reading must not create assessment evidence",before,Store(context).use{it.attempts().map{a->a.toString()}})
     }
 
+    @Test fun readingBookmarkSurvivesFreshLaunchAndUsesOnlyCurrentLearnerAndVersion(){
+        val prefs=context.getSharedPreferences("lesson-bookmarks",0)
+        val saved=prefs.all.toMap()
+        val oldHi=Store(context).use{it.hi}
+        val key=Store(context).use{"${it.workerId}:${Curriculum(context).version}:fire"}
+        try {
+            Store(context).use{it.hi=false};prefs.edit().clear().commit()
+            ActivityScenario.launch(MainActivity::class.java).use { s ->
+                openModule("fire");clickTag("main-lessons");clickTag("main-lesson-next")
+                assertEquals(1,prefs.getInt(key,-1))
+            }
+            fun assertPosition(index:Int){ActivityScenario.launch(MainActivity::class.java).use{s->
+                openModule("fire");clickTag("main-lessons")
+                s.onActivity{a->assertEquals(Curriculum(context).module("fire").getJSONArray("lessons").getJSONObject(index).local("body",false),all(a.window.decorView).filterIsInstance<TextView>().single{it.tag=="main-lesson-content"}.text.toString())}
+            }}
+            assertPosition(1)
+            prefs.edit().remove(key).putInt("other-learner:${Curriculum(context).version}:fire",1).putInt(key.replace(Curriculum(context).version,"old-curriculum"),1).commit()
+            assertPosition(0)
+        } finally {prefs.edit().clear().apply();val e=prefs.edit();saved.forEach{(k,v)->if(v is Int)e.putInt(k,v)};e.commit();Store(context).use{it.hi=oldHi}}
+    }
+
     @Test fun primaryFireAndGasEntryLaunchesTheCorrectGuidedRoomMission(){
         val oldHi=Store(context).use{it.hi}
         val captured=AtomicReference<Intent?>()

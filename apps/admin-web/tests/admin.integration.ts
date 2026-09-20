@@ -1,5 +1,5 @@
-import { account } from "./auth-client.mjs";
-const identity=await account();
+import { account, approveLocalCentre } from "./auth-client.mjs";
+const identity=await account({approved:true});
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readdirSync } from 'node:fs';
@@ -16,6 +16,7 @@ async function call(path:string,body?:unknown,options:{auth?:boolean;space?:stri
 }
 function member(role:string,active=1){database.prepare('UPDATE team_members SET role=?,active=? WHERE owner=?').run(role,active,owner);}
 try {
+ approveLocalCentre(owner);
  database.prepare('INSERT INTO team_members(owner,email,user_id,role,active,updated_at) VALUES(?,?,?,?,1,?)').run(owner,email,actor,'admin',Date.now());
  assert.equal((await call('admin/session',undefined,{auth:false})).status,401);
  const forged=await fetch(`${root}/api/admin/session`,{headers:{Cookie:'__sites_local_auth=1'}});assert.equal(forged.status,401);
@@ -49,7 +50,7 @@ try {
  database.prepare('UPDATE training_assignments SET due_at=? WHERE owner=?').run(Date.now()-1,owner);assert.equal((await getAssignment()).status,'overdue');
  assert.equal((await call('admin/manage',{action:'cancel',id:assigned.data.id,reason:'Fixture cancellation'})).status,200);assert.equal((await getAssignment()).status,'cancelled');
  member('viewer');assert.equal((await call('records')).status,200);assert.equal((await call('admin/manage')).data.team.length,0);
- for(const path of ['import','room-journals','credentials'])assert.equal((await call(path,{attemptId:passed.id})).status,403,`${path} viewer writes`);
+ for(const path of ['import','room-journals','credentials'])assert.equal((await call(path,path==='credentials'?{action:'request',attemptId:passed.id,expiresAt:Date.now()+86400000,note:'Viewer cannot submit requests'}:{attemptId:passed.id})).status,403,`${path} viewer writes`);
  assert.equal((await call('credentials',{id:randomUUID(),reason:'Fixture revoke'},{method:'PATCH'})).status,403);
  assert.equal((await call('admin/manage',{action:'worker',name:'Denied',sector:'Other'})).status,403);
  member('trainer');assert.equal((await call('admin/manage',{action:'worker',id:workerId,name:'Demo worker · edited',sector:'Steel'})).status,200);
@@ -62,6 +63,6 @@ try {
  assert.equal((await call('admin/session',{owner:actor})).status,200,'revoked member can recover personal workspace');
  console.log('Admin API integration passed: login boundary, header spoofing, invitations, isolated workspaces, all roles, revoked access, worker management, assignment evidence/overdue/cancellation, audit and request origin.');
 } finally {
- for(const table of ['credentials','attempts','workers','training_assignments','audit_log','team_members','training_centres'])database.prepare(`DELETE FROM ${table} WHERE owner=?`).run(owner);
+ for(const table of ['centre_approvals','certification_requests','credentials','attempts','workers','training_assignments','audit_log','team_members','training_centres'])database.prepare(`DELETE FROM ${table} WHERE owner=?`).run(owner);
  database.close();
 }

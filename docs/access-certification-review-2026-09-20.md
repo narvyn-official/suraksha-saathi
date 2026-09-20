@@ -2,6 +2,8 @@
 
 Reviewed from `79cad92` after the 0.8.0 checks. Scope: identity, workspace ownership, team roles, revocation, assessment-to-credential flow, and native credential delivery. This is a focused product/access review, not a full security audit or certification-policy approval.
 
+> Historical 0.8.1 review. The user subsequently chose centre approval plus independent certification review; [0.9.0 implements that model](government-demo-0.9.0.md). The matrices and pending decision below describe the earlier state.
+
 ## Findings
 
 | Priority | Finding | Status |

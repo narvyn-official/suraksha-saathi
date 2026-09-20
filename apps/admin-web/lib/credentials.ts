@@ -81,5 +81,5 @@ export async function verify(raw: unknown, now = Date.now()) {
 export function credentialView<T extends { token: string; revoked_at: number | null }>(row: T, now = Date.now()) {
   const payload = JSON.parse(new TextDecoder().decode(decode(row.token.split(".")[1])));
   const dates = validity(payload, now);
-  return { ...row, moduleId: payload.moduleId, workerRef: payload.workerRef, score: payload.score, expiresAt: payload.expiresAt ?? null, ...dates, status: credentialStatus(dates, row.revoked_at) };
+  return { ...row, governanceVersion: payload.governanceVersion ?? null, centreName: payload.centreName ?? null, approvedBy: payload.approvedBy ?? null, workerName: payload.workerName ?? null, moduleId: payload.moduleId, workerRef: payload.workerRef, score: payload.score, expiresAt: payload.expiresAt ?? null, ...dates, status: credentialStatus(dates, row.revoked_at) };
 }

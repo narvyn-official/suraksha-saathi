@@ -1,29 +1,31 @@
 import { env } from "cloudflare:workers";
 import { headers } from "next/headers";
-import { permitted, type Role } from "@/lib/access";
+import { permitted, type Role, type Permission } from "@/lib/access";
 import { getAppUser } from "@/lib/auth";
 export function db() {
   if (!env.DB) throw new Error("Training storage is unavailable.");
   return env.DB as D1Database;
 }
 export type Access = { owner: string; role: Role; user: NonNullable<Awaited<ReturnType<typeof getAppUser>>> };
-export async function access(permission: "read" | "write" | "admin" = "read"): Promise<Access> {
+export async function access(permission: Permission = "read"): Promise<Access> {
   const user = await getAppUser();
   if (!user) throw new Error("Sign in to access training records.");
   const cookie = (await headers()).get("cookie") ?? "";
   const value = cookie.split(";").map(v => v.trim()).find(v => v.startsWith("suraksha_workspace="))?.split("=").slice(1).join("=");
   let who = user.userId;
   if (value) { try { who = decodeURIComponent(value); } catch { throw new Error("Forbidden workspace."); } }
+  const centre=await db().prepare("SELECT status FROM centre_approvals WHERE owner=?").bind(who).first<{status:string}>();
+  if(centre?.status!=="approved")throw new Error("Forbidden centre: approval is required or access has been suspended.");
   let role: Role = "admin";
   if (who !== user.userId) {
     const member = await db().prepare("SELECT role FROM team_members WHERE owner=? AND user_id=? AND active=1").bind(who, user.userId).first<{role: Role}>();
-    if (!member || !["admin", "trainer", "viewer"].includes(member.role)) throw new Error("Forbidden workspace. Select your personal workspace to continue.");
+    if (!member || !["admin", "trainer", "viewer", "certifier"].includes(member.role)) throw new Error("Forbidden workspace. Choose an approved workspace or join a centre.");
     role = member.role;
   }
   if (!permitted(role, permission)) throw new Error("Forbidden: your role does not allow this action.");
   return {owner: who, role, user};
 }
-export async function owner(permission: "read" | "write" | "admin" = "read") { return (await access(permission)).owner; }
+export async function owner(permission: Permission = "read") { return (await access(permission)).owner; }
 export function audit(a: Access, action: string, target: string, detail: unknown = {}, onlyAfterChange = false) {
   return db().prepare("INSERT INTO audit_log(id,owner,actor,actor_email,action,target,detail,at) SELECT ?,?,?,?,?,?,?,?" + (onlyAfterChange ? " WHERE changes() > 0" : ""))
     .bind(crypto.randomUUID(), a.owner, a.user.userId, a.user.email, action, target, JSON.stringify(detail), Date.now());

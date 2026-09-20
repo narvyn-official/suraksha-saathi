@@ -1,8 +1,8 @@
 # SurakshaAr
 
-A **v0.8.1 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with fixed screens and a light interface.
+A **v0.9.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with fixed screens and a light interface.
 
-**Current source: 0.8.1 — SurakshaAr.** The rename keeps the existing Android package, local histories and credential trust compatible. This update adds account recovery support, stronger request limits, concurrent-write protection, reliable workspace refresh and dependency fixes. See [the complete review, verification and remaining gates](docs/surakshaar-review-2026-09-20.md). Build the current APK with the command below; the published downloads listed here are historical 0.7.1 assets.
+**Current source: 0.9.0 — SurakshaAr.** Approved centres, separate trainer/certifier review, signed approval provenance, persistent learner reading positions and deferred dashboard assets are implemented for a controlled government demonstration. See [setup, roles and the demonstration guide](docs/government-demo-0.9.0.md) and [release verification](docs/release-0.9.0.md). Existing centres require explicit approval after migration; this is not government accreditation. The published downloads below are historical 0.7.1 assets.
 
 **Latest published download: [v0.7.1 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.7.1-pilot)**
 
@@ -14,7 +14,7 @@ A **v0.8.1 pilot** for Android safety learning and trainer review, built for Jha
 
 **In the published 0.6.0 version:** 0.6.0 expands fire room practice through exit selection, evacuation, assembly and reporting, adds an explosion-risk evacuation branch and gas PPE/buddy checks, introduces paged native lessons and saved room-practice recovery, and connects separate room journals to trainer review. All four camera paths share camera configuration, pacing, thermal recovery and session-release handling. See [implementation, verification and remaining gaps](docs/release-0.6.0.md). The latest physical checks and remaining scope are in the 0.7.1 release report; this remains a pilot prerelease.
 
-The [access and certification follow-up](docs/access-certification-review-2026-09-20.md) fixes credential sharing/import and revoked-workspace recovery, and identifies the outstanding approval-policy decision.
+The [access and certification follow-up](docs/access-certification-review-2026-09-20.md) fixes credential sharing/import and revoked-workspace recovery, records the earlier findings; the [0.9.0 government demonstration guide](docs/government-demo-0.9.0.md) implements the selected approval model.
 
 ## What you can use now
 
@@ -43,7 +43,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/surakshaar-0.8.1-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own trainer-issued credentials:
+The debug-signed APK is copied to `artifacts/surakshaar-0.9.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own independently approved pilot credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs
@@ -53,7 +53,7 @@ The command creates an ignored private runtime key and matching public trust fil
 
 ## Login and administration
 
-The web dashboard now includes a sign-in screen, shared workspaces, Admin/Trainer/Viewer roles, staff invitations, worker registration/editing, bulk training assignments, overdue tracking, CSV reports and an activity log. See [admin setup and validation](docs/admin-workspace.md). The 0.7.0 development APK adds a native training-centre workspace and independent Suraksha accounts. Public hosting remains unresolved.
+The web dashboard now includes a sign-in screen, shared workspaces, Admin/Trainer/Viewer/Certifier roles, staff invitations, worker registration/editing, bulk training assignments, overdue tracking, CSV reports and an activity log. See [admin setup and validation](docs/admin-workspace.md). The 0.7.0 development APK adds a native training-centre workspace and independent Suraksha accounts. Public hosting remains unresolved.
 
 ## Run the dashboard
 
@@ -64,7 +64,7 @@ npx wrangler d1 migrations apply DB --local --config wrangler.local.json --persi
 npm run dev
 ```
 
-Open the printed localhost address and select **Sign in** for the local development identity. Complete training on Android, use **My record → Export records for trainer**, and import the JSON in the dashboard. Open a passed assessment, choose the expiry approved by the site training policy, issue its pilot credential, then scan the QR or open its downloaded text file in Android.
+Open the printed localhost address and create/sign in to an independent account. Follow the [operator and centre approval setup](docs/government-demo-0.9.0.md) before managing records. Complete training on Android, use **My record → Export records for trainer**, and import the JSON in the dashboard. Open a passed assessment, choose the expiry approved by the site training policy, request certification review, have a different certifier approve it, then scan the QR or open its downloaded text file in Android.
 
 For room practice, use **My record → Export room practice journals** and the separate **Room practice** dashboard tab. These histories cannot issue certificates.
 

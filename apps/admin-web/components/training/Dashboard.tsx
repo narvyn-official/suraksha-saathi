@@ -1,4 +1,7 @@
 "use client";
+import {GovernancePanel} from "./GovernancePanel";
+import {CertificationQueue} from "./CertificationQueue";
+import {permitted} from "@/lib/access";
 import { DialogContent } from "./WorkspaceDialog";
 import { useEffect, useState, useCallback, useRef } from "react";
 import {
@@ -53,11 +56,9 @@ import {
   EmptyMedia,
 } from "@/components/ui/empty";
 import { Skeleton } from "@/components/ui/skeleton";
-import QRCode from "qrcode";
-import {
-  TrainingInsights,
-  WorkerDirectory,
-} from "@/components/training/Insights";
+import {lazy,Suspense} from "react";
+const TrainingInsights=lazy(()=>import("./Insights").then(m=>({default:m.TrainingInsights})));
+const WorkerDirectory=lazy(()=>import("./Insights").then(m=>({default:m.WorkerDirectory})));
 import { curriculum, curriculumFor } from "@/lib/grading";
 import { recordStatus, statusLabel, credentialStatus, validity } from "@/lib/validity";
 type Row = {
@@ -67,7 +68,8 @@ type Row = {
   worker_sector?: string;
   payload: import("@/lib/insights").TrainingRow["payload"];
 };
-type Credential = {
+type ApprovalMetadata = {governanceVersion?:number|null;centreName?:string|null;approvedBy?:string|null;workerName?:string|null};
+type Credential = ApprovalMetadata & {
   id: string;
   attempt_id: string;
   token: string;
@@ -78,7 +80,7 @@ type Credential = {
 };
 import { requestJson } from "@/lib/client-api";
 const api = <T,>(path:string,method="GET",body?:unknown) => requestJson<T>(`/api/${path}`,method,body);
-type Verification = { iat:number;expiresAt?:number|null;revocationStatus:string;moduleId:string;score:number;reason?:string;message?:string };
+type Verification = ApprovalMetadata & { iat:number;expiresAt?:number|null;revocationStatus:string;moduleId:string;score:number;reason?:string;message?:string };
 const title = (id: string) =>
   curriculum.modules.find((m) => m.id === id)?.title[0] ?? id;
 function download(name: string, content: string, type = "application/json") {
@@ -92,9 +94,9 @@ function download(name: string, content: string, type = "application/json") {
 export default function Home() {
   const [refreshVersion,setRefreshVersion]=useState(0);
   const [session, setSession] = useState<AdminSession | null>(null);
-  const writable = session?.current != null && session.current.role !== "viewer";
+  const writable = session?.current != null && permitted(session.current.role,"write");
   const [requestedTab, setActiveTab] = useState("insights");
-  const tab=session?.current?.role!=="admin"&&["settings","team"].includes(requestedTab)?"insights":requestedTab;
+  const tab=session&&!session.current?"access":session?.current?.role!=="admin"&&["settings","team"].includes(requestedTab)?"insights":requestedTab;
   const [workerView,setWorkerView]=useState("register");
   const setTab = useCallback((id:string) => {
     if (!destinations.some(d=>d.id===id)) return;
@@ -106,6 +108,7 @@ export default function Home() {
   useEffect(()=>{const read=()=>{const id=window.location.hash.slice(1);setActiveTab(destinations.some(d=>d.id===id)?id:"insights");};read();window.addEventListener("popstate",read);window.addEventListener("hashchange",read);return()=>{window.removeEventListener("popstate",read);window.removeEventListener("hashchange",read)};},[]);
   useEffect(()=>{document.title=`${destinations.find(d=>d.id===tab)?.title??"Training centre"} · SurakshaAr`;},[tab]);
   const [expiryInput, setExpiryInput] = useState("");
+  const [evidenceNote,setEvidenceNote]=useState("");
   const [clock, setClock] = useState(()=>Date.now());
   useEffect(() => { const timer = setInterval(() => setClock(Date.now()), 30_000); return () => clearInterval(timer); }, []);
   const [records, setRecords] = useState<Row[]>([]),
@@ -122,7 +125,7 @@ export default function Home() {
     [verification, setVerification] = useState<Verification | null>(null),
     [revoke, setRevoke] = useState<Credential | null>(null),
     [reason, setReason] = useState("");
-  const selectRecord=(row:Row)=>{setExpiryInput("");setSelected(row);};
+  const selectRecord=(row:Row)=>{setExpiryInput("");setEvidenceNote("");setSelected(row);};
   const qr=active?.token===qrImage?.token?qrImage?.url??"":"";
   const [coverage, setCoverage] = useState({
     returned: 0,
@@ -137,7 +140,7 @@ export default function Home() {
     const d = await api<{attempts:Row[];credentials:Credential[];coverage:{returned:number;total:number;truncated:boolean}}>("records");
     setRecords(d.attempts);
     if (d.coverage) setCoverage(d.coverage);
-    setCredentials(d.credentials);setRefreshVersion(v=>v+1);
+    setClock(Date.now());setCredentials(d.credentials);setRefreshVersion(v=>v+1);
     } catch(error) {setRecords([]);setCredentials([]);setSelected(null);setActive(null);setRevoke(null);setVerification(null);setSession(null);throw error;}
   }, []);
   useEffect(() => {
@@ -148,11 +151,11 @@ export default function Home() {
   useEffect(() => {
     let alive = true;
     if (active)
-      QRCode.toDataURL(`SURAKSHA:CREDENTIAL:${active.token}`, {
-        width: 360,
+      import("qrcode").then(({default:QRCode})=>QRCode.toDataURL(`SURAKSHA:CREDENTIAL:${active.token}`, {
+        width: 768,
         margin: 4,
         errorCorrectionLevel: "M",
-      })
+      }))
         .then((url) => {
           if (alive) setQrImage({token:active.token,url});
         })
@@ -170,7 +173,7 @@ export default function Home() {
     setToken(value);
     setVerification(null);
     const result = await api<Verification>("verify", "POST", { token: value });
-    setVerification(result);
+    setClock(Date.now());setVerification(result);
     return result;
   }, [setTab]);
   useEffect(() => {
@@ -235,12 +238,12 @@ export default function Home() {
       if (existing) { setActive(existing); setSelected(null); return; }
       const expiresAt = new Date(expiryInput).getTime();
       if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error("Choose a future expiry approved by your site’s training policy.");
-      const result = await api<Credential>("credentials", "POST", { attemptId: row.id, expiresAt });
+      await api("credentials", "POST", {action:"request", attemptId: row.id, expiresAt,note:evidenceNote });
       await load();
-      setActive(result);
+
       setExpiryInput("");
       setSelected(null);
-      setMessage("Pilot simulation credential issued.");
+      setMessage("Certification request submitted. A different authorized certifier must review it.");
     });
   }
 
@@ -292,7 +295,8 @@ export default function Home() {
           ))}
         </div>
         }
-        {session && !session.current && <p className="notice" role="status">You no longer have access to the selected workspace. Choose an available workspace above or use the account menu to join a centre. Your account is still signed in.</p>}
+        {session && (tab==="access"||!session.current) && <GovernancePanel onChange={load}/>}
+        {session && !session.current && <p className="notice" role="status">Choose an approved workspace above, request centre approval, or join with your private invitation code. Your account remains signed in.</p>}
         {error && (
           <div role="alert" className="notice error">
             {error}{" "}
@@ -311,7 +315,8 @@ export default function Home() {
             {message}
           </div>
         )}
-        {session?.current && <>
+        {session?.current && <Suspense fallback={<p role="status">Loading workspace tools…</p>}>
+        {tab==="credentials"&&session&&<CertificationQueue session={session} refreshVersion={refreshVersion} onChange={load} onReview={id=>void run(async()=>{const row=await api<Row>(`records?attemptId=${encodeURIComponent(id)}`);selectRecord(row)})}/>}
         {coverage.truncated && (
           <div className="notice">
             Showing the latest {coverage.returned} of {coverage.total} imported
@@ -515,7 +520,7 @@ export default function Home() {
                           <Button variant="ghost" onClick={() => setActive(c)}>
                             View QR
                           </Button>
-                          {writable && !c.revoked_at && (
+                          {session?.current&&permitted(session.current.role,"revoke") && !c.revoked_at && (
                             <Button
                               variant="destructive"
                               onClick={() => {
@@ -627,13 +632,13 @@ export default function Home() {
                       "Current status checked in this workspace."}
                   </p>
                   <p>{verification.expiresAt == null ? "No expiry recorded; current validity is not established." : `Recorded expiry: ${new Date(verification.expiresAt).toLocaleString()}`}</p>
-                  <p>Signature verified. Practical observation: not assessed.</p>
+                  <p>Signature verified. Practical observation: not assessed.</p><p>{verification.governanceVersion===1 ? `Independent review recorded · ${verification.centreName}` : "Legacy record: independent centre approval is not recorded in this signature."}</p>
                 </div>
               )}
             </section>
           </section>}
           {session?.current && (["assignments","audit",...(session.current.role === "admin"?["team","settings"]:[])] as ("assignments"|"audit"|"team"|"settings")[]).map(view=>tab===view&&<section key={view} aria-label={view}><AdminPanel refreshVersion={refreshVersion} view={view} session={session} onChange={load}/></section>)}
-        </>}
+        </Suspense>}
       </WorkspaceShell>
       <Dialog
         open={!!selected}
@@ -684,7 +689,7 @@ export default function Home() {
                 selected.payload.result.passed && (
                   <>
                     <p className="fine">
-                      Issue a pilot simulation credential. This does not certify
+                      Request independent review of this simulation assessment. This does not certify
                       identity, practical competence or statutory compliance.
                     </p>
                     {credentials.some((c) => c.attempt_id === selected.id) ? (
@@ -693,11 +698,12 @@ export default function Home() {
                       <>
                         <label htmlFor="credential-expiry" className="field-label">Expiry date and time · your local time</label>
                         <Input id="credential-expiry" type="datetime-local" value={expiryInput} onChange={(e) => setExpiryInput(e.target.value)} required aria-describedby="expiry-policy" />
-                        <p id="expiry-policy" className="fine">Use the date approved in your site’s training policy. No statutory validity period is assumed.</p>
+                        <label htmlFor="evidence-note">Evidence / training note</label><Input id="evidence-note" value={evidenceNote} onChange={e=>setEvidenceNote(e.target.value)} minLength={10} maxLength={500} required/>
+                        <p id="expiry-policy" className="fine">Use your approved site policy, at most one year. No statutory validity period is assumed.</p>
                       </>
                     )}
-                    <Button disabled={busy || (!credentials.some((c) => c.attempt_id === selected.id) && !expiryInput)} onClick={() => issue(selected)}>
-                      {credentials.some((c) => c.attempt_id === selected.id) ? "View existing credential" : "Issue pilot credential"}
+                    <Button disabled={busy || (!credentials.some((c) => c.attempt_id === selected.id) && (!expiryInput||evidenceNote.trim().length<10))} onClick={() => issue(selected)}>
+                      {credentials.some((c) => c.attempt_id === selected.id) ? "View existing credential" : "Request certification review"}
                     </Button>
                   </>
                 )}
@@ -723,6 +729,7 @@ export default function Home() {
             </DialogDescription>
           </DialogHeader>
           {active && <p role="status">{statusLabel(recordStatus(active, clock))}<br />{active.expiresAt == null ? "No expiry recorded" : `Expires ${new Date(active.expiresAt).toLocaleString()}`}</p>}
+          {active && <p>{active.governanceVersion===1 ? `Independent review recorded · ${active.centreName}` : "Legacy record: independent approval is not recorded."}<br/>Government accreditation is not claimed.</p>}
           {qr ? (
             <>{/* Generated QR data URL: image optimization must not change encoded modules. */}
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -794,7 +801,7 @@ export default function Home() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              disabled={busy || reason.trim().length < 5}
+              disabled={busy || reason.trim().length < 10}
               onClick={() =>
                 run(async () => {
                   await api("credentials", "PATCH", { id: revoke!.id, reason });
