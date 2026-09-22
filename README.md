@@ -2,13 +2,13 @@
 
 A **v0.9.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with fixed screens and a light interface.
 
-**Current source: 0.9.0 — SurakshaAr.** Approved centres, separate trainer/certifier review, signed approval provenance, persistent learner reading positions and deferred dashboard assets are implemented for a controlled government demonstration. See [setup, roles and the demonstration guide](docs/government-demo-0.9.0.md) and [release verification](docs/release-0.9.0.md). Existing centres require explicit approval after migration; this is not government accreditation. The published downloads below are historical 0.7.1 assets.
+**Current source: 0.9.0 — SurakshaAr.** Approved centres, separate trainer/certifier review, signed approval provenance, persistent learner reading positions and deferred dashboard assets are implemented for a controlled government demonstration. See [setup, roles and the demonstration guide](docs/government-demo-0.9.0.md) and [release verification](docs/release-0.9.0.md). Existing centres require explicit approval after migration; this is not government accreditation. Download the tested 0.9.0 build below.
 
-**Latest published download: [v0.7.1 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.7.1-pilot)**
+**Latest published download: [SurakshaAr v0.9.0 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.9.0-pilot)**
 
-- [Download the Android APK — v0.7.1](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.7.1-pilot/suraksha-saathi-0.7.1-debug.apk) · Android 10+, debug-signed pilot.
+- [Download the Android APK — SurakshaAr v0.9.0](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.9.0-pilot/surakshaar-0.9.0-debug.apk) · Android 10+, debug-signed pilot.
 - [Watch the earlier v0.6.0 emulator walkthrough](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/suraksha-saathi-0.6.0-emulator-demo.mp4) · Screen fire/gas and explosion-evacuation practice; not physical AR evidence.
-- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.7.1-pilot/SHA256SUMS-0.7.1.txt).
+- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.9.0-pilot/SHA256SUMS-0.9.0.txt).
 
 **Previously published (0.7.1):** fixed learner/admin screens with explicit page controls and focused popups, automatic English/Hindi instructions, corrected Android Back navigation, detailed fire-type/agent learning and improved AR surface placement with a 20 cm virtual-footprint gap. Samsung phone checks confirm tracking, placement and automatic Hindi speech; earlier fire-evacuation and outside-only gas branches completed on the same phone. See [0.7.1 changes and validation](docs/release-0.7.1.md). **Public account hosting remains pending; native administration requires a configured account server.**
 
