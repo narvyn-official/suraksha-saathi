@@ -1,4 +1,5 @@
 "use client";
+import {InstructorPanel} from "./InstructorPanel";
 import {GovernancePanel} from "./GovernancePanel";
 import {CertificationQueue} from "./CertificationQueue";
 import {permitted} from "@/lib/access";
@@ -316,6 +317,7 @@ export default function Home() {
           </div>
         )}
         {session?.current && <Suspense fallback={<p role="status">Loading workspace tools…</p>}>
+        {tab==="instructors"&&session&&<InstructorPanel session={session} refreshVersion={refreshVersion}/>}
         {tab==="credentials"&&session&&<CertificationQueue session={session} refreshVersion={refreshVersion} onChange={load} onReview={id=>void run(async()=>{const row=await api<Row>(`records?attemptId=${encodeURIComponent(id)}`);selectRecord(row)})}/>}
         {coverage.truncated && (
           <div className="notice">

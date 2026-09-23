@@ -11,9 +11,10 @@ object ProcedureSpatial {
     const val MAX_GAP_MS = 150L
     data class Zone(val id: String, val center: FloatArray, val radius: Float)
     data class Hit(val id: String, val error: Float)
-    fun supported(step: String) = step in setOf("fire-aim", "fire-sweep-left", "fire-sweep-right", "fire-sweep-return", "gas-attendant")
+    fun supported(step: String) = ScenarioAdditions.modules.values.flatten().any{it.id==step} || step in setOf("fire-aim", "fire-sweep-left", "fire-sweep-right", "fire-sweep-return", "gas-attendant")
     fun zones(step: String): List<Zone> {
         if (!supported(step)) return emptyList()
+        ScenarioAdditions.modules.values.flatten().firstOrNull{it.id==step}?.let{task->return task.actions.map{Zone(it.id,it.point,.085f)}}
         if (step == "gas-attendant") return listOf(
             Zone(step, floatArrayOf(-.365f,.05f,.22f),.085f),
             Zone("$step-unsafe",floatArrayOf(.265f,.05f,-.205f),.085f))

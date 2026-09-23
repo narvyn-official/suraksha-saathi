@@ -210,7 +210,7 @@ class RoomMission(val module: String, val explosionRisk: Boolean = false) {
                 .put("durationMs", value.durationMs).put("samples", value.samples).put("maxGapMs", value.maxGapMs)
                 .put("bins", JSONArray(value.bins)))
         } })
-        .put("scenario", JSONObject().put("simulated", true).put("catalogVersion", ProcedureCatalog.VERSION)
+        .put("scenario", JSONObject().put("simulated", true).put("catalogVersion", 1)
             .apply { if (module == "gas") {
                 put("meter", "SIM").put("liveReading", false).put("rescueReadiness", "unconfirmed").put("entryAuthorised", false)
                 put("ppe", "draft-scenario-kit-for-outside-role").put("ppeAuthorisesEntry", false)

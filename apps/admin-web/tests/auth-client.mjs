@@ -16,7 +16,7 @@ export async function account({approved=false}={}){
 
 // Explicit synthetic fixture, never a production signup path or HTTP bypass.
 import {DatabaseSync} from 'node:sqlite';
-import {readdirSync} from 'node:fs';
+import {readdirSync,readFileSync} from 'node:fs';
 export function localDatabase(){
  const dir='.wrangler/state/v3/d1/miniflare-D1DatabaseObject';
  const file=readdirSync(dir).find(f=>f.endsWith('.sqlite')&&f!=='metadata.sqlite');
@@ -34,4 +34,19 @@ export async function certifierFor(owner){
  db.prepare("INSERT INTO team_members(owner,email,user_id,role,active,updated_at) VALUES(?,?,?,'certifier',1,?)").run(owner.userId,person.email,person.userId,Date.now());
  }finally{db.close()}
  return {...person,cookie:person.cookie+'; suraksha_workspace='+encodeURIComponent(owner.userId)};
+}
+
+/** Synthetic curriculum prerequisites for legacy API regression fixtures; never exposed over HTTP. */
+export function seedCourseForAttempt(owner,id){
+ const db=localDatabase();try{
+  const user=db.prepare('SELECT email FROM auth_user WHERE id=?').get(owner);assert(user?.email.endsWith('@example.test'),'Only synthetic QA accounts may be seeded');
+  const row=db.prepare('SELECT worker_id,payload FROM attempts WHERE owner=? AND id=?').get(owner,id);if(!row)return;
+  const attempt=JSON.parse(row.payload),catalog=JSON.parse(readFileSync(new URL('../lib/scenario-catalog.json',import.meta.url),'utf8'))['2'],steps=catalog[attempt.moduleId];if(!steps)return;
+  const marker='course-qa-'+attempt.moduleId;if(db.prepare('SELECT 1 FROM learning_snapshots WHERE owner=? AND worker_id=? AND device_id=?').get(owner,row.worker_id,marker))return;
+  db.prepare('INSERT INTO learning_snapshots VALUES(?,?,?,?,?,?)').run(owner,row.worker_id,marker,1,JSON.stringify({contentVersion:'0.4.0',lessons:[attempt.moduleId]}),Date.now());
+  for(const guided of [true,false]){let at=Date.now()-10000;const createdAt=at,events=[],flags={};for(const step of steps){events.push({type:'action',sequence:events.length+1,step,action:step,presentation:'description',correct:true,time:++at});flags[step]=true;events.push({type:'advance',sequence:events.length+1,step,time:++at})}
+   const record={schemaVersion:1,catalogVersion:2,id:randomUUID(),workerId:row.worker_id,module:attempt.moduleId,guided,createdAt,updatedAt:at,index:steps.length-1,finished:true,feedback:false,lastCorrect:true,flags,events,criticalFailures:[],completedAt:at,result:{complete:true,stopped:false,criticalFailures:[],practical:'not-assessed',certifiable:false}};
+   db.prepare('INSERT INTO procedure_evidence VALUES(?,?,?,?,?)').run(owner,record.id,row.worker_id,JSON.stringify(record),at);
+  }
+ }finally{db.close()}
 }

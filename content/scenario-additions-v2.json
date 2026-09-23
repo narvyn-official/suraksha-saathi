@@ -1,0 +1,1066 @@
+{
+  "fire": [
+    {
+      "id": "fire-service",
+      "title": "Inspect the virtual inspection label: service status is unconfirmed.",
+      "hindi": "काल्पनिक जाँच लेबल में सेवा स्थिति अपुष्ट है।",
+      "explanation": "An unconfirmed unit is not accepted in this scenario. The next scene supplies a confirmed replacement.",
+      "hindiExplanation": "अपुष्ट उपकरण इस दृश्य में स्वीकार्य नहीं। अगले दृश्य में जाँचा विकल्प मिलेगा।",
+      "actions": [
+        {
+          "id": "fire-service",
+          "label": "Set this unit aside and request a confirmed replacement",
+          "hindi": "यह उपकरण अलग रखकर जाँचा विकल्प माँगें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "fire-service-unsafe",
+          "label": "Treat the label as optional",
+          "hindi": "लेबल को गैरज़रूरी मानें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fire-hose",
+      "title": "The replacement has a visibly damaged hose. Inspect before selecting it.",
+      "hindi": "बदले उपकरण की नली खराब है। चुनने से पहले देखें।",
+      "explanation": "Inspect condition as well as suitability. This rejection changes the scenario to a further replacement.",
+      "hindiExplanation": "उपयुक्तता के साथ स्थिति भी जाँचें। अस्वीकार करने पर दृश्य में दूसरा विकल्प आएगा।",
+      "actions": [
+        {
+          "id": "fire-hose",
+          "label": "Reject the damaged unit",
+          "hindi": "खराब उपकरण अस्वीकार करें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "fire-hose-unsafe",
+          "label": "Cover the damage and continue",
+          "hindi": "खराब हिस्सा ढककर जारी रखें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fire-gauge",
+      "title": "A new unit has a model-specific status indicator.",
+      "hindi": "नए उपकरण पर मॉडल-विशिष्ट स्थिति संकेतक है।",
+      "explanation": "Illustrations are not manufacturer instructions. Only the scenario label confirms this unit.",
+      "hindiExplanation": "चित्र निर्माता के निर्देश नहीं हैं। इस उपकरण की पुष्टि दृश्य का लेबल करता है।",
+      "actions": [
+        {
+          "id": "fire-gauge",
+          "label": "Compare the indicator with its approved label",
+          "hindi": "संकेतक को स्वीकृत लेबल से मिलाएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "fire-gauge-unsafe",
+          "label": "Assume every indicator uses the same limits",
+          "hindi": "सभी संकेतकों की सीमा एक मानें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fire-handover",
+      "title": "At assembly, the responsible person asks what happened.",
+      "hindi": "एकत्र स्थल पर प्रभारी घटना पूछता है।",
+      "explanation": "A clear handover separates observed information from assumptions.",
+      "hindiExplanation": "स्पष्ट सूचना में देखी जानकारी और अनुमान अलग रखें।",
+      "actions": [
+        {
+          "id": "fire-handover",
+          "label": "Report location, changed conditions and missing colleague",
+          "hindi": "जगह, बदले हालात और लापता साथी बताएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "fire-handover-unsafe",
+          "label": "Report that the site is safe without evidence",
+          "hindi": "बिना प्रमाण स्थल सुरक्षित बताएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    }
+  ],
+  "gas": [
+    {
+      "id": "gas-instrument",
+      "title": "The SIM instrument shows a low-battery warning.",
+      "hindi": "SIM उपकरण कम बैटरी दिखाता है।",
+      "explanation": "The phone is never a gas detector. The instrument status is a scenario prompt.",
+      "hindiExplanation": "फ़ोन गैस जाँच उपकरण नहीं है। उपकरण की स्थिति दृश्य का संकेत है।",
+      "actions": [
+        {
+          "id": "gas-instrument",
+          "label": "Flag the instrument and request an authorised check",
+          "hindi": "उपकरण चिन्हित करके अधिकृत जाँच माँगें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "gas-instrument-unsafe",
+          "label": "Treat SIM as an atmospheric reading",
+          "hindi": "SIM को वातावरण की रीडिंग मानें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gas-record",
+      "title": "The instrument check record is missing.",
+      "hindi": "उपकरण की जाँच का रिकॉर्ड नहीं है।",
+      "explanation": "Missing verification is not a passed check. Do not invent measurements.",
+      "hindiExplanation": "अपुष्ट जाँच पास नहीं है। रीडिंग अपने से न बनाएँ।",
+      "actions": [
+        {
+          "id": "gas-record",
+          "label": "Hold the task and refer to the responsible person",
+          "hindi": "काम रोककर ज़िम्मेदार व्यक्ति को बताएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "gas-record-unsafe",
+          "label": "Invent a successful check",
+          "hindi": "सफल जाँच अपने से दर्ज करें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gas-contact-loss",
+      "title": "Radio contact is lost during the outside-role rehearsal.",
+      "hindi": "बाहरी भूमिका के अभ्यास में रेडियो संपर्क टूट गया।",
+      "explanation": "Conditions can change after a checklist is completed. A previous reply is not continuous communication.",
+      "hindiExplanation": "सूची पूरी होने के बाद हालात बदल सकते हैं। पिछला उत्तर लगातार संपर्क नहीं है।",
+      "actions": [
+        {
+          "id": "gas-contact-loss",
+          "label": "Keep entry closed and report the failed contact",
+          "hindi": "प्रवेश बंद रखें और संपर्क विफलता बताएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "gas-contact-loss-unsafe",
+          "label": "Continue because earlier contact worked",
+          "hindi": "पहले संपर्क था इसलिए जारी रखें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "gas-handover",
+      "title": "A replacement attendant arrives.",
+      "hindi": "बदला परिचर आता है।",
+      "explanation": "Handover preserves the unresolved risk; it does not grant permission to enter.",
+      "hindiExplanation": "जानकारी देने से अधूरा खतरा स्पष्ट रहता है; प्रवेश अनुमति नहीं मिलती।",
+      "actions": [
+        {
+          "id": "gas-handover",
+          "label": "Hand over the unresolved controls and closed-entry status",
+          "hindi": "अधूरे नियंत्रण और बंद प्रवेश की स्थिति बताएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "gas-handover-unsafe",
+          "label": "Leave without a handover",
+          "hindi": "बिना जानकारी दिए चले जाएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    }
+  ],
+  "machinery": [
+    {
+      "id": "mach-role",
+      "title": "A conveyor has stopped. A colleague asks you to clear a jam.",
+      "hindi": "कन्वेयर रुका है। साथी जाम हटाने को कहता है।",
+      "explanation": "A stopped machine can still contain hazardous energy. This exercise grants no authority.",
+      "hindiExplanation": "रुकी मशीन में भी खतरनाक ऊर्जा हो सकती है। अभ्यास अधिकार नहीं देता।",
+      "actions": [
+        {
+          "id": "mach-role",
+          "label": "Confirm the authorised role and approved procedure",
+          "hindi": "अधिकृत भूमिका और स्वीकृत प्रक्रिया जाँचें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-role-unsafe",
+          "label": "Start work because the conveyor is stopped",
+          "hindi": "कन्वेयर रुका है इसलिए काम शुरू करें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mach-sources",
+      "title": "Inspect the illustrated electrical drive and raised load.",
+      "hindi": "दिखाए विद्युत ड्राइव और उठे भार को देखें।",
+      "explanation": "Consider all energy sources identified in the equipment-specific procedure.",
+      "hindiExplanation": "उपकरण-विशिष्ट प्रक्रिया की सभी ऊर्जा पहचानें।",
+      "actions": [
+        {
+          "id": "mach-sources",
+          "label": "Identify both electrical and stored mechanical energy",
+          "hindi": "विद्युत और जमा यांत्रिक ऊर्जा दोनों पहचानें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-sources-unsafe",
+          "label": "Identify only the start button",
+          "hindi": "केवल स्टार्ट बटन पहचानें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mach-notify",
+      "title": "People nearby may operate the machine.",
+      "hindi": "पास के लोग मशीन चला सकते हैं।",
+      "explanation": "Communication is part of the planned isolation process.",
+      "hindiExplanation": "संचार नियोजित अलगाव का हिस्सा है।",
+      "actions": [
+        {
+          "id": "mach-notify",
+          "label": "Notify affected people through the agreed process",
+          "hindi": "तय प्रक्रिया से संबंधित लोगों को बताएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-notify-unsafe",
+          "label": "Rely on them noticing the work",
+          "hindi": "उनके खुद देखने पर भरोसा करें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mach-isolate",
+      "title": "The scene offers a stop button and an identified isolating device.",
+      "hindi": "दृश्य में स्टॉप बटन और पहचाना अलगाव उपकरण है।",
+      "explanation": "Normal controls are not automatically energy-isolating devices.",
+      "hindiExplanation": "सामान्य नियंत्रण अपने आप ऊर्जा अलगाव उपकरण नहीं होते।",
+      "actions": [
+        {
+          "id": "mach-isolate",
+          "label": "Identify the procedure-defined isolation point",
+          "hindi": "प्रक्रिया का अलगाव बिंदु पहचानें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-isolate-unsafe",
+          "label": "Treat the stop button as isolation",
+          "hindi": "स्टॉप बटन को अलगाव मानें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mach-lock",
+      "title": "The authorised worker has a personal lock and identification tag.",
+      "hindi": "अधिकृत कर्मचारी के पास निजी लॉक और पहचान टैग है।",
+      "explanation": "The model rehearses responsibility and identification, not a live locking procedure.",
+      "hindiExplanation": "मॉडल ज़िम्मेदारी और पहचान का अभ्यास है, वास्तविक लॉक प्रक्रिया नहीं।",
+      "actions": [
+        {
+          "id": "mach-lock",
+          "label": "Match the lock and tag to that authorised worker",
+          "hindi": "लॉक और टैग को उसी अधिकृत व्यक्ति से मिलाएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-lock-unsafe",
+          "label": "Borrow another person’s lock identity",
+          "hindi": "दूसरे व्यक्ति की लॉक पहचान लें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mach-stored",
+      "title": "The raised load remains an unresolved stored-energy hazard.",
+      "hindi": "उठा भार अब भी जमा ऊर्जा का अधूरा खतरा है।",
+      "explanation": "Stored energy requires the specific approved controls and verification.",
+      "hindiExplanation": "जमा ऊर्जा के लिए विशिष्ट स्वीकृत नियंत्रण और पुष्टि चाहिए।",
+      "actions": [
+        {
+          "id": "mach-stored",
+          "label": "Request the procedure-defined stored-energy controls",
+          "hindi": "प्रक्रिया के जमा ऊर्जा नियंत्रण माँगें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-stored-unsafe",
+          "label": "Assume a lock removes every stored hazard",
+          "hindi": "मान लें लॉक हर जमा खतरा हटा देता है",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mach-verify",
+      "title": "A colleague claims isolation is complete without a verification record.",
+      "hindi": "साथी बिना पुष्टि रिकॉर्ड अलगाव पूरा बताता है।",
+      "explanation": "Verification is separate from applying a control.",
+      "hindiExplanation": "पुष्टि नियंत्रण लगाने से अलग है।",
+      "actions": [
+        {
+          "id": "mach-verify",
+          "label": "Hold work for authorised verification",
+          "hindi": "अधिकृत पुष्टि तक काम रोकें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-verify-unsafe",
+          "label": "Start because the colleague is confident",
+          "hindi": "साथी को भरोसा है इसलिए शुरू करें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mach-shift",
+      "title": "A shift change occurs while the task remains open.",
+      "hindi": "काम जारी है और शिफ्ट बदलती है।",
+      "explanation": "Responsibility must remain clear through changes of personnel.",
+      "hindiExplanation": "कर्मचारियों के बदलाव में ज़िम्मेदारी स्पष्ट रहनी चाहिए।",
+      "actions": [
+        {
+          "id": "mach-shift",
+          "label": "Use the approved transfer and handover process",
+          "hindi": "स्वीकृत बदलाव और जानकारी प्रक्रिया अपनाएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-shift-unsafe",
+          "label": "Remove another worker’s lock to save time",
+          "hindi": "समय बचाने के लिए दूसरे का लॉक हटाएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mach-restart",
+      "title": "The simulated maintenance is finished; a guard is still missing.",
+      "hindi": "काल्पनिक रखरखाव पूरा है; गार्ड नहीं लगा।",
+      "explanation": "An incomplete restoration check is a reason to hold the restart.",
+      "hindiExplanation": "अधूरी बहाली जाँच रीस्टार्ट रोकने का कारण है।",
+      "actions": [
+        {
+          "id": "mach-restart",
+          "label": "Keep restart on hold and report the missing guard",
+          "hindi": "रीस्टार्ट रोकें और गायब गार्ड बताएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-restart-unsafe",
+          "label": "Restart to test before replacing the guard",
+          "hindi": "गार्ड लगाने से पहले परीक्षण चलाएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mach-report",
+      "title": "Complete the handover with remaining restrictions.",
+      "hindi": "बची सीमाओं के साथ जानकारी पूरी करें।",
+      "explanation": "Only the actual authorised site process determines release for work.",
+      "hindiExplanation": "काम की अनुमति वास्तविक अधिकृत कार्यस्थल प्रक्रिया तय करती है।",
+      "actions": [
+        {
+          "id": "mach-report",
+          "label": "Record status and responsible person",
+          "hindi": "स्थिति और ज़िम्मेदार व्यक्ति दर्ज करें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "mach-report-unsafe",
+          "label": "Claim unrestricted permission to operate",
+          "hindi": "बिना सीमा संचालन अनुमति बताएं",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    }
+  ],
+  "ppe": [
+    {
+      "id": "ppe-hazard",
+      "title": "The scenario describes flying particles and a designated outside role.",
+      "hindi": "दृश्य में उड़ते कण और तय बाहरी भूमिका है।",
+      "explanation": "PPE selection starts with assessed hazards and the assigned task.",
+      "hindiExplanation": "पीपीई चयन जाँचे खतरे और तय काम से शुरू होता है।",
+      "actions": [
+        {
+          "id": "ppe-hazard",
+          "label": "Review the assessed hazard and role first",
+          "hindi": "पहले जाँचा खतरा और भूमिका देखें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "ppe-hazard-unsafe",
+          "label": "Pick equipment by colour",
+          "hindi": "रंग से उपकरण चुनें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ppe-label",
+      "title": "Two similar items have different approved uses.",
+      "hindi": "दो समान चीज़ों का स्वीकृत उपयोग अलग है।",
+      "explanation": "Shape alone does not establish suitability.",
+      "hindiExplanation": "केवल आकार उपयुक्तता नहीं बताता।",
+      "actions": [
+        {
+          "id": "ppe-label",
+          "label": "Inspect labels against the specified kit",
+          "hindi": "लेबल को निर्धारित किट से मिलाएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "ppe-label-unsafe",
+          "label": "Assume similar shapes mean equal protection",
+          "hindi": "समान आकार को समान सुरक्षा मानें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ppe-crack",
+      "title": "The helmet illustration shows a crack in the shell.",
+      "hindi": "हेलमेट के चित्र में खोल की दरार है।",
+      "explanation": "Damaged equipment must be handled under the approved replacement process.",
+      "hindiExplanation": "खराब उपकरण स्वीकृत बदलाव प्रक्रिया से संभालें।",
+      "actions": [
+        {
+          "id": "ppe-crack",
+          "label": "Mark defective and replace",
+          "hindi": "खराब चिन्हित करके बदलें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "ppe-crack-unsafe",
+          "label": "Cover the crack with tape",
+          "hindi": "दरार टेप से ढकें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ppe-eye",
+      "title": "The eye protection is damaged and blocks the view.",
+      "hindi": "आँख सुरक्षा खराब है और देखने में बाधा है।",
+      "explanation": "Resolve the equipment problem before resuming the task.",
+      "hindiExplanation": "काम फिर शुरू करने से पहले उपकरण समस्या हल करें।",
+      "actions": [
+        {
+          "id": "ppe-eye",
+          "label": "Choose an approved undamaged replacement",
+          "hindi": "स्वीकृत ठीक विकल्प चुनें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "ppe-eye-unsafe",
+          "label": "Remove protection while continuing the task",
+          "hindi": "सुरक्षा हटाकर काम जारी रखें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ppe-glove",
+      "title": "The supplied glove has a visible tear.",
+      "hindi": "दिए दस्ताने में दिखाई देने वाला फटाव है।",
+      "explanation": "Inspection should lead to a recorded replacement action.",
+      "hindiExplanation": "निरीक्षण के बाद बदलाव की क्रिया दर्ज होनी चाहिए।",
+      "actions": [
+        {
+          "id": "ppe-glove",
+          "label": "Reject the torn glove",
+          "hindi": "फटा दस्ताना अस्वीकार करें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "ppe-glove-unsafe",
+          "label": "Hide the tear under the cuff",
+          "hindi": "फटाव कफ के नीचे छिपाएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ppe-compatible",
+      "title": "The selected items must work together.",
+      "hindi": "चुनी चीज़ें साथ सही काम करें।",
+      "explanation": "A phone model cannot prove fit or replace required physical checks.",
+      "hindiExplanation": "फ़ोन मॉडल फिट साबित नहीं कर सकता या वास्तविक जाँच की जगह नहीं लेता।",
+      "actions": [
+        {
+          "id": "ppe-compatible",
+          "label": "Request the required compatibility and fit checks",
+          "hindi": "ज़रूरी अनुकूलता और फिट जाँच लें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "ppe-compatible-unsafe",
+          "label": "Accept the virtual model as proof of physical fit",
+          "hindi": "काल्पनिक मॉडल को असली फिट का प्रमाण मानें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ppe-change",
+      "title": "The task changes to an unassessed atmosphere.",
+      "hindi": "काम अब बिना जाँचे वातावरण में बदल गया।",
+      "explanation": "Changing hazards can invalidate the previous equipment choice.",
+      "hindiExplanation": "बदलते खतरे पिछला उपकरण चयन अनुपयुक्त कर सकते हैं।",
+      "actions": [
+        {
+          "id": "ppe-change",
+          "label": "Stop and request reassessment of the controls",
+          "hindi": "रुकें और नियंत्रण का फिर आकलन माँगें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "ppe-change-unsafe",
+          "label": "Assume the same kit protects against everything",
+          "hindi": "उसी किट को हर खतरे की सुरक्षा मानें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ppe-store",
+      "title": "The practice ends with equipment inspection and reporting.",
+      "hindi": "अभ्यास उपकरण निरीक्षण और सूचना पर समाप्त होता है।",
+      "explanation": "Prevent another worker from unknowingly receiving defective equipment.",
+      "hindiExplanation": "दूसरे कर्मचारी को अनजाने खराब उपकरण मिलने से रोकें।",
+      "actions": [
+        {
+          "id": "ppe-store",
+          "label": "Separate defective items and record the issue",
+          "hindi": "खराब चीज़ें अलग करें और समस्या दर्ज करें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "ppe-store-unsafe",
+          "label": "Return damaged items to shared stock",
+          "hindi": "खराब चीज़ें साझा भंडार में रखें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    }
+  ],
+  "emergency": [
+    {
+      "id": "em-scene",
+      "title": "A simulated incident is ahead; scene safety is unknown.",
+      "hindi": "आगे काल्पनिक घटना है; स्थल सुरक्षा अज्ञात है।",
+      "explanation": "Unplanned entry can create another casualty.",
+      "hindiExplanation": "बिना योजना प्रवेश दूसरा घायल व्यक्ति बना सकता है।",
+      "actions": [
+        {
+          "id": "em-scene",
+          "label": "Observe from the designated safe position",
+          "hindi": "तय सुरक्षित जगह से देखें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "em-scene-unsafe",
+          "label": "Rush into the scene",
+          "hindi": "जल्दी में घटनास्थल में जाएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "em-alert",
+      "title": "The emergency contact needs an initial report.",
+      "hindi": "आपात संपर्क को शुरुआती सूचना चाहिए।",
+      "explanation": "Report observations clearly and identify uncertainty.",
+      "hindiExplanation": "देखी जानकारी स्पष्ट दें और अनिश्चितता बताएं।",
+      "actions": [
+        {
+          "id": "em-alert",
+          "label": "Give location, incident type and observed hazards",
+          "hindi": "जगह, घटना प्रकार और देखे खतरे बताएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "em-alert-unsafe",
+          "label": "Give an unverified all-clear",
+          "hindi": "बिना जाँच सब सुरक्षित बताएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "em-route",
+      "title": "The first marked route is now obstructed.",
+      "hindi": "पहला चिह्नित मार्ग अब बंद है।",
+      "explanation": "The scenario changes the route. Virtual signs never identify actual exits.",
+      "hindiExplanation": "दृश्य मार्ग बदलता है। काल्पनिक संकेत असली निकास नहीं बताते।",
+      "actions": [
+        {
+          "id": "em-route",
+          "label": "Select the scenario’s designated alternate route",
+          "hindi": "दृश्य का तय वैकल्पिक मार्ग चुनें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "em-route-unsafe",
+          "label": "Continue into the obstruction",
+          "hindi": "बाधा में आगे बढ़ें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "em-support",
+      "title": "A colleague needs assistance beyond your training.",
+      "hindi": "साथी को आपके प्रशिक्षण से अधिक सहायता चाहिए।",
+      "explanation": "Follow the site plan and your actual training; this exercise teaches reporting.",
+      "hindiExplanation": "कार्यस्थल योजना और अपने वास्तविक प्रशिक्षण का पालन करें; यह सूचना का अभ्यास है।",
+      "actions": [
+        {
+          "id": "em-support",
+          "label": "Report their location and request trained assistance",
+          "hindi": "उनकी जगह बताकर प्रशिक्षित सहायता माँगें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "em-support-unsafe",
+          "label": "Attempt an unplanned rescue",
+          "hindi": "बिना योजना बचाव करें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "em-assembly",
+      "title": "The group reaches the simulated assembly point.",
+      "hindi": "दल काल्पनिक एकत्र स्थल पहुँचता है।",
+      "explanation": "Accountability depends on people reporting their status.",
+      "hindiExplanation": "उपस्थिति लोगों की स्थिति सूचना पर निर्भर है।",
+      "actions": [
+        {
+          "id": "em-assembly",
+          "label": "Join the accountability check",
+          "hindi": "उपस्थिति जाँच में शामिल हों",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "em-assembly-unsafe",
+          "label": "Leave without reporting",
+          "hindi": "बिना बताए चले जाएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "em-missing",
+      "title": "The roster lists six people; only five are accounted for.",
+      "hindi": "सूची में छह लोग हैं; पाँच की पुष्टि हुई।",
+      "explanation": "A discrepancy must be reported, not explained away by a guess.",
+      "hindiExplanation": "अंतर की सूचना दें, अनुमान से उसे पूरा न मानें।",
+      "actions": [
+        {
+          "id": "em-missing",
+          "label": "Report one unaccounted person to the coordinator",
+          "hindi": "समन्वयक को एक अपुष्ट व्यक्ति बताएँ",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "em-missing-unsafe",
+          "label": "Assume the sixth person went home",
+          "hindi": "छठा घर गया होगा मान लें",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "em-rumour",
+      "title": "Someone says it is safe to return without an authorised message.",
+      "hindi": "कोई अधिकृत संदेश बिना लौटना सुरक्षित बताता है।",
+      "explanation": "An informal claim is not an authorised all-clear.",
+      "hindiExplanation": "अनौपचारिक दावा अधिकृत अनुमति नहीं है।",
+      "actions": [
+        {
+          "id": "em-rumour",
+          "label": "Wait for the designated authority’s instruction",
+          "hindi": "तय अधिकारी के निर्देश की प्रतीक्षा करें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "em-rumour-unsafe",
+          "label": "Return based on the rumour",
+          "hindi": "अफवाह पर वापस जाएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    },
+    {
+      "id": "em-log",
+      "title": "The coordinator asks for a factual incident handover.",
+      "hindi": "समन्वयक घटना की तथ्यात्मक जानकारी माँगता है।",
+      "explanation": "An honest handover supports the next decision.",
+      "hindiExplanation": "सही जानकारी अगले निर्णय में मदद करती है।",
+      "actions": [
+        {
+          "id": "em-log",
+          "label": "Record observations, actions and unresolved issues",
+          "hindi": "देखी बातें, क्रियाएँ और अधूरी समस्याएँ दर्ज करें",
+          "correct": true,
+          "point": [
+            -0.22,
+            0.28,
+            0.12
+          ]
+        },
+        {
+          "id": "em-log-unsafe",
+          "label": "Invent missing details to finish the form",
+          "hindi": "फ़ॉर्म पूरा करने को जानकारी बनाएँ",
+          "correct": false,
+          "point": [
+            0.28,
+            0.28,
+            0.12
+          ]
+        }
+      ]
+    }
+  ]
+}

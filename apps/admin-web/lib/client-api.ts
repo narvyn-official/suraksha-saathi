@@ -16,11 +16,11 @@ export async function requestJson<T>(path: string, method = "GET", body?: unknow
   let data: unknown;
   try { data = await response.json(); }
   catch { throw new RequestError("The service returned an unreadable response. Please try again.", response.status); }
-  if (!data || typeof data !== "object" || Array.isArray(data))
+  if (!data || typeof data !== "object" || (Array.isArray(data) && path!=="/api/auth/list-sessions"))
     throw new RequestError("The service returned an unreadable response. Please try again.", response.status);
   if (!response.ok) {
     if (response.status === 401 && !path.startsWith("/api/auth/")) {
-      window.location.replace("/login");
+      window.location.replace("/login?next="+encodeURIComponent(window.location.pathname+window.location.search+window.location.hash));
       throw new RequestError("Your session has ended. Sign in again.", 401);
     }
     const info = data as { error?: unknown; message?: unknown };

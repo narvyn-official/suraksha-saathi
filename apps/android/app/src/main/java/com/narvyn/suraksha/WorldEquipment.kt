@@ -38,6 +38,15 @@ class WorldEquipment {
  private var program=0
  // Buffer equality depends on mutable positions/content; GPU ownership follows buffer identity.
  private val vertexBuffers=IdentityHashMap<FloatBuffer,Int>()
+ private val procedureMachinery by lazy { (0..3).associateWith { machinery(locked=it and 1!=0,guardMissing=it and 2!=0) } }
+ private val procedurePpe by lazy { (0..3).associateWith { ppe(cracked=it and 1==0,damagedLens=it and 2==0) } }
+ private val emergencyScenario by lazy { (0..3).associateWith { state->Builder().apply {
+  // Miniature route board: changing obstruction and accountability, never real navigation.
+  box(-.30f,.055f,.12f,.16f,.018f,.50f,.003f,if(state and 1==0)yellow else red)
+  box(.30f,.055f,.12f,.16f,.018f,.50f,.003f,screen)
+  if(state and 1!=0)for(i in 0..2)box(-.30f,.10f+i*.035f,.12f,.18f,.025f,.04f,.002f,red)
+  for(i in 0..5)cylinder(-.25f+i*.10f,.08f,.43f,.045f,.05f,if(state and 2!=0&&i<5)screen else dark)
+ }.finish() } }
  private var position=0;private var normal=0;private var color=0;private var surface=0
  private var mvpLocation=0;private var modelLocation=0;private var eyeLocation=0;private var lightingLocation=0
  private val mvp=FloatArray(16)
@@ -83,7 +92,7 @@ class WorldEquipment {
   mvpLocation=GLES20.glGetUniformLocation(program,"mvp");modelLocation=GLES20.glGetUniformLocation(program,"model");eyeLocation=GLES20.glGetUniformLocation(program,"eye");lightingLocation=GLES20.glGetUniformLocation(program,"lighting")
  }
  /** Prepare bounded variants before starting a procedure renderer; no mesh construction is needed per frame. */
- fun prepareProcedure(module:String){when(module){"fire"->{procedureFire;fireProcedureProps};"gas"->{procedureGas;gasProcedureProps}}}
+ fun prepareProcedure(module:String){when(module){"fire"->{procedureFire;fireProcedureProps};"gas"->{procedureGas;gasProcedureProps};"machinery"->{procedureMachinery};"ppe"->{procedurePpe};"emergency"->{emergencyScenario}}}
  /** Anchor is rigid. Default calls retain one original mesh; procedures add a separate pre-baked scene mesh. */
  fun draw(vp:FloatArray,anchor:FloatArray,module:String,cameraPosition:FloatArray=defaultEye,lightCorrection:FloatArray=defaultLighting,completedActions:Set<String> = emptySet(),procedureMode:Boolean=false,clearDepth:Boolean=true){
   if(program==0)return
@@ -97,7 +106,10 @@ class WorldEquipment {
   }else if(module=="gas" && (procedureMode || completedActions.isNotEmpty())){
    val key=(if("gas-boundary" in completedActions)1 else 0)+(if("gas-attendant" in completedActions)2 else 0)
    listOf(procedureGas) + if(procedureMode)listOf(gasProcedureProps[key])else emptyList()
-  }else listOf(original)
+  }else if(procedureMode && module=="machinery")listOf(procedureMachinery.getValue((if("mach-lock" in completedActions)1 else 0)+(if("mach-shift" in completedActions)2 else 0)))
+  else if(procedureMode && module=="ppe")listOf(procedurePpe.getValue((if("ppe-crack" in completedActions)1 else 0)+(if("ppe-eye" in completedActions)2 else 0)))
+  else if(procedureMode && module=="emergency")listOf(original,emergencyScenario.getValue((if("em-alert" in completedActions)1 else 0)+(if("em-assembly" in completedActions)2 else 0)))
+  else listOf(original)
   GLES20.glEnable(GLES20.GL_DEPTH_TEST);if(clearDepth)GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT);GLES20.glUseProgram(program)
   Matrix.multiplyMM(mvp,0,vp,0,anchor,0)
   GLES20.glUniformMatrix4fv(mvpLocation,1,false,mvp,0);GLES20.glUniformMatrix4fv(modelLocation,1,false,anchor,0)
@@ -250,7 +262,7 @@ class WorldEquipment {
    rod(floatArrayOf(x+.045f,.25f,z),floatArrayOf(x+.055f,.19f,z+.033f),.010f,blue)
   }
  }.finish()
- private fun machinery():FloatBuffer=Builder().apply{
+ private fun machinery(locked:Boolean=true,guardMissing:Boolean=false):FloatBuffer=Builder().apply{
   base(this)
   for(x in listOf(-.225f,.225f))for(z in listOf(-.12f,.12f)){box(x,.072f,z,.057f,.068f,.058f,.006f,dark);cylinder(x,.043f,z,.065f,.014f,rubber)}
   box(-.025f,.255f,0f,.51f,.315f,.295f,.018f,blue)
@@ -258,21 +270,25 @@ class WorldEquipment {
   // Recessed motor/rollers behind a physically separate guard grid.
   box(-.05f,.258f,.149f,.393f,.205f,.012f,.004f,rubber)
   for(x in listOf(-.155f,.05f)){cylinder(x,.255f,.175f,.134f,.03f,metal,rx=90f);cylinder(x,.255f,.195f,.074f,.013f,dark,rx=90f)}
+  if(!guardMissing){
   for(x in listOf(-.26f,.16f))box(x,.258f,.210f,.023f,.249f,.019f,.003f,yellow)
   for(y in listOf(.141f,.375f))box(-.05f,y,.210f,.443f,.021f,.019f,.003f,yellow)
   for(i in -5..5)rod(floatArrayOf(-.05f+i*.035f,.151f,.212f),floatArrayOf(-.05f+i*.035f,.365f,.212f),.0022f,metal)
   for(i in 0..5)rod(floatArrayOf(-.247f,.166f+i*.035f,.214f),floatArrayOf(.147f,.166f+i*.035f,.214f),.0022f,metal)
   for(x in listOf(-.26f,.16f))for(y in listOf(.145f,.372f))bolt(this,x,y,.224f)
+  }
   box(.287f,.308f,.033f,.102f,.266f,.135f,.010f,white)
   box(.287f,.311f,.105f,.08f,.233f,.009f,.004f,dark)
   cylinder(.287f,.369f,.117f,.059f,.018f,yellow,rx=90f);cylinder(.287f,.369f,.134f,.037f,.026f,red,rx=90f)
   cylinder(.287f,.307f,.117f,.026f,.012f,blue,rx=90f)
+  if(locked){
   box(.287f,.237f,.123f,.046f,.058f,.028f,.005f,blue)
   tube(listOf(floatArrayOf(.273f,.267f,.124f),floatArrayOf(.273f,.286f,.124f),floatArrayOf(.287f,.296f,.124f),floatArrayOf(.301f,.286f,.124f),floatArrayOf(.301f,.267f,.124f)),.003f,metal)
+  }
   for(i in 0..7)box(-.284f,.21f+i*.018f,-.027f,.004f,.006f,.14f,.002f,rubber)
   box(-.018f,.409f,.035f,.21f,.003f,.033f,.002f,yellow)
  }.finish()
- private fun ppe():FloatBuffer=Builder().apply{
+ private fun ppe(cracked:Boolean=false,damagedLens:Boolean=false):FloatBuffer=Builder().apply{
   base(this)
   box(0f,.052f,-.075f,.23f,.028f,.21f,.011f,dark)
   rod(floatArrayOf(0f,.06f,-.075f),floatArrayOf(0f,.36f,-.075f),.016f,metal)
@@ -283,7 +299,9 @@ class WorldEquipment {
   for(x in listOf(-.12f,.12f))box(x,.389f,-.125f,.038f,.014f,.015f,.005f,rubber)
   box(0f,.341f,-.162f,.096f,.041f,.025f,.009f,rubber)
   cylinder(0f,.34f,-.18f,.032f,.016f,blue,rx=90f)
+  if(cracked)tube(listOf(floatArrayOf(.08f,.48f,.08f),floatArrayOf(.04f,.46f,.14f),floatArrayOf(.065f,.43f,.165f),floatArrayOf(.035f,.39f,.178f)),.004f,dark)
   // Separate framed lenses, nose bridge, hinges and side arms.
+  if(damagedLens)rod(floatArrayOf(-.13f,.24f,.204f),floatArrayOf(-.045f,.29f,.204f),.004f,white)
   for(x in listOf(-.08f,.08f)){box(x,.263f,.163f,.155f,.094f,.034f,.018f,rubber);box(x,.263f,.184f,.131f,.070f,.015f,.015f,glass);box(x-.025f,.279f,.193f,.047f,.006f,.002f,.002f,white,rz=12f)}
   tube(listOf(floatArrayOf(-.016f,.281f,.177f),floatArrayOf(0f,.285f,.181f),floatArrayOf(.016f,.281f,.177f)),.005f,dark)
   for(x in listOf(-.16f,.16f)){rod(floatArrayOf(x,.28f,.162f),floatArrayOf(x,.28f,-.073f),.0045f,dark);bolt(this,x,.28f,.175f)}

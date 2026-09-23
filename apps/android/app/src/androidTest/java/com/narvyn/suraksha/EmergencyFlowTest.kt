@@ -40,9 +40,9 @@ class EmergencyFlowTest {
         if(practice)tap(s,t("Guided practice","निर्देशित अभ्यास"))
         else {
             tap(s,t("Take an assessment","मूल्यांकन शुरू करें"))
-            onView(withText(t("On-screen decisions","स्क्रीन पर निर्णय"))).inRoot(isDialog()).perform(click())
+            onView(withText(t("On-screen decisions","स्क्रीन पर निर्णय"))).inRoot(isDialog()).perform(revealOnPage(),click())
         }
-        onView(withText(t("I’m in a safe area","मैं सुरक्षित जगह पर हूँ"))).inRoot(isDialog()).perform(click())
+        onView(withText(t("I’m in a safe area","मैं सुरक्षित जगह पर हूँ"))).inRoot(isDialog()).perform(revealOnPage(),click())
     }
     @Test fun emergencyPracticeAndAssessmentCompleteInBothLanguages() {
         val questions = Curriculum(context).module("emergency").getJSONArray("questions").objects()

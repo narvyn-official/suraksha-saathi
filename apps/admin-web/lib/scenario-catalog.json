@@ -1,0 +1,96 @@
+{
+  "1": {
+    "fire": [
+      "fire-alarm",
+      "fire-authorisation",
+      "fire-label",
+      "fire-pin",
+      "fire-aim",
+      "fire-squeeze",
+      "fire-sweep-left",
+      "fire-sweep-right",
+      "fire-sweep-return",
+      "fire-withdraw",
+      "fire-exit",
+      "fire-assembly"
+    ],
+    "gas": [
+      "gas-boundary",
+      "gas-permit",
+      "gas-isolation",
+      "gas-atmosphere",
+      "gas-ppe",
+      "gas-attendant",
+      "gas-communication",
+      "gas-rescue",
+      "gas-refuse-entry"
+    ]
+  },
+  "2": {
+    "fire": [
+      "fire-alarm",
+      "fire-authorisation",
+      "fire-label",
+      "fire-service",
+      "fire-hose",
+      "fire-gauge",
+      "fire-pin",
+      "fire-aim",
+      "fire-squeeze",
+      "fire-sweep-left",
+      "fire-sweep-right",
+      "fire-sweep-return",
+      "fire-withdraw",
+      "fire-exit",
+      "fire-assembly",
+      "fire-handover"
+    ],
+    "gas": [
+      "gas-boundary",
+      "gas-instrument",
+      "gas-record",
+      "gas-permit",
+      "gas-isolation",
+      "gas-atmosphere",
+      "gas-ppe",
+      "gas-attendant",
+      "gas-communication",
+      "gas-contact-loss",
+      "gas-handover",
+      "gas-rescue",
+      "gas-refuse-entry"
+    ],
+    "machinery": [
+      "mach-role",
+      "mach-sources",
+      "mach-notify",
+      "mach-isolate",
+      "mach-lock",
+      "mach-stored",
+      "mach-verify",
+      "mach-shift",
+      "mach-restart",
+      "mach-report"
+    ],
+    "ppe": [
+      "ppe-hazard",
+      "ppe-label",
+      "ppe-crack",
+      "ppe-eye",
+      "ppe-glove",
+      "ppe-compatible",
+      "ppe-change",
+      "ppe-store"
+    ],
+    "emergency": [
+      "em-scene",
+      "em-alert",
+      "em-route",
+      "em-support",
+      "em-assembly",
+      "em-missing",
+      "em-rumour",
+      "em-log"
+    ]
+  }
+}

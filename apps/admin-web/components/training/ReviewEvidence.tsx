@@ -1,0 +1,10 @@
+'use client';
+import {useState} from 'react';
+import {requestJson} from '@/lib/client-api';
+import {Button} from '@/components/ui/button';
+type Packet={events:{action:string;note:string;at:number}[];observations:{id:string;instructor_name:string;observed_at:number;outcome:string;note:string}[];procedures:{id:string;catalogVersion:number;guided:boolean;result?:{complete:boolean};events:{type:string;step:string;action?:string;correct?:boolean;presentation?:string}[]}[]};
+export function ReviewEvidence({requestId}:{requestId:string}){
+ const [data,setData]=useState<Packet|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ async function load(){setBusy(true);setError('');try{setData(await requestJson('/api/credentials?requestId='+requestId))}catch(e){setError(e instanceof Error?e.message:'Could not load evidence')}finally{setBusy(false)}}
+ return <details className="review-card" onToggle={e=>{if(e.currentTarget.open&&!data&&!busy)void load()}}><summary>Course evidence, instructor observations & request history</summary>{busy&&<p role="status">Loading evidence…</p>}{error&&<p role="alert">{error}<Button onClick={()=>void load()}>Retry evidence</Button></p>}{data&&<><h4>Scenario evidence</h4><p>Device-reported practice is separate from witnessed workplace competence.</p>{!data.procedures.length&&<p>No synced scenario records.</p>}{data.procedures.map(p=><details key={p.id}><summary>{p.guided?'Guided':'Independent'} · version {p.catalogVersion} · {p.result?.complete?'Completed':'Incomplete / stopped'}</summary><ol>{p.events.filter(e=>e.type==='action').map((e,i)=><li key={i}>{e.step}: {e.action} · {e.correct?'Accepted':'Needs review'} · {e.presentation}</li>)}</ol></details>)}<h4>Instructor observations</h4>{!data.observations.length&&<p>No practical observation recorded.</p>}{data.observations.map(o=><p key={o.id}>{o.instructor_name??'Named instructor unavailable'} · {new Date(o.observed_at).toLocaleString()} · {o.outcome}<br/>{o.note}</p>)}<h4>Request history</h4><ol>{data.events.map((e,i)=><li key={i}>{new Date(e.at).toLocaleString()} · {e.action}: {e.note}</li>)}</ol></>}</details>
+}

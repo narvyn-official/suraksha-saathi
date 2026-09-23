@@ -61,7 +61,7 @@ class MainActivity: Activity() {
         tts=TextToSpeech(this){status->speechReady=status==TextToSpeech.SUCCESS;runOnUiThread{narrateVisibleLearning()}}
         render()
     }
-    override fun onResume(){super.onResume();if(::store.isInitialized && !store.isCurrentProfile()){store.close();store=Store(this);session=null;page="home";pageHistory.clear();lessonIndex=0;exportBytes=null;render()}else if(::store.isInitialized && page=="records") render()}
+    override fun onResume(){super.onResume();if(::store.isInitialized && !store.isCurrentProfile()){store.close();store=Store(this);session=null;page="home";pageHistory.clear();lessonIndex=0;exportBytes=null;render()}else if(::store.isInitialized && page in listOf("records","module","home")) render();if(::store.isInitialized&&LearningSync.linked(this,store.workerId))LearningSync.schedule(this)}
     override fun onSaveInstanceState(out: Bundle) {super.onSaveInstanceState(out);out.putStringArrayList("pageHistory",ArrayList(pageHistory));out.putString("page",page);out.putString("selected",selected);out.putInt("lessonIndex",lessonIndex);out.putString("session",session?.data?.getString("id"));out.putString("pendingExportId",pendingExportId);out.putString("pendingExportWorker",pendingExportWorker)}
     override fun onDestroy(){backNavigation.close();tts?.shutdown();store.close();super.onDestroy()}
     override fun onPause(){tts?.stop();super.onPause()}
@@ -170,6 +170,7 @@ class MainActivity: Activity() {
     }
     private fun home(){
         title(t("Learn to stay safe.","सुरक्षित रहना सीखें।"))
+        body.add(action(t("My training centre · enrol, sync & certificates","मेरा प्रशिक्षण केंद्र · नामांकन, सिंक और प्रमाणपत्र"),false,role=ActionRole.NEUTRAL){startActivity(Intent(this,LearnerCentreActivity::class.java))},bottom=12)
         val history=store.attempts()
         val latest=curriculum.modules.associate{m->m.getString("id") to history.firstOrNull{it.optString("moduleId")==m.getString("id")&&it.optString("kind")=="assessment"&&it.optBoolean("finished")}}
         val passed=latest.values.count{it?.optJSONObject("result")?.optBoolean("passed")==true}
@@ -217,21 +218,28 @@ class MainActivity: Activity() {
         }
         dialog.show()
     }
+    private fun journey()=LearningJourney(this,store,curriculum)
+    private fun openStage(stage:String){when(stage){"learn"->openLessons();"guided","independent"->startActivity(Intent(this,ProcedureActivity::class.java).putExtra("moduleId",selected).putExtra("guided",stage=="guided").putExtra("camera",true));else->chooseAssessment()}}
     private fun module(){
         val m=curriculum.module(selected)
         body.add(label(t("${m.getString("duration")} MIN · OFFLINE LESSONS","${m.getString("duration")} मिनट · ऑफ़लाइन पाठ"),12f,moduleColour(selected),true),bottom=6)
         title(m.local("title",hi),m.local("subtitle",hi))
         val previous=store.attempts().firstOrNull{it.optString("moduleId")==selected&&it.optString("kind")=="assessment"&&it.optBoolean("finished")}
         body.add(label(if(previous==null)t("Learning path: lessons → guided practice → assessment → independent review.","सीखने का क्रम: पाठ → निर्देशित अभ्यास → मूल्यांकन → स्वतंत्र समीक्षा।")else if(!previous.getJSONObject("result").optBoolean("passed"))t("Recommended next: revisit explanations and practise before reassessment.","अगला सुझाव: दोबारा मूल्यांकन से पहले व्याख्या पढ़ें और अभ्यास करें।")else t("Assessment passed. Keep practising recall; certification requires an independent review.","मूल्यांकन पास। याद करके अभ्यास करते रहें; प्रमाणपत्र के लिए स्वतंत्र समीक्षा आवश्यक है।"),14f,Palette.muted),bottom=12)
-        val room=selected in listOf("fire","gas")
+        val stages=journey().stages(selected)
+        val next=stages.firstOrNull{!it.complete}
+        val path=card();stages.forEachIndexed{i,stage->path.add(label("${if(stage.complete)"✓" else (i+1).toString()+"."} ${if(hi)stage.hi else stage.en}",14f,if(stage.complete)Palette.teal else Palette.ink),bottom=6)};body.add(path,bottom=12)
         val primary=column(14).apply{background=shape(Palette.tealBg,18)}
-        primary.add(action(t("Start training","प्रशिक्षण शुरू करें")){if(room)startRoomMission(false)else openLessons()}.apply{tag="main-start-training"})
-        primary.add(label(if(room)t("Camera room practice, with an on-screen option.","कैमरे से कमरे में अभ्यास, स्क्रीन का विकल्प भी।")else t("Learn the steps, then practise your decisions.","चरण सीखें, फिर निर्णयों का अभ्यास करें।"),13f,Palette.teal),top=8)
+        primary.add(action(if(next!=null)t("Continue: ${next.en}","जारी रखें: ${next.hi}")else t("View certification progress","प्रमाणपत्र की प्रगति देखें")){if(next!=null)openStage(next.id)else startActivity(Intent(this,LearnerCentreActivity::class.java))}.apply{tag="main-start-training"})
+        primary.add(label(t("Your progress is specific to this learner. Every practice remains available.","प्रगति इस शिक्षार्थी की है। हर अभ्यास उपलब्ध है।"),13f,Palette.teal),top=8)
         body.add(primary,bottom=14)
+        if(selected in listOf("fire","gas"))body.add(action(t("Hands-on room actions","कमरे में क्रियाओं का अभ्यास"),false,role=ActionRole.CAMERA){startRoomMission(false)},bottom=10)
+        body.add(action(t("Independent scenario check","स्वतंत्र दृश्य जाँच"),false,role=ActionRole.REVIEW){openStage("independent")},bottom=10)
         pair(action(t("Read or listen to lessons","पाठ पढ़ें या सुनें"),false,role=ActionRole.LEARN){openLessons()}.apply{tag="main-lessons"},
             action(t("Explore in 3D","3D में देखें"),false,role=ActionRole.CAMERA){startActivity(Intent(this,EquipmentActivity::class.java).putExtra("moduleId",selected))})
         pair(action(t("Guided practice","निर्देशित अभ्यास"),false,role=ActionRole.LEARN){startTraining(true,false)},
             action(t("Take an assessment","मूल्यांकन शुरू करें"),false,role=ActionRole.REVIEW){chooseAssessment()})
+        body.add(action(t("Watch a worked example","पूरा उदाहरण देखें"),false,role=ActionRole.LEARN){startActivity(Intent(this,DemonstrationActivity::class.java).putExtra("moduleId",selected))},bottom=10)
         body.add(action(t("More practice options","अभ्यास के और विकल्प"),false,role=ActionRole.NEUTRAL){go("practice")}.apply{
             tag="main-practice-options";textSize=14f;setCompoundDrawables(null,null,appIcon("arrow",Palette.muted,20),null)
         },top=2)
@@ -266,12 +274,14 @@ class MainActivity: Activity() {
         val dock=LinearLayout(this).apply{isBaselineAligned=false;setPadding(dp(18),dp(8),dp(18),dp(8));setBackgroundColor(Palette.surface)}
         if(lessonIndex>0)dock.addView(action(t("Previous","पिछला"),false,role=ActionRole.NEUTRAL){lessonIndex--;saveLessonPosition(lessonIndex);go("lesson")}.apply{tag="main-lesson-previous";textSize=14f},LinearLayout.LayoutParams(0,-2,1f).apply{marginEnd=dp(8)})
         dock.addView(action(if(lessonIndex==lessons.length()-1)t("Finish reading","पढ़ना पूरा करें")else t("Next lesson","अगला पाठ")){
-            if(lessonIndex==lessons.length()-1){saveLessonPosition(0);go("module")}else{lessonIndex++;saveLessonPosition(lessonIndex);go("lesson")}
+            if(lessonIndex==lessons.length()-1){journey().finishReading(selected);saveLessonPosition(0);go("module");LearningSync.schedule(this)}else{lessonIndex++;saveLessonPosition(lessonIndex);go("lesson")}
         }.apply{tag="main-lesson-next";textSize=14f},LinearLayout.LayoutParams(0,-2,if(lessonIndex>0)1.5f else 1f))
         return dock
     }
     private fun practiceOptions(){
         title(t("Choose your practice","अपना अभ्यास चुनें"),curriculum.module(selected).local("title",hi))
+        body.add(action(t("Full AR scenario rehearsal","पूरा AR दृश्य अभ्यास"),false,role=ActionRole.CAMERA){openStage("guided")},bottom=12)
+        body.add(action(t("Independent AR scenario check","स्वतंत्र AR दृश्य जाँच"),false,role=ActionRole.REVIEW){openStage("independent")},bottom=12)
         if(selected in listOf("fire","gas")) {
             body.add(label(t("Room missions","कमरे में मिशन"),18f,Palette.ink,true).asHeading(),bottom=10)
             body.add(action(t("Start immersive AR mission","इमर्सिव AR मिशन शुरू करें"),role=ActionRole.CAMERA){startRoomMission(false)},bottom=10)
@@ -386,7 +396,7 @@ class MainActivity: Activity() {
         },bottom=10)
         body.add(action(t("Choose language","भाषा चुनें"),false,role=ActionRole.NEUTRAL){language()},top=8,bottom=12)
         body.add(action(t("Check AR support","AR समर्थन जाँचें"),false,role=ActionRole.CAMERA){ArCoreApk.getInstance().checkAvailabilityAsync(this){a->notice(t("AR support","AR समर्थन"),a.name)}},bottom=12)
-        body.add(label(t("Version 0.6.0 • Pilot content requires safety review. Santali lessons await native-speaker review. Audio uses installed offline Android voices.","संस्करण 0.6.0 • पायलट सामग्री की सुरक्षा समीक्षा ज़रूरी है। संताली पाठों की स्थानीय वक्ता समीक्षा बाकी है। आवाज़ Android की इंस्टॉल ऑफ़लाइन आवाज़ से आती है।"),14f,Palette.muted))
+        body.add(label(t("Version 0.10.0 • Pilot content requires safety review. Santali lessons await native-speaker review. Audio uses installed offline Android voices.","संस्करण 0.10.0 • पायलट सामग्री की सुरक्षा समीक्षा ज़रूरी है। संताली पाठों की स्थानीय वक्ता समीक्षा बाकी है। आवाज़ Android की इंस्टॉल ऑफ़लाइन आवाज़ से आती है।"),14f,Palette.muted))
     }
     private fun verifyPage(){
         title(t("Verify a record","रिकॉर्ड जाँचें"),t("Scan a receipt or signed training credential.","रसीद या हस्ताक्षरित प्रशिक्षण प्रमाणपत्र स्कैन करें।"))
@@ -409,6 +419,7 @@ class MainActivity: Activity() {
         val c=try { CredentialVerifier.verify(this,saved.getString("token")) } catch(_:Exception) { notice(t("Cannot verify credential","प्रमाणपत्र सत्यापित नहीं हो सका"),t("The saved credential is not valid under the installed issuer trust.","इंस्टॉल जारीकर्ता भरोसे के अनुसार सहेजा प्रमाणपत्र मान्य नहीं है।"));return }
         val box=column(20);box.add(label(t("Signature verified offline","हस्ताक्षर ऑफ़लाइन सत्यापित"),20f,Palette.success,true),bottom=12)
         box.add(label(curriculum.module(c.getString("moduleId")).local("title",hi)),bottom=8)
+        saved.optString("onlineStatus").takeIf{it.isNotBlank()}?.let{box.add(label(t("Last server status: ","अंतिम सर्वर स्थिति: ")+it+" · "+date(saved.optLong("statusCheckedAt")),14f,Palette.muted),bottom=12)}
         val expiry=c.optString("expiryStatus")
         val validity=when {
             c.optBoolean("issuedInFuture") -> t("Device date is earlier than issue date. Check the clock before relying on validity.","फ़ोन की तारीख जारी होने से पहले है। वैधता पर भरोसा करने से पहले घड़ी जाँचें।")
@@ -450,7 +461,7 @@ class MainActivity: Activity() {
         val pdf=PdfDocument();val p=pdf.startPage(PdfDocument.PageInfo.Builder(595,842,1).create());val c=p.canvas;val paint=Paint(Paint.ANTI_ALIAS_FLAG)
         c.drawColor(Color.WHITE);paint.color=Palette.blue;c.drawRect(0f,0f,595f,14f,paint)
         fun line(text:String,y:Float,size:Float=16f){paint.color=Palette.ink;paint.textSize=size;c.drawText(text,44f,y,paint)}
-        line("SURAKSHA SAATHI",72f,24f);line("PILOT COMPLETION RECEIPT",110f,18f)
+        line("SURAKSHAAR",72f,24f);line("PILOT COMPLETION RECEIPT",110f,18f)
         line(store.name.ifBlank{"Learner"}.take(48),165f,22f);line(curriculum.module(s.data.getString("moduleId")).local("title",false),205f)
         line("Simulation score: ${s.data.getJSONObject("result").getInt("score")}%",245f)
         line("Practical observation: NOT ASSESSED",280f);line("Issuer validation: PENDING",310f)

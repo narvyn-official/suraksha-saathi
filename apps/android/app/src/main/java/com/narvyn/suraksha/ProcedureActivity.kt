@@ -41,7 +41,8 @@ class ProcedureActivity: Activity() {
         val module=intent.getStringExtra("moduleId")?.takeIf { it in ProcedureCatalog.modules } ?: "fire"
         val guided=intent.getBooleanExtra("guided",true)
         try {
-            session=evidence.latest(module,guided)?.let { ProcedureSession.restore(it) } ?: ProcedureSession.create(module,identity.workerId,guided).also { evidence.save(it.data) }
+            val saved=state?.takeIf{it.getString("workerId")==identity.workerId}?.getString("procedureId")?.let{id->evidence.records().firstOrNull{it.optString("id")==id}}
+            session=saved?.let{ProcedureSession.restore(it)} ?: evidence.latest(module,guided)?.takeIf{it.optInt("catalogVersion")==ProcedureCatalog.VERSION && !it.optBoolean("finished")}?.let { ProcedureSession.restore(it) } ?: ProcedureSession.create(module,identity.workerId,guided).also { evidence.save(it.data) }
         } catch(_:Exception) { notice(t("Saved procedure unavailable","सहेजी प्रक्रिया उपलब्ध नहीं"),t("This record could not be resumed. It has been preserved.","यह रिकॉर्ड जारी नहीं हो सका। इसे सुरक्षित रखा गया है।"));finish();return }
         val sameLearner=state?.getString("workerId")==identity.workerId
         safeArea=sameLearner && state?.getBoolean("safeArea")==true;camera=if(sameLearner)state?.getBoolean("camera")==true else intent.getBooleanExtra("camera",false);descriptions=sameLearner && state?.getBoolean("descriptions")==true
@@ -74,12 +75,12 @@ class ProcedureActivity: Activity() {
         if(Store(this).use { it.workerId }!=session.data.getString("workerId")) { finish();return }
         render()
     }
-    override fun onPause() { active=false;revision++;if(::scene.isInitialized)scene.pause();super.onPause() }
+    override fun onPause() { if(::identity.isInitialized&&LearningSync.linked(this,identity.workerId))LearningSync.schedule(this);active=false;revision++;if(::scene.isInitialized)scene.pause();super.onPause() }
     // API 33+ uses AppBackNavigation and PagedPanel callbacks; retain this fallback for API 29–32.
     @android.annotation.SuppressLint("GestureBackNavigation")
     @Deprecated("Android 10–12 compatibility") override fun onBackPressed(){if(popContentPage())return;if(immersive){camera=false;scene.useCamera(false);render()}else super.onBackPressed()}
     override fun onDestroy() { backNavigation.close(); if(::scene.isInitialized)scene.close();if(::evidence.isInitialized)evidence.close();if(::identity.isInitialized)identity.close();super.onDestroy() }
-    override fun onSaveInstanceState(out: Bundle) { out.putString("workerId",identity.workerId);out.putBoolean("safeArea",safeArea);out.putBoolean("camera",camera);out.putBoolean("descriptions",descriptions);out.putBoolean("spatial",spatial);out.putBoolean("centreAim",centreAim);super.onSaveInstanceState(out) }
+    override fun onSaveInstanceState(out: Bundle) { out.putString("workerId",identity.workerId);out.putString("procedureId",session.data.getString("id"));out.putBoolean("safeArea",safeArea);out.putBoolean("camera",camera);out.putBoolean("descriptions",descriptions);out.putBoolean("spatial",spatial);out.putBoolean("centreAim",centreAim);super.onSaveInstanceState(out) }
     override fun onRequestPermissionsResult(code:Int, permissions:Array<out String>,results:IntArray) {
         super.onRequestPermissionsResult(code,permissions,results)
         if(code==61 && active && camera) { scene.useCamera(true);render();if(safeArea && !descriptions && !session.done && !session.feedback)scene.resume() }
@@ -131,7 +132,7 @@ class ProcedureActivity: Activity() {
     private fun renderCamera(currentRevision:Int) {
         val step=session.step
         val row=LinearLayout(this).apply { orientation=LinearLayout.HORIZONTAL }
-        row.addView(label(t("CAMERA AR · ${session.index+1}/${ProcedureCatalog.modules.getValue(session.module).steps.size}","कैमरा AR · ${session.index+1}/${ProcedureCatalog.modules.getValue(session.module).steps.size}"),15f,Palette.blue,true),LinearLayout.LayoutParams(0,-2,1f))
+        row.addView(label(t("CAMERA AR · ${session.index+1}/${session.definition.steps.size}","कैमरा AR · ${session.index+1}/${session.definition.steps.size}"),15f,Palette.blue,true),LinearLayout.LayoutParams(0,-2,1f))
         row.addView(action(t("Options","विकल्प"),false,role=ActionRole.NEUTRAL) { cameraOptions() },LinearLayout.LayoutParams(-2,-2))
         header.add(row,bottom=6);header.add(label(step.text(hi),18f,Palette.ink,true).asHeading(),bottom=6)
         status=label(t("Find a clear training surface, then place the scene.","खाली प्रशिक्षण सतह खोजें, फिर दृश्य रखें।"),13f,Palette.muted)
@@ -180,6 +181,11 @@ class ProcedureActivity: Activity() {
             val spatialEvents=events.filter { it.has("spatial") }
             card.add(label(t("Spatial target holds: ${spatialEvents.size} · camera: ${spatialEvents.count { it.optString("presentation")=="camera" }}. These measure virtual targeting, not real equipment handling.","स्थानिक लक्ष्य पर पकड़: ${spatialEvents.size} · कैमरा: ${spatialEvents.count { it.optString("presentation")=="camera" }}। यह काल्पनिक लक्ष्य मापता है, असली उपकरण चलाना नहीं।"),14f,Palette.muted),top=10)
             lower.add(card,bottom=16)
+            lower.add(action(t("Review actions and explanations","क्रियाएँ और व्याख्या देखें"),false,ActionRole.REVIEW){
+                val text=events.joinToString("\n\n"){e->val st=session.definition.steps.first{it.id==e.getString("step")};(if(e.optBoolean("correct"))"✓ " else "! ")+st.text(hi)+"\n"+st.explain(hi)}
+                notice(t("Your decision timeline","आपके निर्णयों का क्रम"),text)
+            },bottom=12)
+            lower.add(action(t("Continue learning path","सीखने का क्रम जारी रखें"),false){finish()},bottom=12)
             lower.add(action(t("Start a new attempt","नया प्रयास शुरू करें")) {
                 try { val next=ProcedureSession.create(session.module,identity.workerId,session.guided);evidence.save(next.data);session=next;safeArea=false;render() }
                 catch(_:Exception) { notice(t("Could not save","सहेजा नहीं जा सका"),t("The existing record is preserved.","मौजूदा रिकॉर्ड सुरक्षित है।")) }
@@ -188,7 +194,7 @@ class ProcedureActivity: Activity() {
             val step=session.step
             val choices=step.actions.shuffled(java.util.Random(session.data.getString("id").hashCode().toLong() xor session.index.toLong()))
             header.accessibilityPaneTitle=step.text(hi)
-            header.add(label(t("Step ${session.index+1} of ${ProcedureCatalog.modules.getValue(session.module).steps.size}","चरण ${session.index+1} / ${ProcedureCatalog.modules.getValue(session.module).steps.size}"),14f,Palette.blue),bottom=8)
+            header.add(label(t("Step ${session.index+1} of ${session.definition.steps.size}","चरण ${session.index+1} / ${session.definition.steps.size}"),14f,Palette.blue),bottom=8)
             header.add(label(step.text(hi),22f,Palette.ink,true).asHeading(),bottom=12)
             if(session.feedback) {
                 val card=card(Palette.soft)
@@ -210,7 +216,7 @@ class ProcedureActivity: Activity() {
                     header.add(action(if(spatial)t("Use button actions instead","बटन वाली क्रियाएँ उपयोग करें")else t("Use spatial target practice","स्थानिक लक्ष्य अभ्यास उपयोग करें"),false,role=ActionRole.LEARN) { spatial=!spatial;render() },bottom=10)
                     if(useSpatial) {
                         header.add(label(t("SPATIAL PRACTICE · hold a target for 0.65 seconds","स्थानिक अभ्यास · लक्ष्य पर 0.65 सेकंड पकड़ रखें"),13f,Palette.blue,true),bottom=8)
-                        header.add(label(if(session.module=="gas")t("Choose where the miniature attendant should stand. Target zones represent positions in this model only.","छोटा निगरानी व्यक्ति कहाँ खड़ा हो, चुनें। लक्ष्य केवल इस मॉडल की जगहें हैं।")else t("Aim at a location on the virtual fire. This measures target alignment, not a real nozzle or continuous sweep technique.","काल्पनिक आग पर जगह का निशाना चुनें। यह लक्ष्य से मिलान मापता है, असली नोज़ल या लगातार चलाने की तकनीक नहीं।"),14f,Palette.muted),bottom=10)
+                        header.add(label(t("Hold on the labelled virtual target to carry out your decision. This records a simulated interaction, not real equipment handling.","निर्णय की क्रिया के लिए नाम वाले काल्पनिक लक्ष्य पर पकड़ें। यह सिमुलेशन है, असली उपकरण संचालन नहीं।"),14f,Palette.muted),bottom=10)
                     }
                 }
                 val flags=session.data.optJSONObject("flags") ?: JSONObject()

@@ -1,14 +1,14 @@
 # SurakshaAr
 
-A **v0.9.0 pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with fixed screens and a light interface.
+A **v0.10.0 local pilot** for Android safety learning and trainer review, built for Jharkhand’s industrial workforce with fixed screens and a light interface.
 
-**Current source: 0.9.0 — SurakshaAr.** Approved centres, separate trainer/certifier review, signed approval provenance, persistent learner reading positions and deferred dashboard assets are implemented for a controlled government demonstration. See [setup, roles and the demonstration guide](docs/government-demo-0.9.0.md) and [release verification](docs/release-0.9.0.md). Existing centres require explicit approval after migration; this is not government accreditation. Download the tested 0.9.0 build below.
+**Current source: 0.10.0 — local P0–P2 learning journey release.** Learner enrolment, MFA, course progress, five expanded scenario sequences, encrypted retry sync, instructor observations and an independent certification correction/review flow are implemented. See [local setup, changes and verification](docs/p0-p2-local-implementation.md). The downloadable APK is published as a pilot prerelease; account hosting remains local.
 
-**Latest published download: [SurakshaAr v0.9.0 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.9.0-pilot)**
+**Latest published download: [SurakshaAr v0.10.0 pilot prerelease](https://github.com/narvyn-official/suraksha-saathi/releases/tag/v0.10.0-pilot)**
 
-- [Download the Android APK — SurakshaAr v0.9.0](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.9.0-pilot/surakshaar-0.9.0-debug.apk) · Android 10+, debug-signed pilot.
+- [Download the Android APK — SurakshaAr v0.10.0](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.10.0-pilot/surakshaar-0.10.0-debug.apk) · Android 10+, debug-signed pilot.
 - [Watch the earlier v0.6.0 emulator walkthrough](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.6.0-pilot/suraksha-saathi-0.6.0-emulator-demo.mp4) · Screen fire/gas and explosion-evacuation practice; not physical AR evidence.
-- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.9.0-pilot/SHA256SUMS-0.9.0.txt).
+- [Download SHA-256 checksums](https://github.com/narvyn-official/suraksha-saathi/releases/download/v0.10.0-pilot/SHA256SUMS-0.10.0.txt).
 
 **Previously published (0.7.1):** fixed learner/admin screens with explicit page controls and focused popups, automatic English/Hindi instructions, corrected Android Back navigation, detailed fire-type/agent learning and improved AR surface placement with a 20 cm virtual-footprint gap. Samsung phone checks confirm tracking, placement and automatic Hindi speech; earlier fire-evacuation and outside-only gas branches completed on the same phone. See [0.7.1 changes and validation](docs/release-0.7.1.md). **Public account hosting remains pending; native administration requires a configured account server.**
 
@@ -43,7 +43,7 @@ Install Android SDK platform/build tools 36 and a compatible JDK, then:
 bash scripts/build-android.sh
 ```
 
-The debug-signed APK is copied to `artifacts/surakshaar-0.9.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own independently approved pilot credentials:
+The debug-signed APK is copied to `artifacts/surakshaar-0.10.0-debug.apk`. Android Studio can open `apps/android`. The repository includes the Gradle wrapper. For a fresh clone, generate the pilot issuer before building if you want your own independently approved pilot credentials:
 
 ```sh
 node scripts/create-pilot-issuer.mjs
@@ -55,7 +55,19 @@ The command creates an ignored private runtime key and matching public trust fil
 
 The web dashboard now includes a sign-in screen, shared workspaces, Admin/Trainer/Viewer/Certifier roles, staff invitations, worker registration/editing, bulk training assignments, overdue tracking, CSV reports and an activity log. See [admin setup and validation](docs/admin-workspace.md). The 0.7.0 development APK adds a native training-centre workspace and independent Suraksha accounts. Public hosting remains unresolved.
 
-## Run the dashboard
+## Run locally
+
+From the repository root, after installing web dependencies:
+
+```sh
+node scripts/local-dev.mjs
+```
+
+The launcher preserves existing signing/account keys, applies local migrations and starts the learner portal at `http://localhost:5173/learn`, staff workspace at `http://localhost:5173`, and temporary development inbox at `http://127.0.0.1:5188`. No external email is sent. For the debug Android app over USB, use `adb reverse tcp:5173 tcp:5173`. Complete centre approval using the existing operator procedure; signup does not grant staff access.
+
+Register the Android learner ID in Workers, create a private invitation in **Learners & observations**, then join and sync in Android **My training centre**. Finish and sync all four course stages before requesting certification. A different certifier reviews the evidence and can request clarification, reject, or approve. Approved credentials sync into the Android wallet and have a printable learner web record.
+
+### Manual dashboard startup
 
 ```sh
 cd apps/admin-web
@@ -78,6 +90,6 @@ See the [complete requirements tracker](docs/requirements-tracker.md), [source-b
 
 ## Before field release
 
-Reviewed Santali text/audio, safety-content approval, broader physical AR testing, richer physical AR actions, practical assessment, secure automatic sync, production identity/access validation and production distribution are still required. The supplied brief was truncated at “(3) Machinery”; domains 3–5 in the design documents are proposals.
+Reviewed Santali text/audio, safety-content approval, broader physical AR testing, richer physical AR actions, field validation of practical assessment and sync, production identity/access validation and production distribution are still required. The supplied brief was truncated at “(3) Machinery”; domains 3–5 in the design documents are proposals.
 
 See [learning research and six interaction designs](docs/ar-learning-evidence.md), [implemented spaced review](docs/spaced-review.md), and [staged component practice](docs/component-practice.md). The pilot does not claim measured learning gains.

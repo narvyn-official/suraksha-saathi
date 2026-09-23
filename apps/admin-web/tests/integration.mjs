@@ -1,4 +1,4 @@
-import { account, certifierFor } from "./auth-client.mjs";
+import { account, certifierFor, seedCourseForAttempt } from "./auth-client.mjs";
 const identity=await account({approved:true});
 const certifier=await certifierFor(identity);
 import assert from "node:assert/strict";
@@ -20,9 +20,10 @@ async function call(path, body, method = "POST", auth = true, cookie = identity.
 }
 // Run the full request/review contract with two independent authenticated accounts.
 async function issue(body) {
+ seedCourseForAttempt(identity.userId,body.attemptId);
  const request=await call('credentials',{action:'request',note:'Synthetic evidence reviewed for regression testing',...body});
  if(request.status!==202)return request;
- return call('credentials',{action:'approve',requestId:request.data.request.id,reason:'Independent synthetic assessment review completed'},'POST',true,certifier.cookie);
+ return call('credentials',{action:'approve',rubric:{evidenceReviewed:true,scopeConfirmed:true,latestAssessment:true,identityBasis:'not-verified',practical:'not-assessed'},requestId:request.data.request.id,reason:'Independent synthetic assessment review completed'},'POST',true,certifier.cookie);
 }
 assert.equal((await call("records", undefined, "GET", false)).status, 401);
 const testExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // Test fixture only.

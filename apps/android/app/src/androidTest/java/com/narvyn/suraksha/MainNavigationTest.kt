@@ -164,7 +164,7 @@ class MainNavigationTest {
         } finally {prefs.edit().clear().apply();val e=prefs.edit();saved.forEach{(k,v)->if(v is Int)e.putInt(k,v)};e.commit();Store(context).use{it.hi=oldHi}}
     }
 
-    @Test fun primaryFireAndGasEntryLaunchesTheCorrectGuidedRoomMission(){
+    @Test fun roomActionsLaunchTheCorrectGuidedMission(){
         val oldHi=Store(context).use{it.hi}
         val captured=AtomicReference<Intent?>()
         val monitor=object:Instrumentation.ActivityMonitor(){
@@ -180,14 +180,14 @@ class MainNavigationTest {
             Store(context).use{it.hi=false}
             ActivityScenario.launch(MainActivity::class.java).use { s ->
                 for(id in listOf("fire","gas")) {
-                    captured.set(null);openModule(id);clickTag("main-start-training")
-                    val intent=captured.get() ?: error("Primary training entry did not launch a room mission")
+                    captured.set(null);openModule(id);onView(withText("Hands-on room actions")).perform(revealOnPage(),click())
+                    val intent=captured.get() ?: error("Room actions entry did not launch a room mission")
                     assertEquals(id,intent.getStringExtra("moduleId"))
                     assertTrue(intent.getBooleanExtra("guided",false));assertTrue(intent.getBooleanExtra("camera",false))
                     assertFalse(intent.getBooleanExtra("recall",true))
                     assertPage(s,"module");back()
                 }
-                captured.set(null);openModule("machinery");clickTag("main-start-training");assertPage(s,"lesson")
+                captured.set(null);openModule("machinery");clickTag("main-lessons");assertPage(s,"lesson")
                 assertNull("Other modules must not enter a fire/gas room mission",captured.get())
             }
         } finally { instrumentation.removeMonitor(monitor);Store(context).use{it.hi=oldHi} }

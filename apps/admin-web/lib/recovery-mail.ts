@@ -26,3 +26,9 @@ export async function sendRecovery(config: MailConfig, email: string, token: str
   });
   if (!response.ok) throw new Error("Recovery delivery failed.");
 }
+
+export async function sendAccountVerification(config:MailConfig,email:string,url:string){
+ const {base,endpoint,key}=recoveryDelivery(config);const link=new URL(url);if(link.origin!==base.origin)throw new Error('Invalid verification origin.');
+ const response=await fetch(endpoint,{method:'POST',redirect:'manual',signal:AbortSignal.timeout(10_000),headers:{'Content-Type':'application/json',Authorization:`Bearer ${key}`},body:JSON.stringify({to:email,subject:'Verify your SurakshaAr email',text:`Confirm your account email using this local or configured account link:\n\n${url}`})});
+ if(!response.ok)throw new Error('Verification delivery failed.');
+}

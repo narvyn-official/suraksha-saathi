@@ -31,12 +31,12 @@ class ProcedureFlowTest {
     private fun records(module:String,guided:Boolean)=Store(context).use { s -> ProcedureStore(context,s.workerId).use { ProcedureSession.restore(it.latest(module,guided)!!) } }
     private fun seed(module:String, guided:Boolean,hi:Boolean):String = Store(context).use { s -> s.hi=hi;val p=ProcedureSession.create(module,s.workerId,guided);ProcedureStore(context,s.workerId).use { it.save(p.data) };p.data.getString("id") }
     private fun click(s:ActivityScenario<ProcedureActivity>,text:String?=null,tag:String?=null) {
+        androidx.test.espresso.Espresso.onView(if(tag!=null)androidx.test.espresso.matcher.ViewMatchers.withTagValue(org.hamcrest.Matchers.equalTo<Any>(tag))else androidx.test.espresso.matcher.ViewMatchers.withText(text)).perform(revealOnPage())
         repeat(70) {
             var clicked=false
             s.onActivity { a ->
                 val button=views(a.window.decorView).filterIsInstance<Button>().firstOrNull { if(tag!=null)it.tag==tag else it.text.toString()==text }
                 if(button!=null && button.isShown && button.width>0) {
-                    button.requestRectangleOnScreen(Rect(0,0,button.width,button.height),true)
                     val r=Rect()
                     if(button.isEnabled && button.getGlobalVisibleRect(r) && r.height()>=button.height && r.width()>=button.width) { button.performClick();clicked=true }
                 }
@@ -61,9 +61,9 @@ class ProcedureFlowTest {
         for(y in 0 until image.height step 4)for(x in 0 until image.width step 4) { val c=image.getPixel(x,y);if(android.graphics.Color.red(c)<200 || android.graphics.Color.green(c)<200 || android.graphics.Color.blue(c)<200)colored++ }
         image.recycle();assertTrue("No rendered equipment pixels",colored>100)
     }
-    @Test fun bothProceduresCompleteThroughSceneActionsAndSurviveRecreation() {
+    @Test fun allFiveProceduresCompleteThroughSceneActionsAndSurviveRecreation() {
         val before=Store(context).use { it.attempts().map { a->a.toString() }.toSet() }
-        for(module in listOf("fire","gas")) {
+        for(module in listOf("fire","gas","machinery","ppe","emergency")) {
             seed(module,true,false)
             ActivityScenario.launch<ProcedureActivity>(Intent(context,ProcedureActivity::class.java).putExtra("moduleId",module)).use { s ->
                 click(s,"I am in a safe training area");pixels(s)
@@ -71,7 +71,8 @@ class ProcedureFlowTest {
                     val current=records(module,true)
                     if(InstrumentationRegistry.getArguments().getString("walkthrough")=="true")Thread.sleep(900)
                     if(current.feedback)click(s,"Continue procedure") else {
-                        if(current.step.id=="fire-aim" || current.step.id=="gas-attendant")click(s,"Use button actions instead")
+                        var spatialOn=false;s.onActivity{a->spatialOn=views(a.window.decorView).filterIsInstance<Button>().any{it.text.toString()=="Use button actions instead"}}
+                        if(spatialOn)click(s,"Use button actions instead")
                         if(current.index in listOf(0,4,6,9)) { pixels(s);screenshot("$module-step-${current.index+1}") }
                         click(s,tag="procedure-target-${current.step.actions.first { it.correct }.id}")
                         assertTrue(records(module,true).feedback)

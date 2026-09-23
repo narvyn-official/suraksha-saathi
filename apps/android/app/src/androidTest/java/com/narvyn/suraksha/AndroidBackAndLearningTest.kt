@@ -52,7 +52,15 @@ class AndroidBackAndLearningTest {
     }
     @Test fun placementHelpWorksWithoutAReadySurfaceAndNeverPlacesAnAnchor(){
         setup();ActivityScenario.launch<RoomMissionActivity>(Intent(context,RoomMissionActivity::class.java).putExtra("camera",true)).use{s->
-            tap("Start in a clear area");tap("Placement help");assertTrue(visible("Scan, aim, then place"));tap("Next");tap("Continue scanning")
+            tap("Start in a clear area")
+            // A fresh emulator may still show the first camera permission prompt.
+            repeat(15){
+                val root=ins.uiAutomation.rootInActiveWindow
+                val deny=listOf("permission_deny_button","permission_deny_and_dont_ask_again_button").flatMap{root?.findAccessibilityNodeInfosByViewId("com.android.permissioncontroller:id/$it").orEmpty()}.firstOrNull()
+                deny?.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+                Thread.sleep(80)
+            }
+            tap("Placement help");assertTrue(visible("Scan, aim, then place"));tap("Next");tap("Continue scanning")
             s.onActivity{a->val scene=field(a,"scene")as RoomMissionView
                 assertFalse(scene.ready);assertTrue((field(a,"mission")as RoomMission).events.isEmpty())
                 val buttons=views(a.window.decorView).filterIsInstance<Button>()

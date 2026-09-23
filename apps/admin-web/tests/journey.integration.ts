@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {account,certifierFor,localDatabase} from './auth-client.mjs';
+import {curriculum} from '../lib/grading';
+import {procedure} from './journey.test';
+const origin='http://localhost:5173';
+const owner=await account({approved:true}),learner=await account(),other=await account(),certifier=await certifierFor(owner);
+const users=[owner,learner,other,certifier];
+async function call(person:typeof owner|null,path:string,body?:unknown,method=body?'POST':'GET') {const r=await fetch(origin+'/api/'+path,{method,headers:{Origin:origin,'Content-Type':'application/json',...(person?{Cookie:person.cookie}:{})},body:body?JSON.stringify(body):undefined});const data:any=await r.json();return {status:r.status,data}}
+const worker={id:randomUUID(),name:'Journey integration learner',sector:'Mining'};
+try{
+ assert.equal((await call(owner,'admin/manage',{action:'worker',androidId:worker.id,name:worker.name,sector:worker.sector})).status,200);
+ const invited=await call(owner,'learners',{action:'invite',workerId:worker.id,email:learner.email});assert.equal(invited.status,200,JSON.stringify(invited));
+ assert.equal((await call(other,'learner',{action:'join',invitation:invited.data.invitation,workerId:worker.id})).status,400);
+ assert.equal((await call(learner,'learner',{action:'join',invitation:invited.data.invitation,workerId:randomUUID()})).status,400);
+ assert.equal((await call(learner,'learner',{action:'join',invitation:invited.data.invitation,workerId:worker.id})).status,200);
+ assert.equal((await call(learner,'learner',{action:'join',invitation:invited.data.invitation})).status,400);
+ assert.equal((await call(other,'learner?workerId='+worker.id)).status,403);
+ assert.equal((await call(learner,'records')).status,403,'Enrolment must not grant staff access');
+ const m=curriculum.modules[0],start=Date.now()-10000,attempt={id:randomUUID(),workerId:worker.id,moduleId:m.id,contentVersion:curriculum.version,kind:'assessment',mode:'screen',finished:true,startedAt:start,endedAt:start+1000,events:m.questions.map((q,i)=>({type:'answer',sequence:i+1,questionId:q.id,optionId:q.options.find(o=>o.correct)!.id,time:start+i+1}))};
+ const deviceId=randomUUID(),sync={action:'sync',workerId:worker.id,deviceId,revision:1,learning:{contentVersion:curriculum.version,lessons:['fire']},bundle:{schemaVersion:1,worker,attempts:[attempt]},procedures:[procedure(worker.id,'fire',true),procedure(worker.id)]};
+ assert.equal((await call(other,'learner',sync)).status,403);
+ assert.equal((await call(learner,'learner',{...sync,learning:{...sync.learning,lessons:[]},procedures:[]})).status,200);
+ assert.equal((await call(learner,'learner',{action:'request',workerId:worker.id,attemptId:attempt.id,note:'An assessment without course prerequisites must be denied'})).status,400);
+ sync.revision=2;
+ for(let i=0;i<2;i++){const r=await call(learner,'learner',sync);assert.equal(r.status,200,JSON.stringify(r))}
+ assert.equal((await call(learner,'learner',{...sync,learning:{...sync.learning,lessons:[]}})).status,400,'Same revision cannot change learning');
+ const forged=structuredClone(sync);forged.procedures[0].events[0].correct=false;assert.equal((await call(learner,'learner',{...forged,revision:2})).status,400);
+ const state=await call(learner,'learner?workerId='+worker.id);assert.equal(state.status,200,JSON.stringify(state));assert(state.data.courses[0].steps.every((s:{done:boolean})=>s.done));
+ const request=await call(learner,'learner',{action:'request',workerId:worker.id,attemptId:attempt.id,note:'Completed course and independent practice for review'});assert.equal(request.status,202,JSON.stringify(request));const requestId=request.data.request.id;
+ const packet=await call(certifier,'credentials?requestId='+requestId);assert.equal(packet.status,200,JSON.stringify(packet));assert.equal(packet.data.procedures.length,2);assert.equal(packet.data.events.length,1);
+ assert.equal((await call(learner,'credentials',{action:'approve',requestId,reason:'Attempted self approval'})).status,403);
+ assert.equal((await call(certifier,'credentials',{action:'needs-information',requestId,reason:'Please clarify the training context for this assessment'})).status,200);
+ assert.equal((await call(other,'learner',{action:'clarify',workerId:worker.id,requestId,note:'Unauthorised clarification attempt'})).status,403);
+ assert.equal((await call(learner,'learner',{action:'clarify',workerId:worker.id,requestId,note:'Completed locally with independent screen-based scenario evidence'})).status,200);
+ assert.equal((await call(certifier,'credentials',{action:'approve',requestId,reason:'Evidence reviewed without checklist'})).status,400);
+ const approved=await call(certifier,'credentials',{action:'approve',requestId,reason:'Reviewed answer evidence and the pilot simulation scope',rubric:{evidenceReviewed:true,scopeConfirmed:true,latestAssessment:true,identityBasis:'not-verified',practical:'not-assessed'}});assert.equal(approved.status,200,JSON.stringify(approved));
+ const wallet=await call(learner,'learner?workerId='+worker.id);assert.equal(wallet.data.credentials.length,1);assert.equal(wallet.data.events.length,4);
+ const pub=await call(null,'public-credential?id='+approved.data.id);assert.equal(pub.status,200);assert.equal(pub.data.status,'active');assert(!('workerName' in pub.data));
+ const print=await fetch(origin+'/certificate/'+approved.data.id,{headers:{Cookie:learner.cookie}});assert.equal(print.status,200);assert((await print.text()).includes('Simulation training credential'));
+ assert.equal((await call(owner,'learners',{action:'observe',workerId:worker.id,moduleId:'fire',observedAt:Date.now(),outcome:'demonstrated',note:'Observed the controlled training procedure with a documented checklist.',rubric:{identityChecked:true,procedureReviewed:true,safeDecisions:false,sequence:true,communication:true}})).status,400);
+ assert.equal((await call(owner,'credentials',{id:approved.data.id,reason:'Synthetic credential revoked after integration test'},'PATCH')).status,200);
+ assert.equal((await call(null,'public-credential?id='+approved.data.id)).data.status,'revoked');
+ const newer={...attempt,id:randomUUID(),startedAt:Date.now()-500,endedAt:Date.now(),events:attempt.events.map((e,i)=>({...e,time:Date.now()-400+i}))};
+ assert.equal((await call(learner,'learner',{...sync,revision:3,bundle:{...sync.bundle,attempts:[newer]},procedures:[]})).status,200);
+ const staff=await call(owner,'credentials',{action:'request',attemptId:newer.id,expiresAt:Date.now()+86400000,note:'Trainer submission of complete current learning evidence'});assert.equal(staff.status,202,JSON.stringify(staff));
+ const staffId=staff.data.request.id;
+ assert.equal((await call(certifier,'credentials',{action:'needs-information',requestId:staffId,reason:'Please add the local training context for the review'})).status,200);
+ assert.equal((await call(owner,'credentials',{action:'clarify',requestId:staffId,reason:'The learner completed the course on the local pilot device'})).status,200);
+ assert.equal((await call(certifier,'credentials?requestId='+staffId)).data.events.length,3);
+ assert.equal((await call(owner,'learners',{action:'unlink',workerId:worker.id})).status,200);assert.equal((await call(learner,'learner?workerId='+worker.id)).status,403);
+ console.log('Journey integration PASS: enrolment, profile/account isolation, duplicate/stale sync, replay validation, course readiness, correction cycle, independent rubric approval, wallet, printable certificate, public privacy and revocation.');
+}finally{const db=localDatabase();try{for(const u of users){for(const table of ['certification_events','practical_observations','learning_snapshots','procedure_evidence','learner_links','certification_requests','credentials','attempts','workers','training_assignments','team_members','audit_log','centre_approvals','training_centres'])db.prepare(`DELETE FROM ${table} WHERE owner=?`).run(u.userId);db.prepare('DELETE FROM auth_user WHERE id=?').run(u.userId)}}finally{db.close()}}

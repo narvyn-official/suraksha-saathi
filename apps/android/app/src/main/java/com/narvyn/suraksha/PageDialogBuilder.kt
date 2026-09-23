@@ -31,7 +31,7 @@ internal class PageDialogBuilder(private val host:Context):AlertDialog.Builder(h
         description?.takeIf{it.isNotBlank()}?.let{content.add(host.label(it.toString(),15f),bottom=12)}
         super.setMessage(null)
         lateinit var dialog:AlertDialog
-        entries.forEachIndexed{index,label->content.add(host.action(label.toString(),false,ActionRole.LEARN){selected?.onClick(dialog,index);dialog.dismiss()}.apply{textSize=14f},bottom=8)}
+        entries.forEachIndexed{index,label->content.add(host.action(label.toString(),false,ActionRole.LEARN){dialog.dismiss();selected?.onClick(dialog,index)}.apply{textSize=14f},bottom=8)}
         super.setView(host.paged(content,hi))
         if(!hasNegative)super.setNegativeButton(if(hi)"बंद करें"else"Close",null)
         dialog=super.create();dialog.setOnShowListener{dialog.window?.setLayout(-1,-1)}

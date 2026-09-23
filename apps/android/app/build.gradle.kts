@@ -7,14 +7,16 @@ android {
         applicationId = "com.narvyn.suraksha"
         minSdk = 29
         targetSdk = 36
-        versionCode = 22
-        versionName = "0.9.0"
+        versionCode = 23
+        versionName = "0.10.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    // Keep emulator window transitions from obscuring injected UI test touches.
+    testOptions { animationsDisabled = true }
     sourceSets["main"].assets.srcDir("../../../content")
 }
 dependencies {

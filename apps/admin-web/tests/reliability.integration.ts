@@ -3,10 +3,11 @@ import {randomUUID} from 'node:crypto';
 import {DatabaseSync} from 'node:sqlite';
 import {setTimeout as wait} from 'node:timers/promises';
 import {readFileSync,readdirSync} from 'node:fs';
-import {account,certifierFor} from './auth-client.mjs';
+import {account,certifierFor,seedCourseForAttempt} from './auth-client.mjs';
 import {curriculum} from '../lib/grading';
 const base='http://localhost:5173',user=await account({approved:true});
 async function call(path:string,body:unknown,cookie=user.cookie){
+ if((body as {action?:string})?.action==='request')seedCourseForAttempt(user.userId,(body as {attemptId:string}).attemptId);
  let r=await fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',Origin:base,Cookie:cookie},body:JSON.stringify(body)});
  if(r.status===429){await wait((Math.max(1,Number(r.headers.get('retry-after'))||60)+1)*1000);r=await fetch(base+path,{method:'POST',headers:{'Content-Type':'application/json',Origin:base,Cookie:cookie},body:JSON.stringify(body)});}
  return {status:r.status,data:await r.json() as {imported:number;unchanged:number;id:string;request:{id:string};message:string},headers:r.headers};
@@ -23,7 +24,7 @@ const certifier=await certifierFor(user);
 const expiresAt=now+86400000;
 const issuance=await Promise.all(Array.from({length:4},()=>call('/api/credentials',{action:'request',note:'Concurrent synthetic request evidence',attemptId:attempt.id,expiresAt})));
 assert(issuance.every(r=>r.status===202),'Concurrent requests must succeed');assert.equal(new Set(issuance.map(r=>r.data.request.id)).size,1);
-assert.equal((await call('/api/credentials',{action:'approve',requestId:issuance[0].data.request.id,reason:'Independent synthetic review for concurrency test'},certifier.cookie)).status,200);
+assert.equal((await call('/api/credentials',{action:'approve',rubric:{evidenceReviewed:true,scopeConfirmed:true,latestAssessment:true,identityBasis:'not-verified',practical:'not-assessed'},requestId:issuance[0].data.request.id,reason:'Independent synthetic review for concurrency test'},certifier.cookie)).status,200);
 const changed=structuredClone(payload);changed.attempts[0].mode='arcore';
 assert.equal((await call('/api/import',changed)).status,400,'Conflicting attempt must not overwrite evidence');
 const logs=await fetch(base+'/api/admin/manage',{headers:{Cookie:user.cookie}}).then(r=>r.json()) as {audit:{action:string}[]};

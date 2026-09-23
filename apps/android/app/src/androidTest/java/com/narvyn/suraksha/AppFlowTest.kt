@@ -36,7 +36,7 @@ class AppFlowTest {
    s.onActivity{it.setShowWhenLocked(true);it.setTurnScreenOn(true);it.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);it.getSystemService(android.app.KeyguardManager::class.java).requestDismissKeyguard(it,null)}
    InstrumentationRegistry.getInstrumentation().waitForIdleSync()
    onView(withText("Learn to stay safe.")).check(matches(isDisplayed()));shot("home.png")
-   openModule("fire");tap(s,"Take an assessment");onView(withText("On-screen decisions")).inRoot(isDialog()).perform(click());onView(withText("I’m in a safe area")).inRoot(isDialog()).perform(click())
+   openModule("fire");tap(s,"Take an assessment");onView(withText("On-screen decisions")).inRoot(isDialog()).perform(revealOnPage(),click());onView(withText("I’m in a safe area")).inRoot(isDialog()).perform(revealOnPage(),click())
    val curriculum=Curriculum(context);val questions=curriculum.module("fire").getJSONArray("questions").objects()
    questions.forEachIndexed{i,q->
     if(i==2)s.recreate()
@@ -59,7 +59,7 @@ class AppFlowTest {
   val c=InstrumentationRegistry.getInstrumentation().targetContext;Store(c).use{it.hi=false}
   ActivityScenario.launch(MainActivity::class.java).use{s->
    openModule("machinery")
-   tap(s,"Take an assessment");onView(withText("On-screen decisions")).inRoot(isDialog()).perform(click());onView(withText("I’m in a safe area")).inRoot(isDialog()).perform(click())
+   tap(s,"Take an assessment");onView(withText("On-screen decisions")).inRoot(isDialog()).perform(revealOnPage(),click());onView(withText("I’m in a safe area")).inRoot(isDialog()).perform(revealOnPage(),click())
    val q=Curriculum(c).module("machinery").getJSONArray("questions").getJSONObject(0)
    tap(s,q.getJSONArray("options").objects().first{!it.optBoolean("correct")}.local("text",false))
    Store(c).use{val a=it.attempts().first();assertEquals("machinery",a.getString("moduleId"));assertTrue(a.getBoolean("finished"));assertFalse(a.getJSONObject("result").getBoolean("passed"));assertEquals(1,a.getJSONArray("events").length())}
@@ -87,8 +87,8 @@ class AppFlowTest {
    ActivityScenario.launch(MainActivity::class.java).use{s->
     openModule("ppe")
     shot(if(hi)"ppe-hindi-lesson.png" else "ppe-lesson.png")
-    if(guided){tap(s,t("Guided practice","निर्देशित अभ्यास"))}else{tap(s,t("Take an assessment","मूल्यांकन शुरू करें"));onView(withText(t("On-screen decisions","स्क्रीन पर निर्णय"))).inRoot(isDialog()).perform(click())}
-    onView(withText(t("I’m in a safe area","मैं सुरक्षित जगह पर हूँ"))).inRoot(isDialog()).perform(click())
+    if(guided){tap(s,t("Guided practice","निर्देशित अभ्यास"))}else{tap(s,t("Take an assessment","मूल्यांकन शुरू करें"));onView(withText(t("On-screen decisions","स्क्रीन पर निर्णय"))).inRoot(isDialog()).perform(revealOnPage(),click())}
+    onView(withText(t("I’m in a safe area","मैं सुरक्षित जगह पर हूँ"))).inRoot(isDialog()).perform(revealOnPage(),click())
     questions.forEachIndexed{i,q->
      if(i==3)s.recreate()
      val option=q.getJSONArray("options").objects().first{if(guided&&i==0)!it.optBoolean("correct") else it.optBoolean("correct")}

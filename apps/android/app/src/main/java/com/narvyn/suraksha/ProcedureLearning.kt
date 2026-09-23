@@ -11,7 +11,7 @@ import java.util.UUID
  * These scene actions cannot measure gas, authorise entry, or establish practical competence.
  */
 object ProcedureCatalog {
-    const val VERSION = 1
+    const val VERSION = 2
     data class Action(val id: String, val label: String, val hindi: String, val correct: Boolean,
                       val point: FloatArray = floatArrayOf(0f, .25f, .08f)) {
         fun text(hi: Boolean) = if (hi) hindi else label
@@ -30,7 +30,7 @@ object ProcedureCatalog {
         Action(id,action,actionHi,true,point),
         Action("$id-unsafe",unsafe,unsafeHi,false,floatArrayOf(.28f,.28f,.12f))
     ))
-    val modules = mapOf(
+    val legacyModules = mapOf(
         "fire" to Module("fire","Fire response sequence","आग पर प्रतिक्रिया का क्रम",listOf(
             task("fire-alarm","A small simulated fire has appeared.","एक छोटी काल्पनिक आग दिखाई दी है।",
                 "Raise the alarm and follow the site's emergency plan. The training scene is not a live emergency guide.","अलार्म दें और कार्यस्थल की आपात योजना अपनाएँ। यह दृश्य वास्तविक आपात स्थिति का मार्गदर्शक नहीं है।",
@@ -99,13 +99,28 @@ object ProcedureCatalog {
                 "Keep the barrier closed and refuse entry","बाधा बंद रखें और प्रवेश न करें","Enter because other checks passed","बाकी जाँचें पूरी होने पर अंदर जाएँ",floatArrayOf(-.30f,.22f,.10f))
         ))
     )
+    val modules: Map<String,Module> by lazy {
+        val fire=legacyModules.getValue("fire");val gas=legacyModules.getValue("gas")
+        buildMap {
+            val f=ScenarioAdditions.modules.getValue("fire")
+            put("fire",fire.copy(steps=fire.steps.take(3)+f.take(3)+fire.steps.drop(3)+f.takeLast(1)))
+            val g=ScenarioAdditions.modules.getValue("gas")
+            put("gas",gas.copy(steps=gas.steps.take(1)+g.take(2)+gas.steps.drop(1).take(6)+g.subList(2,3)+g.takeLast(1)+gas.steps.drop(7)))
+            put("machinery",Module("machinery","Isolation and handover mission","अलगाव और जानकारी मिशन",ScenarioAdditions.modules.getValue("machinery")))
+            put("ppe",Module("ppe","Inspect, select and replace PPE","पीपीई निरीक्षण, चयन और बदलाव",ScenarioAdditions.modules.getValue("ppe")))
+            put("emergency",Module("emergency","Incident, evacuation and accountability","घटना, निकासी और उपस्थिति",ScenarioAdditions.modules.getValue("emergency")))
+        }
+    }
+    fun module(id:String,version:Int)=when(version){1->legacyModules;VERSION->modules;else->error("Unsupported procedure version")}.getValue(id)
+
 }
 
 /** Versioned personal procedural evidence, deliberately separate from curriculum certification. */
 class ProcedureSession private constructor(val data: JSONObject) {
     val module: String get() = data.getString("module")
     val index: Int get() = data.getInt("index")
-    val step: ProcedureCatalog.Step get() = ProcedureCatalog.modules.getValue(module).steps[index]
+    val definition get() = ProcedureCatalog.module(module,data.getInt("catalogVersion"))
+    val step: ProcedureCatalog.Step get() = definition.steps[index]
     val done: Boolean get() = data.getBoolean("finished")
     val guided: Boolean get() = data.getBoolean("guided")
     val feedback: Boolean get() = data.getBoolean("feedback")
@@ -134,7 +149,7 @@ class ProcedureSession private constructor(val data: JSONObject) {
         events.put(JSONObject().put("type","advance").put("sequence",events.length()+1).put("step",step.id).put("time",now))
         data.put("updatedAt",now).put("feedback",false)
         if (!data.getBoolean("lastCorrect")) return true // guided retry of exactly the same step
-        if (index == ProcedureCatalog.modules.getValue(module).steps.lastIndex) finish(complete=true,stopped=false)
+        if (index == definition.steps.lastIndex) finish(complete=true,stopped=false)
         else data.put("index",index+1)
         return true
     }
@@ -147,20 +162,20 @@ class ProcedureSession private constructor(val data: JSONObject) {
     companion object {
         private const val MAX_EVENTS = 512
         fun create(module: String, workerId: String, guided: Boolean): ProcedureSession = fresh(module,workerId,guided,UUID.randomUUID().toString(),System.currentTimeMillis())
-        private fun fresh(module: String, workerId: String, guided: Boolean, id: String, now: Long): ProcedureSession {
-            require(ProcedureCatalog.modules.containsKey(module)) { "Unknown procedure module." }
+        private fun fresh(module: String, workerId: String, guided: Boolean, id: String, now: Long, version:Int=ProcedureCatalog.VERSION): ProcedureSession {
+            ProcedureCatalog.module(module,version)
             require(workerId.isNotBlank() && workerId.length <= 128 && now >= 0) { "Invalid procedure identity or time." }
-            return ProcedureSession(JSONObject().put("schemaVersion",1).put("catalogVersion",ProcedureCatalog.VERSION)
+            return ProcedureSession(JSONObject().put("schemaVersion",1).put("catalogVersion",version)
                 .put("id",id).put("module",module).put("workerId",workerId).put("guided",guided)
                 .put("createdAt",now).put("updatedAt",now).put("index",0).put("finished",false).put("feedback",false)
                 .put("lastCorrect",false).put("flags",JSONObject()).put("events",JSONArray()).put("criticalFailures",JSONArray()))
         }
         /** Replay the journal, rejecting malformed/stale events and fabricated derived state. Never silently advance a saved session. */
         fun restore(record: JSONObject): ProcedureSession {
-            require(record.getInt("schemaVersion") == 1 && record.getInt("catalogVersion") == ProcedureCatalog.VERSION) { "Unsupported procedure version." }
+            require(record.getInt("schemaVersion") == 1 && record.getInt("catalogVersion") in setOf(1,ProcedureCatalog.VERSION)) { "Unsupported procedure version." }
             val id = record.getString("id")
             require(UUID.fromString(id).toString().equals(id,true)) { "Invalid procedure ID." }
-            val session = fresh(record.getString("module"),record.getString("workerId"),record.getBoolean("guided"),id,record.getLong("createdAt"))
+            val session = fresh(record.getString("module"),record.getString("workerId"),record.getBoolean("guided"),id,record.getLong("createdAt"),record.getInt("catalogVersion"))
             val savedEvents = record.getJSONArray("events")
             require(savedEvents.length() <= MAX_EVENTS) { "Procedure journal is too long." }
             for (i in 0 until savedEvents.length()) {
